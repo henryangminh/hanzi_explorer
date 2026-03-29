@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+/* ── Brown color tokens ─────────────────────────────────── */
+:root {
+  --brown-50:  #fdf8f6;
+  --brown-100: #f2e8e5;
+  --brown-200: #eaddd7;
+  --brown-300: #e0cec7;
+  --brown-400: #d2bab0;
+  --brown-500: #b08b74;
+  --brown-600: #8b6453;
+  --brown-700: #6f4e37;
+  --brown-800: #4a3728;
+  --brown-900: #2c1f14;
+
+  /* semantic */
+  --color-bg:          var(--brown-50);
+  --color-bg-surface:  #ffffff;
+  --color-bg-subtle:   var(--brown-100);
+  --color-border:      var(--brown-200);
+  --color-border-md:   var(--brown-300);
+  --color-text:        var(--brown-900);
+  --color-text-muted:  var(--brown-600);
+  --color-primary:     var(--brown-700);
+  --color-primary-hover: var(--brown-800);
+  --color-primary-fg:  var(--brown-50);
+  --color-accent:      var(--brown-500);
+}
+
+.dark {
+  --color-bg:          var(--brown-900);
+  --color-bg-surface:  var(--brown-800);
+  --color-bg-subtle:   #3a2a1e;
+  --color-border:      #3a2a1e;
+  --color-border-md:   var(--brown-700);
+  --color-text:        var(--brown-50);
+  --color-text-muted:  var(--brown-400);
+  --color-primary:     var(--brown-400);
+  --color-primary-hover: var(--brown-300);
+  --color-primary-fg:  var(--brown-900);
+  --color-accent:      var(--brown-500);
+}
+
+/* ── Base ───────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { font-size: 16px; }
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  transition: background-color 0.2s, color 0.2s;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--brown-300); border-radius: 3px; }
+.dark ::-webkit-scrollbar-thumb { background: var(--brown-700); }
+
+/* ── Chinese character font ─────────────────────────────── */
+.font-cjk {
+  font-family: 'Noto Sans SC', 'Source Han Sans CN', 'PingFang SC',
+               'Microsoft YaHei', system-ui, sans-serif;
+}
