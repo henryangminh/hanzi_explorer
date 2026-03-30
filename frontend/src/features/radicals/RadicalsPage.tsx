@@ -35,7 +35,12 @@ function CharDetail({ char, onBack }: { char: string; onBack: () => void }) {
           className="p-1.5 rounded-lg hover:bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] transition-colors">
           <ArrowLeft size={16} />
         </button>
-        <span className="font-cjk text-4xl text-[var(--color-primary)] leading-none">{char}</span>
+        <div className="flex items-baseline gap-1.5">
+          <span className="font-cjk text-4xl text-[var(--color-primary)] leading-none">{char}</span>
+          {cedict[0]?.traditional && cedict[0].traditional !== char && (
+            <span className="font-cjk text-lg text-[var(--color-text-muted)]">({cedict[0].traditional})</span>
+          )}
+        </div>
         {cedict[0] && (
           <div>
             <span className="font-medium text-[var(--color-text)]">{cedict[0].pinyin}</span>

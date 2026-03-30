@@ -29,9 +29,22 @@ class UserNoteResponse(BaseModel):
     tags: List[str]
 
 
+class CvdictEntry(BaseModel):
+    id: int
+    simplified: str
+    traditional: Optional[str]
+    pinyin: str
+    meaning_vi: str
+    radical: Optional[str]
+    stroke_count: Optional[int]
+    hsk_level: Optional[int]
+    source_name: str
+
+
 class DictionaryResponse(BaseModel):
     char: str
     cedict: List[CedictEntry]   # list — multiple readings supported
+    cvdict: List[CvdictEntry] = []
     external: List[ExternalSource]
     user_note: Optional[UserNoteResponse]
 

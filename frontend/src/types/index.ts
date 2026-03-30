@@ -41,9 +41,22 @@ export interface UserNoteResponse {
   tags: string[]
 }
 
+export interface CvdictEntry {
+  id: number
+  simplified: string
+  traditional: string | null
+  pinyin: string
+  meaning_vi: string
+  radical: string | null
+  stroke_count: number | null
+  hsk_level: number | null
+  source_name: string
+}
+
 export interface DictionaryResponse {
   char: string
   cedict: CedictEntry[]
+  cvdict: CvdictEntry[]
   external: ExternalSource[]
   user_note: UserNoteResponse | null
 }

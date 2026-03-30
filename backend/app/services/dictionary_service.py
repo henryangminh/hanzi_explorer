@@ -9,18 +9,43 @@ from sqlmodel import Session, select
 from app.core.pinyin import numeric_to_diacritic
 from app.core.cedict_utils import clean_meaning
 from app.models.character import CcCedictCharacter, DictionarySource, ExternalCache
+from app.models.cvdict_character import CvdictCharacter
 from app.models.note import UserNote
 from app.schemas.dictionary import (
-    CedictEntry, DictionaryResponse, ExternalSource,
+    CedictEntry, CvdictEntry, DictionaryResponse, ExternalSource,
     NoteUpsert, UserNoteResponse,
 )
-from app.services.wiktionary_parser import parse_wiktionary
+from app.services.wiktionary_parser import parse_wiktionary, parse_vi_wikitext
 
 CACHE_TTL_HOURS = 72
 HEADERS = {'User-Agent': 'HanziExplorer/1.0 (personal study tool)'}
 
 
 # ── CC-CEDICT ─────────────────────────────────────────────
+
+def lookup_cvdict(session: Session, char: str) -> list[CvdictEntry]:
+    rows = session.exec(
+        select(CvdictCharacter)
+        .where(CvdictCharacter.simplified == char)
+        .order_by(CvdictCharacter.id)
+    ).all()
+
+    results = []
+    for row in rows:
+        source = session.get(DictionarySource, row.source_id)
+        results.append(CvdictEntry(
+            id=row.id,
+            simplified=row.simplified,
+            traditional=row.traditional,
+            pinyin=numeric_to_diacritic(row.pinyin),
+            meaning_vi=row.meaning_vi,
+            radical=row.radical,
+            stroke_count=row.stroke_count,
+            hsk_level=row.hsk_level,
+            source_name=source.name if source else 'CVDICT',
+        ))
+    return results
+
 
 def lookup_cedict(session: Session, char: str) -> list[CedictEntry]:
     rows = session.exec(
@@ -93,29 +118,49 @@ def _set_cache(session: Session, char: str, source: str, data: dict) -> None:
 
 # ── Wiktionary EN ─────────────────────────────────────────
 
-async def _fetch_wiktionary_en(char: str) -> dict:
+async def _fetch_en_single(char: str) -> dict:
+    """Fetch one character/word from EN Wiktionary REST API."""
     encoded = quote(char, safe='')
     url = f'https://en.wiktionary.org/api/rest_v1/page/definition/{encoded}'
     try:
         async with httpx.AsyncClient(timeout=8) as client:
             resp = await client.get(url, headers=HEADERS)
-            if resp.status_code != 200:
-                return {'error': f'HTTP {resp.status_code}'}
-            return resp.json()
+            if resp.status_code == 200:
+                return resp.json()
+            return {'error': f'HTTP {resp.status_code}'}
     except Exception as exc:
         return {'error': str(exc)}
+
+
+async def _fetch_wiktionary_en(char: str, traditional: str | None = None) -> dict:
+    """
+    Fetch from EN Wiktionary. If simplified form returns 404,
+    fall back to traditional form (e.g. 睡觉 → 睡覺).
+    """
+    result = await _fetch_en_single(char)
+
+    # Fallback to traditional if simplified not found
+    if 'error' in result and traditional and traditional != char:
+        fallback = await _fetch_en_single(traditional)
+        if 'error' not in fallback:
+            return fallback
+
+    return result
 
 
 # ── Wiktionary VI (MediaWiki Action API) ──────────────────
 
 async def _fetch_wiktionary_vi(char: str) -> dict:
+    """
+    Fetch raw wikitext from Vietnamese Wiktionary via revisions API.
+    Returns the raw wikitext string or an error dict.
+    """
     url = 'https://vi.wiktionary.org/w/api.php'
     params = {
         'action': 'query',
+        'prop': 'revisions',
+        'rvprop': 'content',
         'titles': char,
-        'prop': 'extracts',
-        'exintro': True,
-        'explaintext': True,
         'format': 'json',
         'utf8': 1,
     }
@@ -129,10 +174,13 @@ async def _fetch_wiktionary_vi(char: str) -> dict:
             for page_id, page in pages.items():
                 if page_id == '-1':
                     return {'error': 'Page not found'}
-                extract = page.get('extract', '').strip()
-                if not extract:
-                    return {'error': 'No content'}
-                return {'found': True, 'text': extract}
+                revisions = page.get('revisions', [])
+                if not revisions:
+                    return {'error': 'No revisions'}
+                wikitext = revisions[0].get('*', '').strip()
+                if not wikitext:
+                    return {'error': 'Empty content'}
+                return {'wikitext': wikitext}
             return {'error': 'No pages returned'}
     except Exception as exc:
         return {'error': str(exc)}
@@ -141,25 +189,22 @@ async def _fetch_wiktionary_vi(char: str) -> dict:
 def _parse_vi_response(data: dict) -> dict:
     if 'error' in data:
         return {'found': False, 'error': data['error']}
-    if not data.get('found'):
-        return {'found': False, 'error': 'Not found'}
-    text = data.get('text', '').strip()
-    if not text:
+    wikitext = data.get('wikitext', '')
+    if not wikitext:
         return {'found': False, 'error': 'Empty content'}
-    lines = [l.strip() for l in text.splitlines() if l.strip()]
-    return {'found': True, 'sections': [{'part_of_speech': '', 'definitions': lines}]}
+    return parse_vi_wikitext(wikitext)
 
 
 # ── Aggregate external sources ────────────────────────────
 
-async def fetch_external_sources(session: Session, char: str) -> list[ExternalSource]:
+async def fetch_external_sources(session: Session, char: str, traditional: str | None = None) -> list[ExternalSource]:
     sources: list[ExternalSource] = []
 
-    # Wiktionary EN
+    # Wiktionary EN — fallback to traditional if simplified not found
     cached_raw = _get_cache(session, char, 'wiktionary_en')
     from_cache = cached_raw is not None
     if not cached_raw:
-        cached_raw = await _fetch_wiktionary_en(char)
+        cached_raw = await _fetch_wiktionary_en(char, traditional=traditional)
         parsed_en = parse_wiktionary(cached_raw, 'en')
         _set_cache(session, char, 'wiktionary_en', cached_raw)
     else:
@@ -232,9 +277,18 @@ def _note_to_response(note: UserNote) -> UserNoteResponse:
 # ── Main ──────────────────────────────────────────────────
 
 async def get_dictionary_entry(session: Session, char: str, user_id: int) -> DictionaryResponse:
+    cedict_entries = lookup_cedict(session, char)
+
+    # Get traditional form from first CEDICT entry for EN Wiktionary fallback
+    traditional = next(
+        (e.traditional for e in cedict_entries if e.traditional),
+        None
+    )
+
     return DictionaryResponse(
         char=char,
-        cedict=lookup_cedict(session, char),
-        external=await fetch_external_sources(session, char),
+        cedict=cedict_entries,
+        cvdict=lookup_cvdict(session, char),
+        external=await fetch_external_sources(session, char, traditional=traditional),
         user_note=get_user_note(session, user_id, char),
     )

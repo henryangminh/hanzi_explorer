@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Search, ChevronDown, ChevronUp } from 'lucide-react'
 import api from '@/lib/axios'
 import type { DictionaryResponse, UserNoteResponse } from '@/types'
+import { CvdictSection } from './CvdictSection'
 import { CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -56,12 +57,19 @@ function EntryCard({
         onClick={() => setCollapsed((v) => !v)}
         className="w-full flex items-center gap-3 px-4 py-3 bg-[var(--color-bg-surface)] hover:bg-[var(--color-bg-subtle)] transition-colors text-left"
       >
-        <span className={cn(
-          'font-cjk leading-none shrink-0',
-          isMultiChar ? 'text-3xl text-[var(--color-primary)]' : 'text-2xl text-[var(--color-text)]'
-        )}>
-          {entry.char}
-        </span>
+        <div className="flex items-baseline gap-1.5 shrink-0">
+          <span className={cn(
+            'font-cjk leading-none',
+            isMultiChar ? 'text-3xl text-[var(--color-primary)]' : 'text-2xl text-[var(--color-text)]'
+          )}>
+            {entry.char}
+          </span>
+          {firstCedict?.traditional && firstCedict.traditional !== entry.char && (
+            <span className="font-cjk text-sm text-[var(--color-text-muted)]">
+              ({firstCedict.traditional})
+            </span>
+          )}
+        </div>
 
         <div className="flex-1 min-w-0">
           {firstCedict ? (
@@ -152,6 +160,11 @@ function EntryCard({
                 ))}
               </div>
             </div>
+          )}
+
+          {/* CVDICT — Hán Việt */}
+          {entry.cvdict && entry.cvdict.length > 0 && (
+            <CvdictSection entries={entry.cvdict} />
           )}
 
           {/* External sources */}
