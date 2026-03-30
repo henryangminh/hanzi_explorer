@@ -1,11 +1,25 @@
 from typing import List
-
 from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel
 from app.core.deps import CurrentUser, DbSession
 from app.schemas.radical import RadicalDetail, RadicalSummary
 from app.services import radical_service
+from app.services.hanzi_service import get_characters_with_component
+from app.services.dictionary_service import lookup_cedict
+from app.core.pinyin import numeric_to_diacritic
 
 router = APIRouter(prefix="/radicals", tags=["radicals"])
+
+
+class CharCard(BaseModel):
+    char: str
+    pinyin: str
+    meaning_en: str
+
+
+class RadicalCharsResponse(BaseModel):
+    radical: str
+    chars: List[CharCard]
 
 
 @router.get("", response_model=List[RadicalSummary])
@@ -13,12 +27,41 @@ def list_radicals(current_user: CurrentUser, session: DbSession):
     return radical_service.list_radicals(session)
 
 
+@router.get("/{radical}/chars", response_model=RadicalCharsResponse)
+def get_radical_chars(radical: str, current_user: CurrentUser, session: DbSession):
+    """
+    Return all characters that share the given radical,
+    enriched with pinyin from CC-CEDICT.
+    """
+    chars = get_characters_with_component(radical)
+    if chars is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"No data for radical '{radical}'")
+
+    result: list[CharCard] = []
+    seen: set[str] = set()
+    for char in chars:
+        if char in seen:
+            continue
+        seen.add(char)
+        entries = lookup_cedict(session, char)
+        if entries:
+            first = entries[0]
+            result.append(CharCard(
+                char=char,
+                pinyin=first.pinyin,
+                meaning_en=first.meaning_en,
+            ))
+        else:
+            result.append(CharCard(char=char, pinyin='', meaning_en=''))
+
+    return RadicalCharsResponse(radical=radical, chars=result)
+
+
 @router.get("/{radical}", response_model=RadicalDetail)
 def get_radical(radical: str, current_user: CurrentUser, session: DbSession):
     result = radical_service.get_radical(session, radical)
     if not result:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Radical '{radical}' not found",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"Radical '{radical}' not found")
     return result

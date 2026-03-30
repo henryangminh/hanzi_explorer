@@ -1,6 +1,6 @@
 """
-Import radicals from data/radical.csv into radical_groups table.
-Clears existing data first.
+Import all 214 Kangxi radicals from data/radical.csv.
+Clears all radical data (compounds + groups) before importing.
 
 Usage:
     python scripts/import_radicals_csv.py
@@ -20,15 +20,13 @@ CSV_PATH = Path(__file__).parent.parent / 'data' / 'radical.csv'
 
 
 def parse_stroke_count(text: str) -> int | None:
-    """Extract number from 'Bộ thủ 2 Nét' → 2"""
     m = re.search(r'(\d+)', str(text))
     return int(m.group(1)) if m else None
 
 
 def clean_radical(text: str) -> str:
-    """'人 (亻)' → '人', keep first char/group before space+paren"""
+    """'人 (亻)' → '人'"""
     text = str(text).strip()
-    # If contains space followed by (, take part before it
     m = re.match(r'^([^\s(]+)', text)
     return m.group(1) if m else text
 
@@ -42,64 +40,56 @@ def run():
 
     df = pd.read_csv(CSV_PATH, header=None)
 
-    radicals = []
+    by_stt: dict[int, dict] = {}
     current_strokes = None
 
     for _, row in df.iterrows():
         cell0 = str(row[0]).strip()
 
-        # Stroke group header: "Bộ thủ 2 Nét"
         if 'Bộ thủ' in cell0 and 'Nét' in cell0:
             current_strokes = parse_stroke_count(cell0)
             continue
-
-        # Sub-header row: "STT BỘ THỦ ..."
         if cell0 == 'STT':
             continue
 
-        # Data row: must have numeric STT
-        try:
-            int(float(cell0))
-        except (ValueError, TypeError):
+        # Strip non-numeric chars (e.g. '59<' in source CSV)
+        nums = re.findall(r'\d+', cell0)
+        if not nums:
             continue
+        stt = int(nums[0])
 
         radical_raw = str(row[1]).strip() if pd.notna(row[1]) else ''
-        name_vi     = str(row[2]).strip() if pd.notna(row[2]) else ''
-        pinyin      = str(row[3]).strip() if pd.notna(row[3]) else ''
-        meaning_vi  = str(row[4]).strip() if pd.notna(row[4]) else ''
-
         if not radical_raw or radical_raw == 'nan':
             continue
 
-        radical_char = clean_radical(radical_raw)
-
-        radicals.append({
-            'radical':      radical_char,
-            'pinyin':       pinyin,
-            'meaning_en':   name_vi,   # CSV only has Vietnamese name — use as meaning_en fallback
-            'meaning_vi':   meaning_vi,
+        by_stt[stt] = {
+            'radical':      clean_radical(radical_raw),
+            'pinyin':       str(row[3]).strip() if pd.notna(row[3]) else '',
+            'meaning_en':   str(row[2]).strip() if pd.notna(row[2]) else '',
+            'meaning_vi':   str(row[4]).strip() if pd.notna(row[4]) else '',
             'stroke_count': current_strokes,
-        })
+        }
 
-    print(f'Parsed {len(radicals)} radicals from CSV')
+    radicals = [by_stt[k] for k in sorted(by_stt)]
+    print(f'Parsed {len(radicals)} radicals (expected 214)')
+
+    missing = sorted(set(range(1, 215)) - set(by_stt.keys()))
+    if missing:
+        print(f'  Warning — missing STT: {missing}')
 
     with Session(engine) as session:
-        # Clear existing
-        session.exec(delete(RadicalCompound))
-        session.exec(delete(RadicalGroup))
+        # Clear all radical data first
+        deleted_compounds = session.exec(delete(RadicalCompound)).rowcount
+        deleted_groups    = session.exec(delete(RadicalGroup)).rowcount
         session.commit()
-        print('Cleared existing radical data')
+        print(f'Cleared {deleted_groups} radical groups, {deleted_compounds} compounds')
 
-        # Insert all
         for r in radicals:
             session.add(RadicalGroup(**r))
-
         session.commit()
-        print(f'Inserted {len(radicals)} radical groups')
 
-        # Verify
-        count = len(session.exec(select(RadicalGroup)).all())
-        print(f'Verified: {count} rows in radical_groups')
+        count = session.exec(select(RadicalGroup)).all()
+        print(f'Done. Inserted {len(count)} radical groups.')
 
 
 if __name__ == '__main__':

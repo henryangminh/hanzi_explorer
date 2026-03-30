@@ -93,7 +93,7 @@ STT,BỘ THỦ,TÊN BỘ THỦ,PHIÊN ÂM,Ý NGHĨA
 85,水(氵、氺),Thủy,shǔi,Nước
 86,火 (灬),Hỏa,huǒ,Lửa
 87,爪,Trảo,zhǎo,Móng vuốt cầm thú
-88,父<,Phụ,fù,Cha
+88,父,Phụ,fù,Cha
 89,爻,Hào,yáo,"Hào âm, hào dương (Kinh Dịch)"
 90,爿(丬),Tường,qiáng,"Mảnh gỗ, cái giường"
 91,片,Phiến,piàn,"Mảnh, tấm, miếng"
@@ -176,7 +176,7 @@ STT,BỘ THỦ,TÊN BỘ THỦ,PHIÊN ÂM,Ý NGHĨA
 162,辵(辶),Sước,chuò,Chợt bước đi chợt dừng lại
 163,邑(阝),Ấp,yì,"Vùng đất, đất phong cho quan"
 164,酉,Dậu,yǒu,Một trong 12 địa chi
-165,釆,Biện,biàn<,Phân biệt
+165,釆,Biện,biàn,Phân biệt
 166,里,Lý,lǐ,Dặm; làng xóm
 Bộ thủ 8 Nét,,,,
 STT,BỘ THỦ,TÊN BỘ THỦ,PHIÊN ÂM,Ý NGHĨA
@@ -205,7 +205,7 @@ STT,BỘ THỦ,TÊN BỘ THỦ,PHIÊN ÂM,Ý NGHĨA
 187,馬 (马),Mã,mǎ,Con ngựa
 188,骨,Cốt,gǔ,Xương
 189,高,Cao,gāo,Cao
-190,>髟,"Bưu, tiêu",biāo,Tóc dài
+190,髟,"Bưu, tiêu",biāo,Tóc dài
 191,鬥 (斗),Đấu,dòu,Đánh nhau
 192,鬯,Sưởng,chàng,Ủ rượu nếp
 193,鬲,Cách,gé,"Nồi, chõ"
@@ -239,7 +239,7 @@ STT,BỘ THỦ,TÊN BỘ THỦ,PHIÊN ÂM,Ý NGHĨA
 211,"齒(齿, 歯 )",Xỉ,chǐ,Răng
 Bộ thủ 16 Nét,,,,
 STT,BỘ THỦ,TÊN BỘ THỦ,PHIÊN ÂM,Ý NGHĨA
-212,龍(龙 ),long,lóng,con rồng>
+212,龍(龙 ),long,lóng,con rồng
 213,"龜 (亀, 龟 )",quy,guī,con rùa
 Bộ thủ 17 Nét,,,,
 STT,BỘ THỦ,TÊN BỘ THỦ,PHIÊN ÂM,Ý NGHĨA
