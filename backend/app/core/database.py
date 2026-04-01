@@ -12,7 +12,7 @@ engine = create_engine(
 
 def init_db() -> None:
     # Import all models here so SQLModel metadata is fully populated
-    from app.models import user, character, note  # noqa: F401
+    from app.models import user, character, note, notebook  # noqa: F401
     SQLModel.metadata.create_all(engine)
 
 

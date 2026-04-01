@@ -6,6 +6,7 @@ import { RadicalsPage } from '@/features/radicals/RadicalsPage'
 import { DictionaryPage } from '@/features/dictionary/DictionaryPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
 import { ProfilePage } from '@/features/auth/ProfilePage'
+import { NotebooksPage } from '@/features/notebooks/NotebooksPage'
 
 export const router = createBrowserRouter([
   {
@@ -23,6 +24,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/radicals" replace /> },
       { path: 'radicals', element: <RadicalsPage /> },
       { path: 'dictionary', element: <DictionaryPage /> },
+      { path: 'notebooks', element: <NotebooksPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'profile', element: <ProfilePage /> },
     ],

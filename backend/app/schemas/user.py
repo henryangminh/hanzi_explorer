@@ -9,6 +9,7 @@ class UserPublic(BaseModel):
     display_name: str
     language: str
     theme: str
+    is_admin: bool
     created_at: datetime
 
     class Config:

@@ -30,15 +30,6 @@ env/
 .env
 !.env.example
 
-# ── Database ─────────────────────────────────────────────
-backend/data/hanzi.db
-backend/data/hanzi.db-shm
-backend/data/hanzi.db-wal
-
-# CC-CEDICT raw file (large, download separately)
-backend/data/cedict_ts.u8
-backend/data/cedict_1_0_ts_utf-8_mdbg.txt
-
 # ── Node / Frontend ──────────────────────────────────────
 node_modules/
 frontend/node_modules/

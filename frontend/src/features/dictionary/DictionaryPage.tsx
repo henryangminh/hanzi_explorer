@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Search, ChevronDown, ChevronUp } from 'lucide-react'
+import { Search, ChevronDown, ChevronUp, BookmarkPlus } from 'lucide-react'
 import api from '@/lib/axios'
 import type { DictionaryResponse, UserNoteResponse } from '@/types'
 import { CvdictSection } from './CvdictSection'
@@ -8,6 +8,7 @@ import { CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { cn } from '@/lib/cn'
+import { SaveToNotebookModal } from '@/features/notebooks/SaveToNotebookModal'
 
 // ── Single entry card ─────────────────────────────────────
 
@@ -22,6 +23,7 @@ function EntryCard({
 }) {
   const { t } = useTranslation()
   const [collapsed, setCollapsed] = useState(false)
+  const [saveModalOpen, setSaveModalOpen] = useState(false)
   const [noteMeaningVi, setNoteMeaningVi] = useState(entry.user_note?.meaning_vi ?? '')
   const [noteText, setNoteText] = useState(entry.user_note?.note ?? '')
   const [noteTags, setNoteTags] = useState(entry.user_note?.tags.join(', ') ?? '')
@@ -52,6 +54,9 @@ function EntryCard({
       'border border-[var(--color-border)] rounded-xl overflow-hidden',
       isMultiChar && 'border-[var(--color-accent)]'
     )}>
+      {saveModalOpen && (
+        <SaveToNotebookModal char={entry.char} onClose={() => setSaveModalOpen(false)} />
+      )}
       {/* Header */}
       <button
         onClick={() => setCollapsed((v) => !v)}
@@ -104,6 +109,14 @@ function EntryCard({
               HSK {firstCedict.hsk_level}
             </span>
           )}
+          <span
+            role="button"
+            onClick={(e) => { e.stopPropagation(); setSaveModalOpen(true) }}
+            className="p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-bg-subtle)] transition-colors"
+            title={t('notebooks.saveToNotebook')}
+          >
+            <BookmarkPlus size={14} />
+          </span>
           {collapsed
             ? <ChevronDown size={14} className="text-[var(--color-text-muted)]" />
             : <ChevronUp size={14} className="text-[var(--color-text-muted)]" />
@@ -307,7 +320,7 @@ export function DictionaryPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="vd: 我可以游泳"
+            placeholder="vd: 我可以游泳, 指导, bukeqi, ming2tian1"
             className={cn(
               'w-full pl-9 pr-3 py-2 rounded-lg text-sm font-cjk',
               'bg-[var(--color-bg-surface)] text-[var(--color-text)]',

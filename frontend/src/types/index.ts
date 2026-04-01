@@ -4,6 +4,7 @@ export interface User {
   display_name: string
   language: 'vi' | 'en'
   theme: 'light' | 'dark'
+  is_admin: boolean
   created_at: string
 }
 
@@ -96,3 +97,35 @@ export interface Settings {
   language: 'vi' | 'en'
   theme: 'light' | 'dark'
 }
+
+// ── Notebooks ─────────────────────────────────────────────
+
+export interface NotebookResponse {
+  id: number
+  name: string
+  description: string | null
+  type: 'global' | 'private'
+  owner_id: number | null
+  entry_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface NotebookEntryResponse {
+  id: number
+  notebook_id: number
+  char: string
+  added_at: string
+}
+
+export interface NotebookDetail extends NotebookResponse {
+  entries: NotebookEntryResponse[]
+}
+
+export type NotebookSortOrder =
+  | 'updated_at_desc'
+  | 'updated_at_asc'
+  | 'created_at_desc'
+  | 'created_at_asc'
+  | 'name_asc'
+  | 'name_desc'
