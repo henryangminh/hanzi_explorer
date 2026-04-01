@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash2, X, ChevronDown } from 'lucide-react'
+import { Plus, Trash2, X, ChevronDown, ChevronLeft } from 'lucide-react'
 import api from '@/lib/axios'
 import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useAuthStore } from '@/store/auth.store'
-import type { NotebookDetail, NotebookEntryResponse, NotebookResponse, NotebookSortOrder } from '@/types'
+import { CvdictSection } from '@/features/dictionary/CvdictSection'
+import type { DictLiteResponse, NotebookEntryPreview, NotebookResponse, NotebookSortOrder } from '@/types'
 
 const SORT_OPTIONS: { value: NotebookSortOrder; labelKey: string }[] = [
   { value: 'updated_at_desc', labelKey: 'notebooks.sortUpdatedDesc' },
@@ -31,34 +32,55 @@ function NotebookEntriesModal({
   onDeleted: () => void
 }) {
   const { t } = useTranslation()
-  const [detail, setDetail] = useState<NotebookDetail | null>(null)
+  const [entries, setEntries] = useState<NotebookEntryPreview[]>([])
   const [sort, setSort] = useState<NotebookSortOrder>('updated_at_desc')
   const [loading, setLoading] = useState(true)
   const [removingChar, setRemovingChar] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  // inline detail view
+  const [selectedChar, setSelectedChar] = useState<string | null>(null)
+  const [charDetail, setCharDetail] = useState<DictLiteResponse | null>(null)
+  const [loadingDetail, setLoadingDetail] = useState(false)
 
-  const fetchDetail = useCallback(async (s: NotebookSortOrder) => {
+  const fetchEntries = useCallback(async (s: NotebookSortOrder) => {
     setLoading(true)
     try {
-      const { data } = await api.get<NotebookDetail>(`/notebooks/${notebook.id}`, { params: { sort: s } })
-      setDetail(data)
+      const { data } = await api.get<NotebookEntryPreview[]>(
+        `/notebooks/${notebook.id}/entries/preview`,
+        { params: { sort: s } }
+      )
+      setEntries(data)
     } finally {
       setLoading(false)
     }
   }, [notebook.id])
 
-  useEffect(() => {
-    fetchDetail(sort)
-  }, [fetchDetail, sort])
+  useEffect(() => { fetchEntries(sort) }, [fetchEntries, sort])
 
-  const handleRemoveEntry = async (entry: NotebookEntryResponse) => {
+  const handleSelectChar = async (char: string) => {
+    if (selectedChar === char) {
+      setSelectedChar(null)
+      setCharDetail(null)
+      return
+    }
+    setSelectedChar(char)
+    setCharDetail(null)
+    setLoadingDetail(true)
+    try {
+      const { data } = await api.get<DictLiteResponse>('/dictionary/lookup', { params: { q: char } })
+      setCharDetail(data)
+    } finally {
+      setLoadingDetail(false)
+    }
+  }
+
+  const handleRemoveEntry = async (entry: NotebookEntryPreview) => {
     setRemovingChar(entry.char)
     try {
       await api.delete(`/notebooks/${notebook.id}/entries/${encodeURIComponent(entry.char)}`)
-      setDetail((prev) =>
-        prev ? { ...prev, entries: prev.entries.filter((e) => e.id !== entry.id), entry_count: prev.entry_count - 1 } : prev
-      )
+      setEntries((prev) => prev.filter((e) => e.id !== entry.id))
+      if (selectedChar === entry.char) { setSelectedChar(null); setCharDetail(null) }
     } finally {
       setRemovingChar(null)
     }
@@ -80,23 +102,20 @@ function NotebookEntriesModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="w-full max-w-2xl h-full max-h-[90vh] bg-[var(--color-bg-surface)] rounded-2xl shadow-2xl flex flex-col">
+      <div className="w-full max-w-3xl h-full max-h-[90vh] bg-[var(--color-bg-surface)] rounded-2xl shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="flex items-start justify-between px-6 pt-6 pb-4 shrink-0 border-b border-[var(--color-border)]">
+        <div className="flex items-start justify-between px-6 pt-5 pb-3 shrink-0 border-b border-[var(--color-border)]">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-lg font-semibold text-[var(--color-text)]">{notebook.name}</h2>
+              <h2 className="text-base font-semibold text-[var(--color-text)]">{notebook.name}</h2>
               {notebook.type === 'global' && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-bg-subtle)] text-[var(--color-primary)] border border-[var(--color-border)]">
                   {t('notebooks.globalSection')}
                 </span>
               )}
             </div>
-            {notebook.description && (
-              <p className="text-sm text-[var(--color-text-muted)] mt-1">{notebook.description}</p>
-            )}
-            <p className="text-xs text-[var(--color-text-muted)] mt-1">
-              {detail?.entry_count ?? notebook.entry_count} {t('notebooks.entries')}
+            <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+              {entries.length} {t('notebooks.entries')}
             </p>
           </div>
           <div className="flex items-center gap-1 ml-3 shrink-0">
@@ -118,46 +137,147 @@ function NotebookEntriesModal({
           </div>
         </div>
 
-        {/* Sort */}
-        <div className="px-6 py-3 shrink-0">
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as NotebookSortOrder)}
-            className="text-xs px-2 py-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-surface)] text-[var(--color-text-muted)] outline-none"
-          >
-            {SORT_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Entries */}
-        <div className="flex-1 overflow-y-auto px-6 pb-6">
-          {loading ? (
-            <p className="text-sm text-[var(--color-text-muted)] text-center py-8">{t('common.loading')}</p>
-          ) : !detail || detail.entries.length === 0 ? (
-            <p className="text-sm text-[var(--color-text-muted)] text-center py-8">{t('notebooks.emptyEntries')}</p>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {detail.entries.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)]"
-                >
-                  <span className="font-cjk text-xl text-[var(--color-text)]">{entry.char}</span>
-                  {canEdit && (
-                    <button
-                      onClick={() => handleRemoveEntry(entry)}
-                      disabled={removingChar === entry.char}
-                      className="p-1 rounded text-[var(--color-text-muted)] hover:text-red-400 transition-colors disabled:opacity-40"
-                      title={t('notebooks.removeEntry')}
-                    >
-                      <X size={13} />
-                    </button>
-                  )}
-                </div>
+        {/* Sort — only in list view */}
+        {!selectedChar && (
+          <div className="px-6 py-2 shrink-0">
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as NotebookSortOrder)}
+              className="text-xs px-2 py-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-surface)] text-[var(--color-text-muted)] outline-none"
+            >
+              {SORT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
               ))}
+            </select>
+          </div>
+        )}
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 pb-6">
+          {/* ── Detail view ── */}
+          {selectedChar ? (
+            <div className="flex flex-col gap-4 pt-3">
+              {/* Back */}
+              <button
+                onClick={() => { setSelectedChar(null); setCharDetail(null) }}
+                className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors w-fit"
+              >
+                <ChevronLeft size={14} />
+                {t('common.back')}
+              </button>
+
+              {loadingDetail ? (
+                <p className="text-sm text-[var(--color-text-muted)] py-4 text-center">{t('common.loading')}</p>
+              ) : charDetail ? (
+                <>
+                  {/* Char header */}
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-cjk text-3xl text-[var(--color-text)]">{charDetail.char}</span>
+                    {charDetail.cedict[0]?.traditional && charDetail.cedict[0].traditional !== charDetail.char && (
+                      <span className="font-cjk text-3xl leading-none text-[var(--color-text-muted)]">
+                        ({charDetail.cedict[0].traditional})
+                      </span>
+                    )}
+                    {charDetail.cedict[0] && (
+                      <span className="text-sm text-[var(--color-text-muted)]">{charDetail.cedict[0].pinyin}</span>
+                    )}
+                  </div>
+
+                  {/* CC-CEDICT */}
+                  {charDetail.cedict.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
+                        {t('dictionary.cedict')}
+                      </p>
+                      <div className="flex flex-col gap-3">
+                        {charDetail.cedict.map((ce, idx) => (
+                          <div key={ce.id} className={cn(
+                            'flex flex-col gap-1 pl-3',
+                            charDetail.cedict.length > 1 && 'border-l-2 border-[var(--color-border-md)]'
+                          )}>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {charDetail.cedict.length > 1 && (
+                                <span className="text-xs font-medium text-[var(--color-primary)]">#{idx + 1}</span>
+                              )}
+                              <span className="font-medium text-[var(--color-text)]">{ce.pinyin}</span>
+                              {ce.traditional && (
+                                <span className="text-xs text-[var(--color-text-muted)]">
+                                  繁: <span className="font-cjk">{ce.traditional}</span>
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-[var(--color-text-muted)]">{ce.meaning_en}</p>
+                            <div className="flex flex-wrap gap-2 mt-0.5">
+                              {ce.radical && (
+                                <span className="text-xs text-[var(--color-text-muted)]">
+                                  {t('dictionary.radical')}: <span className="font-cjk">{ce.radical}</span>
+                                </span>
+                              )}
+                              {ce.hsk_level && (
+                                <span className="text-xs bg-[var(--color-bg-subtle)] px-2 py-0.5 rounded-full text-[var(--color-primary)]">
+                                  HSK {ce.hsk_level}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CVDICT */}
+                  {charDetail.cvdict && charDetail.cvdict.length > 0 && (
+                    <CvdictSection entries={charDetail.cvdict} />
+                  )}
+                </>
+              ) : null}
             </div>
+          ) : (
+            /* ── Grid view ── */
+            loading ? (
+              <p className="text-sm text-[var(--color-text-muted)] text-center py-8">{t('common.loading')}</p>
+            ) : entries.length === 0 ? (
+              <p className="text-sm text-[var(--color-text-muted)] text-center py-8">{t('notebooks.emptyEntries')}</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                {entries.map((entry) => (
+                  <button
+                    key={entry.id}
+                    onClick={() => handleSelectChar(entry.char)}
+                    className="text-left flex flex-col gap-1 px-3 py-2.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)] hover:border-[var(--color-primary)] transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-cjk text-2xl text-[var(--color-text)]">{entry.char}</span>
+                      {canEdit && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleRemoveEntry(entry) }}
+                          disabled={removingChar === entry.char}
+                          className="p-0.5 rounded text-[var(--color-text-muted)] hover:text-red-400 transition-colors disabled:opacity-40 shrink-0 mt-0.5"
+                          title={t('notebooks.removeEntry')}
+                        >
+                          <X size={11} />
+                        </button>
+                      )}
+                    </div>
+                    {entry.pinyins.length > 0 && (
+                      <p className="text-xs text-[var(--color-text-muted)] leading-tight">
+                        {entry.pinyins.join(', ')}
+                      </p>
+                    )}
+                    {entry.cedict_brief && (
+                      <p className="text-xs text-[var(--color-text-muted)] line-clamp-1 leading-tight">
+                        {entry.cedict_brief}
+                      </p>
+                    )}
+                    {entry.cvdict_brief && (
+                      <p className="text-xs text-[var(--color-primary)] line-clamp-1 leading-tight">
+                        {entry.cvdict_brief}
+                      </p>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )
           )}
         </div>
       </div>
@@ -268,6 +388,10 @@ function CreateNotebookForm({
 
 // ── Notebook card ─────────────────────────────────────────
 
+const GRID_COLS = 4
+const MAX_VISIBLE_ROWS = 2
+const MAX_VISIBLE = GRID_COLS * MAX_VISIBLE_ROWS
+
 function NotebookCard({
   notebook,
   canEdit,
@@ -281,12 +405,12 @@ function NotebookCard({
   return (
     <button
       onClick={onClick}
-      className="w-full text-left flex flex-col gap-1 px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-surface)] hover:border-[var(--color-primary)] hover:bg-[var(--color-bg-subtle)] transition-colors"
+      className="w-full text-left flex flex-col gap-1 px-3 py-2.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-surface)] hover:border-[var(--color-primary)] hover:bg-[var(--color-bg-subtle)] transition-colors"
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-1.5">
         <p className="text-sm font-semibold text-[var(--color-text)] truncate">{notebook.name}</p>
         {canEdit && (
-          <span className="shrink-0 text-[10px] text-[var(--color-text-muted)] border border-[var(--color-border)] rounded px-1.5 py-0.5">
+          <span className="shrink-0 text-[10px] text-[var(--color-text-muted)] border border-[var(--color-border)] rounded px-1 py-0.5 leading-none">
             {t('notebooks.typePrivate')}
           </span>
         )}
@@ -311,6 +435,8 @@ export function NotebooksPage() {
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [openNotebook, setOpenNotebook] = useState<NotebookResponse | null>(null)
+  const [globalExpanded, setGlobalExpanded] = useState(false)
+  const [privateExpanded, setPrivateExpanded] = useState(false)
 
   const fetchNotebooks = useCallback(async (s: NotebookSortOrder) => {
     setLoading(true)
@@ -340,7 +466,7 @@ export function NotebooksPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-[var(--color-text)]">{t('notebooks.title')}</h1>
         <div className="flex items-center gap-2">
@@ -380,11 +506,18 @@ export function NotebooksPage() {
           {/* Global notebooks */}
           {globalNotebooks.length > 0 && (
             <section className="flex flex-col gap-3">
-              <h2 className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">
+              <button
+                onClick={() => setGlobalExpanded((v) => !v)}
+                className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider hover:text-[var(--color-text)] transition-colors w-fit"
+              >
                 {t('notebooks.globalSection')} ({globalNotebooks.length})
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {globalNotebooks.map((nb) => (
+                <ChevronDown
+                  size={12}
+                  className={cn('transition-transform duration-200', globalExpanded && 'rotate-180')}
+                />
+              </button>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {(globalExpanded ? globalNotebooks : globalNotebooks.slice(0, MAX_VISIBLE)).map((nb) => (
                   <NotebookCard
                     key={nb.id}
                     notebook={nb}
@@ -398,14 +531,23 @@ export function NotebooksPage() {
 
           {/* Private notebooks */}
           <section className="flex flex-col gap-3">
-            <h2 className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">
+            <button
+              onClick={() => setPrivateExpanded((v) => !v)}
+              className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider hover:text-[var(--color-text)] transition-colors w-fit"
+            >
               {t('notebooks.privateSection')} ({privateNotebooks.length})
-            </h2>
+              {privateNotebooks.length > MAX_VISIBLE && (
+                <ChevronDown
+                  size={12}
+                  className={cn('transition-transform duration-200', privateExpanded && 'rotate-180')}
+                />
+              )}
+            </button>
             {privateNotebooks.length === 0 ? (
               <p className="text-sm text-[var(--color-text-muted)]">{t('notebooks.empty')}</p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {privateNotebooks.map((nb) => (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {(privateExpanded ? privateNotebooks : privateNotebooks.slice(0, MAX_VISIBLE)).map((nb) => (
                   <NotebookCard
                     key={nb.id}
                     notebook={nb}

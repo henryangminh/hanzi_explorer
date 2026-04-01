@@ -1,7 +1,7 @@
 from typing import List
 from fastapi import APIRouter, HTTPException, status
 from app.core.deps import CurrentUser, DbSession
-from app.schemas.dictionary import DictionaryResponse, NoteUpsert, UserNoteResponse
+from app.schemas.dictionary import DictLiteResponse, DictionaryResponse, NoteUpsert, UserNoteResponse
 from app.services import dictionary_service
 
 router = APIRouter(prefix="/dictionary", tags=["dictionary"])
@@ -9,6 +9,15 @@ router = APIRouter(prefix="/dictionary", tags=["dictionary"])
 @router.put("/{char}/note", response_model=UserNoteResponse)
 def upsert_note(char: str, body: NoteUpsert, current_user: CurrentUser, session: DbSession):
     return dictionary_service.upsert_user_note(session, current_user.id, char, body)
+
+
+@router.get("/lookup", response_model=DictLiteResponse)
+def lookup_lite(q: str, current_user: CurrentUser, session: DbSession):
+    """Fast CEDICT + CVDICT lookup without external API calls. Used by notebook detail view."""
+    q = q.strip()
+    if not q:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Query is empty")
+    return dictionary_service.get_lite_entry(session, q)
 
 
 @router.get("/search", response_model=List[DictionaryResponse])

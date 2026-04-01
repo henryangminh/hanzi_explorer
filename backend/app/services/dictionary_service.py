@@ -12,7 +12,7 @@ from app.models.character import CcCedictCharacter, DictionarySource, ExternalCa
 from app.models.cvdict_character import CvdictCharacter
 from app.models.note import UserNote
 from app.schemas.dictionary import (
-    CedictEntry, CvdictEntry, DictionaryResponse, ExternalSource,
+    CedictEntry, CvdictEntry, DictLiteResponse, DictionaryResponse, ExternalSource,
     NoteUpsert, UserNoteResponse,
 )
 from app.services.wiktionary_parser import parse_wiktionary, parse_vi_wikitext
@@ -274,7 +274,34 @@ def _note_to_response(note: UserNote) -> UserNoteResponse:
     )
 
 
+# ── HSK tags (from drkameleon notebook data) ─────────────
+
+def lookup_hsk_tags(session: Session, char: str) -> list[str]:
+    """Return names of global HSK notebooks that contain this character/word."""
+    from sqlalchemy import text
+    rows = session.execute(
+        text("""
+            SELECT DISTINCT n.name
+            FROM notebooks n
+            JOIN notebook_entries ne ON n.id = ne.notebook_id
+            WHERE ne.char = :char AND n.type = 'global'
+            ORDER BY n.name
+        """),
+        {"char": char},
+    ).fetchall()
+    return [row[0] for row in rows]
+
+
 # ── Main ──────────────────────────────────────────────────
+
+def get_lite_entry(session: Session, char: str) -> DictLiteResponse:
+    """Fast lookup — CEDICT + CVDICT only, no external API calls."""
+    return DictLiteResponse(
+        char=char,
+        cedict=lookup_cedict(session, char),
+        cvdict=lookup_cvdict(session, char),
+    )
+
 
 async def get_dictionary_entry(session: Session, char: str, user_id: int) -> DictionaryResponse:
     cedict_entries = lookup_cedict(session, char)
@@ -291,4 +318,5 @@ async def get_dictionary_entry(session: Session, char: str, user_id: int) -> Dic
         cvdict=lookup_cvdict(session, char),
         external=await fetch_external_sources(session, char, traditional=traditional),
         user_note=get_user_note(session, user_id, char),
+        hsk_tags=lookup_hsk_tags(session, char),
     )

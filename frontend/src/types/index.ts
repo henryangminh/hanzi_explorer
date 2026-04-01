@@ -54,12 +54,19 @@ export interface CvdictEntry {
   source_name: string
 }
 
+export interface DictLiteResponse {
+  char: string
+  cedict: CedictEntry[]
+  cvdict: CvdictEntry[]
+}
+
 export interface DictionaryResponse {
   char: string
   cedict: CedictEntry[]
   cvdict: CvdictEntry[]
   external: ExternalSource[]
   user_note: UserNoteResponse | null
+  hsk_tags: string[]
 }
 
 // ── Radicals ─────────────────────────────────────────────
@@ -116,6 +123,15 @@ export interface NotebookEntryResponse {
   notebook_id: number
   char: string
   added_at: string
+}
+
+export interface NotebookEntryPreview {
+  id: number
+  char: string
+  added_at: string
+  pinyins: string[]
+  cedict_brief: string | null
+  cvdict_brief: string | null
 }
 
 export interface NotebookDetail extends NotebookResponse {

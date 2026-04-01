@@ -41,12 +41,20 @@ class CvdictEntry(BaseModel):
     source_name: str
 
 
+class DictLiteResponse(BaseModel):
+    """CEDICT + CVDICT only — no external sources, no user note."""
+    char: str
+    cedict: List[CedictEntry]
+    cvdict: List[CvdictEntry] = []
+
+
 class DictionaryResponse(BaseModel):
     char: str
     cedict: List[CedictEntry]   # list — multiple readings supported
     cvdict: List[CvdictEntry] = []
     external: List[ExternalSource]
     user_note: Optional[UserNoteResponse]
+    hsk_tags: List[str] = []    # HSK notebook names from drkameleon DB
 
 
 class NoteUpsert(BaseModel):

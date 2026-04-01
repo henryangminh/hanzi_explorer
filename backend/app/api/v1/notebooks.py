@@ -8,6 +8,7 @@ from app.schemas.notebook import (
     AddEntryRequest,
     NotebookCreate,
     NotebookDetail,
+    NotebookEntryPreview,
     NotebookEntryResponse,
     NotebookResponse,
     NotebookUpdate,
@@ -61,6 +62,79 @@ def create_notebook(
             detail="Chỉ admin mới có thể tạo sổ tay chung",
         )
     return notebook_service.create_notebook(session, user.id, data)
+
+
+@router.get("/{notebook_id}/entries/preview", response_model=list[NotebookEntryPreview])
+def get_entries_preview(
+    notebook_id: int,
+    session: DbSession,
+    user: CurrentUser,
+    sort: SortParam = "updated_at_desc",
+):
+    """Return notebook entries with brief CEDICT / CVDICT meanings for the grid view."""
+    from sqlalchemy import text
+    from app.core.cedict_utils import clean_meaning
+
+    nb = _get_notebook_or_404(session, notebook_id)
+    _assert_can_view(nb, user)
+
+    from app.core.pinyin import numeric_to_diacritic
+
+    rows = session.execute(
+        text("""
+            SELECT
+                ne.id, ne.char, ne.added_at,
+                (SELECT meaning_en FROM cc_cedict_characters
+                 WHERE simplified = ne.char ORDER BY id LIMIT 1) AS cedict_raw,
+                (SELECT meaning_vi FROM cvdict_characters
+                 WHERE simplified = ne.char ORDER BY id LIMIT 1) AS cvdict_raw,
+                (SELECT GROUP_CONCAT(pinyin, '|||') FROM (
+                    SELECT DISTINCT pinyin FROM cc_cedict_characters
+                    WHERE simplified = ne.char ORDER BY id
+                )) AS pinyins_raw
+            FROM notebook_entries ne
+            WHERE ne.notebook_id = :nb_id
+        """),
+        {"nb_id": notebook_id},
+    ).fetchall()
+
+    def _cedict_brief(raw: str | None) -> str | None:
+        if not raw:
+            return None
+        return clean_meaning(raw).split(";")[0].strip()
+
+    def _cvdict_brief(raw: str | None) -> str | None:
+        if not raw:
+            return None
+        return raw.split("/")[0].strip()
+
+    def _pinyins(raw: str | None) -> list[str]:
+        if not raw:
+            return []
+        return [numeric_to_diacritic(p.strip()) for p in raw.split("|||") if p.strip()]
+
+    entries = [
+        NotebookEntryPreview(
+            id=row[0],
+            char=row[1],
+            added_at=str(row[2]),
+            cedict_brief=_cedict_brief(row[3]),
+            cvdict_brief=_cvdict_brief(row[4]),
+            pinyins=_pinyins(row[5]),
+        )
+        for row in rows
+    ]
+
+    if sort == "name_asc":
+        entries.sort(key=lambda e: e.char)
+    elif sort == "name_desc":
+        entries.sort(key=lambda e: e.char, reverse=True)
+    elif sort in ("created_at_asc", "updated_at_asc"):
+        entries.sort(key=lambda e: e.added_at)
+    else:
+        entries.sort(key=lambda e: e.added_at, reverse=True)
+
+    return entries
 
 
 @router.get("/{notebook_id}", response_model=NotebookDetail)

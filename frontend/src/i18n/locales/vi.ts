@@ -66,6 +66,7 @@ export default {
       loading: 'Đang tải...',
       error: 'Có lỗi xảy ra',
       cancel: 'Huỷ',
+      back: 'Quay lại',
     },
     // notebooks
     notebooks: {

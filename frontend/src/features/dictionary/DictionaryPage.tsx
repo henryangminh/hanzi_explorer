@@ -70,7 +70,10 @@ function EntryCard({
             {entry.char}
           </span>
           {firstCedict?.traditional && firstCedict.traditional !== entry.char && (
-            <span className="font-cjk text-sm text-[var(--color-text-muted)]">
+            <span className={cn(
+              'font-cjk leading-none text-[var(--color-text-muted)]',
+              isMultiChar ? 'text-3xl' : 'text-2xl'
+            )}>
               ({firstCedict.traditional})
             </span>
           )}
@@ -127,6 +130,20 @@ function EntryCard({
       {/* Body */}
       {!collapsed && (
         <div className="px-4 pb-4 pt-2 bg-[var(--color-bg-surface)] border-t border-[var(--color-border)] flex flex-col gap-4">
+
+          {/* HSK level tags */}
+          {entry.hsk_tags?.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {entry.hsk_tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="text-xs px-2.5 py-0.5 rounded-full bg-[var(--color-bg-subtle)] border border-[var(--color-border)] text-[var(--color-primary)] font-medium"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* CC-CEDICT — all readings */}
           {entry.cedict.length > 0 && (

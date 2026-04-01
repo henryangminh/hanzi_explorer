@@ -42,5 +42,15 @@ class NotebookDetail(NotebookResponse):
     entries: list[NotebookEntryResponse]
 
 
+class NotebookEntryPreview(BaseModel):
+    """Entry with brief CEDICT / CVDICT meanings for the notebook grid view."""
+    id: int
+    char: str
+    added_at: str
+    pinyins: list[str] = []
+    cedict_brief: Optional[str] = None
+    cvdict_brief: Optional[str] = None
+
+
 class AddEntryRequest(BaseModel):
     char: str

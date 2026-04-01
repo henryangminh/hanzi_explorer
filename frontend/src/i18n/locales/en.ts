@@ -60,6 +60,7 @@ export default {
       loading: 'Loading...',
       error: 'Something went wrong',
       cancel: 'Cancel',
+      back: 'Back',
     },
     notebooks: {
       title: 'Notebooks',
