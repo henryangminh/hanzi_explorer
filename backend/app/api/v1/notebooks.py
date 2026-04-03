@@ -113,6 +113,20 @@ def get_entries_preview(
             return []
         return [numeric_to_diacritic(p.strip()) for p in raw.split("|||") if p.strip()]
 
+    from app.services.sino_vn_service import _get_db_readings, _combine
+
+    def _sino_vn(char: str, pinyins_raw: str | None) -> list[str]:
+        if not pinyins_raw:
+            return []
+        # Use the first (most common) pinyin entry for sino_vn lookup
+        first_pinyin = pinyins_raw.split("|||")[0].strip()
+        chars = list(char)
+        syllables = first_pinyin.split()
+        if len(chars) != len(syllables):
+            return []
+        parts = [_get_db_readings(session, c, s) for c, s in zip(chars, syllables)]
+        return _combine(parts)
+
     entries = [
         NotebookEntryPreview(
             id=row[0],
@@ -121,6 +135,7 @@ def get_entries_preview(
             cedict_brief=_cedict_brief(row[3]),
             cvdict_brief=_cvdict_brief(row[4]),
             pinyins=_pinyins(row[5]),
+            sino_vn=_sino_vn(row[1], row[5]),
         )
         for row in rows
     ]

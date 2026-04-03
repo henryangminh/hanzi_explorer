@@ -48,6 +48,7 @@ class NotebookEntryPreview(BaseModel):
     char: str
     added_at: str
     pinyins: list[str] = []
+    sino_vn: list[str] = []
     cedict_brief: Optional[str] = None
     cvdict_brief: Optional[str] = None
 

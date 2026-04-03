@@ -58,6 +58,7 @@ export interface DictLiteResponse {
   char: string
   cedict: CedictEntry[]
   cvdict: CvdictEntry[]
+  sino_vn: string[]
 }
 
 export interface DictionaryResponse {
@@ -67,6 +68,7 @@ export interface DictionaryResponse {
   external: ExternalSource[]
   user_note: UserNoteResponse | null
   hsk_tags: string[]
+  sino_vn: string[]
 }
 
 // ── Radicals ─────────────────────────────────────────────
@@ -130,6 +132,7 @@ export interface NotebookEntryPreview {
   char: string
   added_at: string
   pinyins: string[]
+  sino_vn: string[]
   cedict_brief: string | null
   cvdict_brief: string | null
 }

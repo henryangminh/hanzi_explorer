@@ -46,6 +46,7 @@ class DictLiteResponse(BaseModel):
     char: str
     cedict: List[CedictEntry]
     cvdict: List[CvdictEntry] = []
+    sino_vn: List[str] = []     # Hán Việt readings, e.g. ["phán đoán"]
 
 
 class DictionaryResponse(BaseModel):
@@ -55,6 +56,7 @@ class DictionaryResponse(BaseModel):
     external: List[ExternalSource]
     user_note: Optional[UserNoteResponse]
     hsk_tags: List[str] = []    # HSK notebook names from drkameleon DB
+    sino_vn: List[str] = []     # Hán Việt readings, e.g. ["phán đoán"]
 
 
 class NoteUpsert(BaseModel):

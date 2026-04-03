@@ -171,7 +171,7 @@ function NotebookEntriesModal({
               ) : charDetail ? (
                 <>
                   {/* Char header */}
-                  <div className="flex items-baseline gap-2">
+                  <div className="flex items-baseline gap-2 flex-wrap">
                     <span className="font-cjk text-3xl text-[var(--color-text)]">{charDetail.char}</span>
                     {charDetail.cedict[0]?.traditional && charDetail.cedict[0].traditional !== charDetail.char && (
                       <span className="font-cjk text-3xl leading-none text-[var(--color-text-muted)]">
@@ -179,7 +179,12 @@ function NotebookEntriesModal({
                       </span>
                     )}
                     {charDetail.cedict[0] && (
-                      <span className="text-sm text-[var(--color-text-muted)]">{charDetail.cedict[0].pinyin}</span>
+                      <span className="text-sm text-[var(--color-text-muted)]">
+                        {charDetail.cedict[0].pinyin}
+                        {charDetail.sino_vn?.length > 0 && (
+                          <span className="text-[var(--color-primary)]"> · {charDetail.sino_vn.join(', ')}</span>
+                        )}
+                      </span>
                     )}
                   </div>
 
@@ -262,6 +267,9 @@ function NotebookEntriesModal({
                     {entry.pinyins.length > 0 && (
                       <p className="text-xs text-[var(--color-text-muted)] leading-tight">
                         {entry.pinyins.join(', ')}
+                        {entry.sino_vn?.length > 0 && (
+                          <span className="text-[var(--color-primary)]"> · {entry.sino_vn.join(', ')}</span>
+                        )}
                       </p>
                     )}
                     {entry.cedict_brief && (

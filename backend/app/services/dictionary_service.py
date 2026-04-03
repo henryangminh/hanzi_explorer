@@ -296,14 +296,36 @@ def lookup_hsk_tags(session: Session, char: str) -> list[str]:
 
 def get_lite_entry(session: Session, char: str) -> DictLiteResponse:
     """Fast lookup — CEDICT + CVDICT only, no external API calls."""
+    cedict_entries = lookup_cedict(session, char)
+    # For sino_vn, use numeric pinyin from first cedict entry (sync, no crawl)
+    from app.services.sino_vn_service import _get_db_readings, _combine
+    sino_vn: list[str] = []
+    if cedict_entries:
+        first = cedict_entries[0]
+        # Reconstruct numeric pinyin from diacritic (already converted in lookup_cedict)
+        # We need the raw numeric pinyin — re-query the DB row
+        from app.models.character import CcCedictCharacter
+        raw_row = session.exec(
+            select(CcCedictCharacter).where(CcCedictCharacter.simplified == char)
+        ).first()
+        if raw_row:
+            chars = list(char)
+            syllables = raw_row.pinyin.strip().split()
+            if len(chars) == len(syllables):
+                parts = [_get_db_readings(session, c, s) for c, s in zip(chars, syllables)]
+                sino_vn = _combine(parts)
+
     return DictLiteResponse(
         char=char,
-        cedict=lookup_cedict(session, char),
+        cedict=cedict_entries,
         cvdict=lookup_cvdict(session, char),
+        sino_vn=sino_vn,
     )
 
 
 async def get_dictionary_entry(session: Session, char: str, user_id: int) -> DictionaryResponse:
+    from app.services.sino_vn_service import compute_sino_vn
+
     cedict_entries = lookup_cedict(session, char)
 
     # Get traditional form from first CEDICT entry for EN Wiktionary fallback
@@ -312,6 +334,16 @@ async def get_dictionary_entry(session: Session, char: str, user_id: int) -> Dic
         None
     )
 
+    # Compute Hán Việt using numeric pinyin from DB
+    sino_vn: list[str] = []
+    if cedict_entries:
+        from app.models.character import CcCedictCharacter
+        raw_row = session.exec(
+            select(CcCedictCharacter).where(CcCedictCharacter.simplified == char)
+        ).first()
+        if raw_row:
+            sino_vn = await compute_sino_vn(session, char, raw_row.pinyin)
+
     return DictionaryResponse(
         char=char,
         cedict=cedict_entries,
@@ -319,4 +351,5 @@ async def get_dictionary_entry(session: Session, char: str, user_id: int) -> Dic
         external=await fetch_external_sources(session, char, traditional=traditional),
         user_note=get_user_note(session, user_id, char),
         hsk_tags=lookup_hsk_tags(session, char),
+        sino_vn=sino_vn,
     )

@@ -84,6 +84,11 @@ function EntryCard({
             <>
               <span className="text-sm font-medium text-[var(--color-text)]">
                 {firstCedict.pinyin}
+                {entry.sino_vn?.length > 0 && (
+                  <span className="ml-1.5 text-[var(--color-text-muted)]">
+                    · {entry.sino_vn.join(', ')}
+                  </span>
+                )}
                 {entry.cedict.length > 1 && (
                   <span className="ml-1.5 text-xs text-[var(--color-text-muted)]">
                     +{entry.cedict.length - 1} cách đọc

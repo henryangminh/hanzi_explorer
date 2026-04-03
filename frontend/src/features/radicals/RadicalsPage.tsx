@@ -196,8 +196,8 @@ function RadicalPopup({
               <div>
                 <p className="font-semibold text-lg text-[var(--color-text)]">{radical.pinyin}</p>
                 <p className="text-sm text-[var(--color-text-muted)]">
-                  {radical.meaning_vi && <span className="mr-1">{radical.meaning_vi}</span>}
-                  · {radical.meaning_en}
+                  {radical.meaning_en && <span className="mr-1">{radical.meaning_en}</span>}
+                  {radical.meaning_vi && <span>· {radical.meaning_vi}</span>}
                 </p>
                 {radical.stroke_count && (
                   <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{radical.stroke_count} nét</p>
@@ -270,7 +270,7 @@ function RadicalCard({ radical, onClick }: { radical: RadicalSummary; onClick: (
       <span className="font-cjk text-3xl text-[var(--color-text)] leading-none mt-1">{displayRadical}</span>
       <span className="text-xs text-[var(--color-primary)] font-medium">{radical.pinyin}</span>
       <span className="text-xs text-[var(--color-text-muted)] text-center leading-tight line-clamp-1">
-        {radical.meaning_vi ?? radical.meaning_en}
+        {radical.meaning_en ?? radical.meaning_vi}
       </span>
     </button>
   )
