@@ -25,10 +25,11 @@ def parse_stroke_count(text: str) -> int | None:
 
 
 def clean_radical(text: str) -> str:
-    """'人 (亻)' → '人'"""
-    text = str(text).strip()
-    m = re.match(r'^([^\s(]+)', text)
-    return m.group(1) if m else text
+    """
+    CSV column is already normalized to comma-separated form e.g. '川,巛' or '人,亻'.
+    Just strip whitespace and return as-is.
+    """
+    return str(text).strip()
 
 
 def run():

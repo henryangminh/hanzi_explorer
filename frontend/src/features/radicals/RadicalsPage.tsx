@@ -10,12 +10,14 @@ import api from '@/lib/axios'
 
 interface CharCard { char: string; pinyin: string; meaning_en: string }
 interface CedictEntry { id: number; pinyin: string; traditional: string | null; meaning_en: string; hsk_level: number | null }
+interface CvdictEntry { id: number; pinyin: string; traditional: string | null; meaning_vi: string; hsk_level: number | null }
 interface ExtSource { source: string; label: string; data: { found?: boolean; sections?: { part_of_speech: string; definitions: string[] }[] }; from_cache: boolean }
 
 // ── Char detail panel (inside popup) ─────────────────────
 
 function CharDetail({ char, onBack }: { char: string; onBack: () => void }) {
   const [cedict, setCedict] = useState<CedictEntry[]>([])
+  const [cvdict, setCvdict] = useState<CvdictEntry[]>([])
   const [external, setExternal] = useState<ExtSource[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -23,6 +25,7 @@ function CharDetail({ char, onBack }: { char: string; onBack: () => void }) {
     setLoading(true)
     api.get(`/dictionary/${encodeURIComponent(char)}`).then(({ data }) => {
       setCedict(data.cedict ?? [])
+      setCvdict(data.cvdict ?? [])
       setExternal((data.external ?? []).filter((s: ExtSource) => s.data?.found === true))
     }).finally(() => setLoading(false))
   }, [char])
@@ -91,6 +94,36 @@ function CharDetail({ char, onBack }: { char: string; onBack: () => void }) {
           <p className="text-sm text-[var(--color-text-muted)] italic">Không có trong CC-CEDICT</p>
         )}
 
+        {/* CVDICT */}
+        {cvdict.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
+              CVDICT
+            </p>
+            <div className="flex flex-col gap-2">
+              {cvdict.map((cv, idx) => (
+                <div key={cv.id} className={cn(
+                  'pl-3 flex flex-col gap-0.5',
+                  cvdict.length > 1 && 'border-l-2 border-[var(--color-border-md)]'
+                )}>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {cvdict.length > 1 && (
+                      <span className="text-xs font-medium text-[var(--color-primary)]">#{idx + 1}</span>
+                    )}
+                    <span className="font-medium text-[var(--color-text)]">{cv.pinyin}</span>
+                    {cv.traditional && (
+                      <span className="text-xs text-[var(--color-text-muted)]">
+                        繁: <span className="font-cjk">{cv.traditional}</span>
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-[var(--color-text-muted)]">{cv.meaning_vi}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* External sources */}
         {external.map((src) => (
           <div key={src.source}>
@@ -153,8 +186,12 @@ function RadicalPopup({
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-border)] shrink-0">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-[var(--color-bg-subtle)] border border-[var(--color-border)] flex items-center justify-center">
-                <span className="font-cjk text-4xl text-[var(--color-primary)]">{radical.radical}</span>
+              <div className="flex gap-2">
+                {radical.radical.split(',').map((form) => (
+                  <div key={form} className="w-14 h-14 rounded-2xl bg-[var(--color-bg-subtle)] border border-[var(--color-border)] flex items-center justify-center">
+                    <span className="font-cjk text-4xl text-[var(--color-primary)]">{form}</span>
+                  </div>
+                ))}
               </div>
               <div>
                 <p className="font-semibold text-lg text-[var(--color-text)]">{radical.pinyin}</p>
@@ -219,6 +256,7 @@ function RadicalPopup({
 // ── Radical card ──────────────────────────────────────────
 
 function RadicalCard({ radical, onClick }: { radical: RadicalSummary; onClick: () => void }) {
+  const displayRadical = radical.radical.split(',').join('、')
   return (
     <button
       onClick={onClick}
@@ -229,7 +267,7 @@ function RadicalCard({ radical, onClick }: { radical: RadicalSummary; onClick: (
         'active:scale-95'
       )}
     >
-      <span className="font-cjk text-3xl text-[var(--color-text)] leading-none mt-1">{radical.radical}</span>
+      <span className="font-cjk text-3xl text-[var(--color-text)] leading-none mt-1">{displayRadical}</span>
       <span className="text-xs text-[var(--color-primary)] font-medium">{radical.pinyin}</span>
       <span className="text-xs text-[var(--color-text-muted)] text-center leading-tight line-clamp-1">
         {radical.meaning_vi ?? radical.meaning_en}

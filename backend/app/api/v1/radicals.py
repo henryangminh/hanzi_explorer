@@ -32,9 +32,15 @@ def get_radical_chars(radical: str, current_user: CurrentUser, session: DbSessio
     """
     Return all characters that share the given radical,
     enriched with pinyin from CC-CEDICT.
+    Radical may be comma-separated (e.g. '川,巛') — all forms are looked up.
     """
-    chars = get_characters_with_component(radical)
-    if chars is None:
+    forms = [f.strip() for f in radical.split(',') if f.strip()]
+    chars: list[str] = []
+    for form in forms:
+        result = get_characters_with_component(form)
+        if result:
+            chars.extend(result)
+    if not chars:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"No data for radical '{radical}'")
 
