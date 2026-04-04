@@ -64,6 +64,7 @@ export default {
     },
     common: {
       loading: 'Đang tải...',
+      streamingLoading: 'Đang tìm kiếm thêm kho báu',
       error: 'Có lỗi xảy ra',
       cancel: 'Huỷ',
       back: 'Quay lại',

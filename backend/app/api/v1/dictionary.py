@@ -58,9 +58,4 @@ async def search_phrase(q: str, current_user: CurrentUser, session: DbSession):
 
 @router.get("/{char}", response_model=DictionaryResponse)
 async def get_char(char: str, current_user: CurrentUser, session: DbSession):
-    if len(char) != 1:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Only single characters are supported",
-        )
     return await dictionary_service.get_dictionary_entry(session, char, current_user.id)

@@ -247,47 +247,59 @@ function NotebookEntriesModal({
             ) : !loading && entries.length === 0 ? (
               <p className="text-sm text-[var(--color-text-muted)] text-center py-8">{t('notebooks.emptyEntries')}</p>
             ) : (
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                {entries.map((entry) => (
-                  <button
-                    key={entry.id}
-                    onClick={() => handleSelectChar(entry.char)}
-                    className="text-left flex flex-col gap-1 px-3 py-2.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)] hover:border-[var(--color-primary)] transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="font-cjk text-2xl text-[var(--color-text)]">{entry.char}</span>
-                      {canEdit && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleRemoveEntry(entry) }}
-                          disabled={removingChar === entry.char}
-                          className="p-0.5 rounded text-[var(--color-text-muted)] hover:text-red-400 transition-colors disabled:opacity-40 shrink-0 mt-0.5"
-                          title={t('notebooks.removeEntry')}
-                        >
-                          <X size={11} />
-                        </button>
-                      )}
-                    </div>
-                    {entry.pinyins.length > 0 && (
-                      <p className="text-xs text-[var(--color-text-muted)] leading-tight">
-                        {entry.pinyins.join(', ')}
-                        {entry.sino_vn?.length > 0 && (
-                          <span className="text-[var(--color-primary)]"> · {entry.sino_vn.join(', ')}</span>
+              <>
+                <div className="grid grid-cols-2 gap-2 pt-2">
+                  {entries.map((entry) => (
+                    <button
+                      key={entry.id}
+                      onClick={() => handleSelectChar(entry.char)}
+                      className="text-left flex flex-col gap-1 px-3 py-2.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)] hover:border-[var(--color-primary)] transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-cjk text-2xl text-[var(--color-text)]">{entry.char}</span>
+                        {canEdit && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleRemoveEntry(entry) }}
+                            disabled={removingChar === entry.char}
+                            className="p-0.5 rounded text-[var(--color-text-muted)] hover:text-red-400 transition-colors disabled:opacity-40 shrink-0 mt-0.5"
+                            title={t('notebooks.removeEntry')}
+                          >
+                            <X size={11} />
+                          </button>
                         )}
-                      </p>
-                    )}
-                    {entry.cedict_brief && (
-                      <p className="text-xs text-[var(--color-text-muted)] line-clamp-1 leading-tight">
-                        {entry.cedict_brief}
-                      </p>
-                    )}
-                    {entry.cvdict_brief && (
-                      <p className="text-xs text-[var(--color-primary)] line-clamp-1 leading-tight">
-                        {entry.cvdict_brief}
-                      </p>
-                    )}
-                  </button>
-                ))}
-              </div>
+                      </div>
+                      {entry.pinyins.length > 0 && (
+                        <p className="text-xs text-[var(--color-text-muted)] leading-tight">
+                          {entry.pinyins.join(', ')}
+                          {entry.sino_vn?.length > 0 && (
+                            <span className="text-[var(--color-primary)]"> · {entry.sino_vn.join(', ')}</span>
+                          )}
+                        </p>
+                      )}
+                      {entry.cedict_brief && (
+                        <p className="text-xs text-[var(--color-text-muted)] line-clamp-1 leading-tight">
+                          {entry.cedict_brief}
+                        </p>
+                      )}
+                      {entry.cvdict_brief && (
+                        <p className="text-xs text-[var(--color-primary)] line-clamp-1 leading-tight">
+                          {entry.cvdict_brief}
+                        </p>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                {loading && (
+                  <div className="flex items-center gap-2.5 px-1 py-3 text-sm text-[var(--color-text-muted)]">
+                    <span>{t('common.streamingLoading')}</span>
+                    <div className="flex gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-text-muted)] animate-bounce [animation-delay:-0.3s]" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-text-muted)] animate-bounce [animation-delay:-0.15s]" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-text-muted)] animate-bounce" />
+                    </div>
+                  </div>
+                )}
+              </>
             )
           )}
         </div>

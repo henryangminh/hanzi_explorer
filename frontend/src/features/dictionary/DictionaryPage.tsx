@@ -209,6 +209,16 @@ export function DictionaryPage() {
               onNoteSaved={(note) => handleNoteSaved(entry.char, note)}
             />
           ))}
+          {loading && (
+            <div className="flex items-center gap-2.5 px-1 py-2 text-sm text-[var(--color-text-muted)]">
+              <span>{t('common.streamingLoading')}</span>
+              <div className="flex gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-text-muted)] animate-bounce [animation-delay:-0.3s]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-text-muted)] animate-bounce [animation-delay:-0.15s]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-text-muted)] animate-bounce" />
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

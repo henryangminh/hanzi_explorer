@@ -58,6 +58,7 @@ export default {
     },
     common: {
       loading: 'Loading...',
+      streamingLoading: 'Finding more treasures',
       error: 'Something went wrong',
       cancel: 'Cancel',
       back: 'Back',
