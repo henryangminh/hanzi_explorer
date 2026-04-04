@@ -35,3 +35,11 @@ class RadicalCompound(SQLModel, table=True):
     # FK to cc_cedict_characters — using the first entry id for a given simplified
     char_simplified: str = Field(index=True, max_length=10)
     note: Optional[str] = None
+
+
+class HanziDecomposition(SQLModel, table=True):
+    __tablename__ = "hanzi_decomposition"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    character: str = Field(index=True, max_length=4)
+    component: str = Field(index=True, max_length=4)

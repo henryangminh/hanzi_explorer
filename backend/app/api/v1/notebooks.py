@@ -1,6 +1,7 @@
 from typing import Literal, Optional
 
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import StreamingResponse
 
 from app.core.deps import CurrentUser, DbSession
 from app.models.notebook import Notebook
@@ -64,21 +65,21 @@ def create_notebook(
     return notebook_service.create_notebook(session, user.id, data)
 
 
-@router.get("/{notebook_id}/entries/preview", response_model=list[NotebookEntryPreview])
+@router.get("/{notebook_id}/entries/preview")
 def get_entries_preview(
     notebook_id: int,
     session: DbSession,
     user: CurrentUser,
     sort: SortParam = "updated_at_desc",
 ):
-    """Return notebook entries with brief CEDICT / CVDICT meanings for the grid view."""
+    """Stream notebook entries as NDJSON with brief CEDICT / CVDICT meanings for the grid view."""
     from sqlalchemy import text
     from app.core.cedict_utils import clean_meaning
+    from app.core.pinyin import numeric_to_diacritic
+    from app.services.sino_vn_service import _get_db_readings, _combine
 
     nb = _get_notebook_or_404(session, notebook_id)
     _assert_can_view(nb, user)
-
-    from app.core.pinyin import numeric_to_diacritic
 
     rows = session.execute(
         text("""
@@ -113,12 +114,9 @@ def get_entries_preview(
             return []
         return [numeric_to_diacritic(p.strip()) for p in raw.split("|||") if p.strip()]
 
-    from app.services.sino_vn_service import _get_db_readings, _combine
-
     def _sino_vn(char: str, pinyins_raw: str | None) -> list[str]:
         if not pinyins_raw:
             return []
-        # Use the first (most common) pinyin entry for sino_vn lookup
         first_pinyin = pinyins_raw.split("|||")[0].strip()
         chars = list(char)
         syllables = first_pinyin.split()
@@ -127,29 +125,30 @@ def get_entries_preview(
         parts = [_get_db_readings(session, c, s) for c, s in zip(chars, syllables)]
         return _combine(parts)
 
-    entries = [
-        NotebookEntryPreview(
-            id=row[0],
-            char=row[1],
-            added_at=str(row[2]),
-            cedict_brief=_cedict_brief(row[3]),
-            cvdict_brief=_cvdict_brief(row[4]),
-            pinyins=_pinyins(row[5]),
-            sino_vn=_sino_vn(row[1], row[5]),
-        )
-        for row in rows
-    ]
-
+    # Sort rows before streaming so client receives them in the right order
     if sort == "name_asc":
-        entries.sort(key=lambda e: e.char)
+        rows = sorted(rows, key=lambda r: r[1])
     elif sort == "name_desc":
-        entries.sort(key=lambda e: e.char, reverse=True)
+        rows = sorted(rows, key=lambda r: r[1], reverse=True)
     elif sort in ("created_at_asc", "updated_at_asc"):
-        entries.sort(key=lambda e: e.added_at)
+        rows = sorted(rows, key=lambda r: r[2])
     else:
-        entries.sort(key=lambda e: e.added_at, reverse=True)
+        rows = sorted(rows, key=lambda r: r[2], reverse=True)
 
-    return entries
+    def generate():
+        for row in rows:
+            entry = NotebookEntryPreview(
+                id=row[0],
+                char=row[1],
+                added_at=str(row[2]),
+                cedict_brief=_cedict_brief(row[3]),
+                cvdict_brief=_cvdict_brief(row[4]),
+                pinyins=_pinyins(row[5]),
+                sino_vn=_sino_vn(row[1], row[5]),
+            )
+            yield entry.model_dump_json() + '\n'
+
+    return StreamingResponse(generate(), media_type='application/x-ndjson')
 
 
 @router.get("/{notebook_id}", response_model=NotebookDetail)

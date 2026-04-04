@@ -37,7 +37,7 @@ def get_radical_chars(radical: str, current_user: CurrentUser, session: DbSessio
     forms = [f.strip() for f in radical.split(',') if f.strip()]
     chars: list[str] = []
     for form in forms:
-        result = get_characters_with_component(form)
+        result = get_characters_with_component(session, form)
         if result:
             chars.extend(result)
     if not chars:

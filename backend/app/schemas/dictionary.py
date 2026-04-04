@@ -49,6 +49,10 @@ class DictLiteResponse(BaseModel):
     sino_vn: List[str] = []     # Hán Việt readings, e.g. ["phán đoán"]
 
 
+class HanzipyData(BaseModel):
+    components: List[str] = []  # Immediate structural components (decompose level 1)
+
+
 class DictionaryResponse(BaseModel):
     char: str
     cedict: List[CedictEntry]   # list — multiple readings supported
@@ -57,6 +61,7 @@ class DictionaryResponse(BaseModel):
     user_note: Optional[UserNoteResponse]
     hsk_tags: List[str] = []    # HSK notebook names from drkameleon DB
     sino_vn: List[str] = []     # Hán Việt readings, e.g. ["phán đoán"]
+    hanzipy: Optional[HanzipyData] = None
 
 
 class NoteUpsert(BaseModel):

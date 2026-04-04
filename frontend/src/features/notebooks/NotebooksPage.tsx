@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash2, X, ChevronDown, ChevronLeft } from 'lucide-react'
+import { Plus, Trash2, X, ChevronDown, ChevronLeft, BookmarkPlus } from 'lucide-react'
 import api from '@/lib/axios'
 import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useAuthStore } from '@/store/auth.store'
-import { CvdictSection } from '@/features/dictionary/CvdictSection'
-import type { DictLiteResponse, NotebookEntryPreview, NotebookResponse, NotebookSortOrder } from '@/types'
+import { CharDetailBody } from '@/features/dictionary/CharDetailBody'
+import { SaveToNotebookModal } from '@/features/notebooks/SaveToNotebookModal'
+import type { DictionaryResponse, NotebookEntryPreview, NotebookResponse, NotebookSortOrder } from '@/types'
 
 const SORT_OPTIONS: { value: NotebookSortOrder; labelKey: string }[] = [
   { value: 'updated_at_desc', labelKey: 'notebooks.sortUpdatedDesc' },
@@ -40,23 +41,55 @@ function NotebookEntriesModal({
   const [deleting, setDeleting] = useState(false)
   // inline detail view
   const [selectedChar, setSelectedChar] = useState<string | null>(null)
-  const [charDetail, setCharDetail] = useState<DictLiteResponse | null>(null)
+  const [charDetail, setCharDetail] = useState<DictionaryResponse | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
+  const [saveModalChar, setSaveModalChar] = useState<string | null>(null)
 
-  const fetchEntries = useCallback(async (s: NotebookSortOrder) => {
-    setLoading(true)
-    try {
-      const { data } = await api.get<NotebookEntryPreview[]>(
-        `/notebooks/${notebook.id}/entries/preview`,
-        { params: { sort: s } }
-      )
-      setEntries(data)
-    } finally {
-      setLoading(false)
+  useEffect(() => {
+    const controller = new AbortController()
+    const { signal } = controller
+
+    const run = async () => {
+      setLoading(true)
+      setEntries([])
+      try {
+        const token = localStorage.getItem('access_token')
+        const response = await fetch(
+          `/api/v1/notebooks/${notebook.id}/entries/preview?sort=${sort}`,
+          { headers: token ? { Authorization: `Bearer ${token}` } : {}, signal }
+        )
+        if (!response.ok || signal.aborted) return
+        const reader = response.body!.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        while (true) {
+          const { done, value } = await reader.read()
+          if (signal.aborted) { reader.cancel(); break }
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() ?? ''
+          for (const line of lines) {
+            if (line.trim()) {
+              const entry = JSON.parse(line) as NotebookEntryPreview
+              setEntries((prev) => [...prev, entry])
+            }
+          }
+        }
+        if (!signal.aborted && buffer.trim()) {
+          const entry = JSON.parse(buffer) as NotebookEntryPreview
+          setEntries((prev) => [...prev, entry])
+        }
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') throw err
+      } finally {
+        if (!signal.aborted) setLoading(false)
+      }
     }
-  }, [notebook.id])
 
-  useEffect(() => { fetchEntries(sort) }, [fetchEntries, sort])
+    run()
+    return () => controller.abort()
+  }, [notebook.id, sort])
 
   const handleSelectChar = async (char: string) => {
     if (selectedChar === char) {
@@ -68,7 +101,7 @@ function NotebookEntriesModal({
     setCharDetail(null)
     setLoadingDetail(true)
     try {
-      const { data } = await api.get<DictLiteResponse>('/dictionary/lookup', { params: { q: char } })
+      const { data } = await api.get<DictionaryResponse>(`/dictionary/${encodeURIComponent(char)}`)
       setCharDetail(data)
     } finally {
       setLoadingDetail(false)
@@ -155,16 +188,32 @@ function NotebookEntriesModal({
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 pb-6">
           {/* ── Detail view ── */}
+          {saveModalChar && (
+            <SaveToNotebookModal
+              char={saveModalChar}
+              excludeNotebookId={notebook.id}
+              onClose={() => setSaveModalChar(null)}
+            />
+          )}
           {selectedChar ? (
             <div className="flex flex-col gap-4 pt-3">
-              {/* Back */}
-              <button
-                onClick={() => { setSelectedChar(null); setCharDetail(null) }}
-                className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors w-fit"
-              >
-                <ChevronLeft size={14} />
-                {t('common.back')}
-              </button>
+              {/* Back + save */}
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => { setSelectedChar(null); setCharDetail(null) }}
+                  className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
+                >
+                  <ChevronLeft size={14} />
+                  {t('common.back')}
+                </button>
+                <button
+                  onClick={() => setSaveModalChar(selectedChar)}
+                  className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-bg-subtle)] transition-colors"
+                  title={t('notebooks.saveToNotebook')}
+                >
+                  <BookmarkPlus size={15} />
+                </button>
+              </div>
 
               {loadingDetail ? (
                 <p className="text-sm text-[var(--color-text-muted)] py-4 text-center">{t('common.loading')}</p>
@@ -187,61 +236,15 @@ function NotebookEntriesModal({
                       </span>
                     )}
                   </div>
-
-                  {/* CC-CEDICT */}
-                  {charDetail.cedict.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
-                        {t('dictionary.cedict')}
-                      </p>
-                      <div className="flex flex-col gap-3">
-                        {charDetail.cedict.map((ce, idx) => (
-                          <div key={ce.id} className={cn(
-                            'flex flex-col gap-1 pl-3',
-                            charDetail.cedict.length > 1 && 'border-l-2 border-[var(--color-border-md)]'
-                          )}>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {charDetail.cedict.length > 1 && (
-                                <span className="text-xs font-medium text-[var(--color-primary)]">#{idx + 1}</span>
-                              )}
-                              <span className="font-medium text-[var(--color-text)]">{ce.pinyin}</span>
-                              {ce.traditional && (
-                                <span className="text-xs text-[var(--color-text-muted)]">
-                                  繁: <span className="font-cjk">{ce.traditional}</span>
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm text-[var(--color-text-muted)]">{ce.meaning_en}</p>
-                            <div className="flex flex-wrap gap-2 mt-0.5">
-                              {ce.radical && (
-                                <span className="text-xs text-[var(--color-text-muted)]">
-                                  {t('dictionary.radical')}: <span className="font-cjk">{ce.radical}</span>
-                                </span>
-                              )}
-                              {ce.hsk_level && (
-                                <span className="text-xs bg-[var(--color-bg-subtle)] px-2 py-0.5 rounded-full text-[var(--color-primary)]">
-                                  HSK {ce.hsk_level}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* CVDICT */}
-                  {charDetail.cvdict && charDetail.cvdict.length > 0 && (
-                    <CvdictSection entries={charDetail.cvdict} />
-                  )}
+                  <CharDetailBody entry={charDetail} showNotes={false} />
                 </>
               ) : null}
             </div>
           ) : (
             /* ── Grid view ── */
-            loading ? (
+            loading && entries.length === 0 ? (
               <p className="text-sm text-[var(--color-text-muted)] text-center py-8">{t('common.loading')}</p>
-            ) : entries.length === 0 ? (
+            ) : !loading && entries.length === 0 ? (
               <p className="text-sm text-[var(--color-text-muted)] text-center py-8">{t('notebooks.emptyEntries')}</p>
             ) : (
               <div className="grid grid-cols-2 gap-2 pt-2">

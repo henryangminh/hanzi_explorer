@@ -1,29 +1,39 @@
 """
-Hanzipy-based character decomposition service.
-Returns all characters that share the given radical/component.
+Character decomposition service.
+Returns all characters that share the given component, using the hanzi_decomposition DB table.
 """
 from functools import lru_cache
-from hanzipy.decomposer import HanziDecomposer
+
+from sqlmodel import Session, select
+
+from app.models.note import HanziDecomposition
+
+
+def get_characters_with_component(session: Session, component: str) -> list[str]:
+    """
+    Return all characters that contain the given component/radical,
+    queried from the hanzi_decomposition table.
+    """
+    rows = session.exec(
+        select(HanziDecomposition.character)
+        .where(HanziDecomposition.component == component)
+    ).all()
+    return list(rows)
 
 
 @lru_cache(maxsize=1)
-def _get_decomposer() -> HanziDecomposer:
-    """Singleton — compiling 12k chars is expensive, do it once."""
+def _get_decomposer():
+    from hanzipy.decomposer import HanziDecomposer
     return HanziDecomposer()
 
 
-def get_characters_with_component(component: str) -> list[str]:
-    """
-    Return all characters that contain the given component/radical.
-    Handles radical variants automatically (氵↔水, 忄↔心, etc.)
-    """
-    decomposer = _get_decomposer()
-    if component in decomposer.radicals:
-        components = decomposer.find_same_meaning_radicals(component)
-        characters: list[str] = []
-        for comp in components:
-            chars = decomposer.characters_with_component.get(comp)
-            if chars:
-                characters.extend(chars)
-        return characters
-    return decomposer.characters_with_component.get(component) or []
+def get_hanzipy_components(char: str) -> list[str]:
+    """Return immediate structural components of a character via hanzipy (decompose level 1)."""
+    try:
+        decomposer = _get_decomposer()
+        result = decomposer.decompose(char, 1)
+        components = result.get('components', [])
+        # Filter out the character itself
+        return [c for c in components if c != char]
+    except Exception:
+        return []

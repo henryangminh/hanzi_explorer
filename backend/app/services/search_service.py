@@ -17,6 +17,43 @@ def _is_chinese_char(c: str) -> bool:
     return '\u4e00' <= c <= '\u9fff' or '\u3400' <= c <= '\u4dbf'
 
 
+def traditional_to_simplified(session: Session, text: str) -> str:
+    """
+    Convert any traditional-only characters in text to simplified.
+    Characters that are already simplified (or not Chinese) are kept as-is.
+    Works character-by-character so mixed input is handled correctly.
+    """
+    from app.models.character import CcCedictCharacter
+
+    unique_chars = list({c for c in text if _is_chinese_char(c)})
+    if not unique_chars:
+        return text
+
+    # t→s candidates: rows where traditional is one of our chars
+    trad_rows = session.exec(
+        select(CcCedictCharacter.traditional, CcCedictCharacter.simplified)
+        .where(CcCedictCharacter.traditional.in_(unique_chars))
+        .distinct()
+    ).all()
+
+    # chars that already exist as simplified entries — keep them as-is
+    simp_set: set[str] = set(session.exec(
+        select(CcCedictCharacter.simplified)
+        .where(CcCedictCharacter.simplified.in_(unique_chars))
+        .distinct()
+    ).all())
+
+    t2s: dict[str, str] = {}
+    for trad, simp in trad_rows:
+        if trad and simp and trad != simp and trad not in simp_set:
+            t2s[trad] = simp
+
+    if not t2s:
+        return text
+
+    return ''.join(t2s.get(c, c) for c in text)
+
+
 def detect_search_mode(text: str) -> str:
     """Returns 'sentence', 'short', or 'pinyin'."""
     chinese_chars = [c for c in text if _is_chinese_char(c)]
@@ -106,7 +143,14 @@ def short_search(session: Session, query: str) -> List[str]:
     # Sort extensions: shorter first (= higher match ratio = shown before longer ones)
     extensions.sort(key=lambda w: len(w))
 
-    return multi_words + extensions + single_chars
+    # Put exact match first so the query itself always appears before prefix extensions.
+    # This matters especially for single-char queries where the char would otherwise
+    # end up after all extensions (e.g. searching "指" should show 指 before 指导).
+    exact = [w for w in (multi_words + single_chars) if w == query]
+    other_multi = [w for w in multi_words if w != query]
+    other_singles = [w for w in single_chars if w != query]
+
+    return exact + other_multi + extensions + other_singles
 
 
 # ── Pinyin mode ───────────────────────────────────────────

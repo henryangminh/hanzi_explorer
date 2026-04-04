@@ -13,7 +13,7 @@ from app.models.cvdict_character import CvdictCharacter
 from app.models.note import UserNote
 from app.schemas.dictionary import (
     CedictEntry, CvdictEntry, DictLiteResponse, DictionaryResponse, ExternalSource,
-    NoteUpsert, UserNoteResponse,
+    HanzipyData, NoteUpsert, UserNoteResponse,
 )
 from app.services.wiktionary_parser import parse_wiktionary, parse_vi_wikitext
 
@@ -29,6 +29,14 @@ def lookup_cvdict(session: Session, char: str) -> list[CvdictEntry]:
         .where(CvdictCharacter.simplified == char)
         .order_by(CvdictCharacter.id)
     ).all()
+
+    # Fallback: search by traditional form if no simplified match
+    if not rows:
+        rows = session.exec(
+            select(CvdictCharacter)
+            .where(CvdictCharacter.traditional == char)
+            .order_by(CvdictCharacter.id)
+        ).all()
 
     results = []
     for row in rows:
@@ -53,6 +61,14 @@ def lookup_cedict(session: Session, char: str) -> list[CedictEntry]:
         .where(CcCedictCharacter.simplified == char)
         .order_by(CcCedictCharacter.id)
     ).all()
+
+    # Fallback: search by traditional form if no simplified match
+    if not rows:
+        rows = session.exec(
+            select(CcCedictCharacter)
+            .where(CcCedictCharacter.traditional == char)
+            .order_by(CcCedictCharacter.id)
+        ).all()
 
     results = []
     for row in rows:
@@ -325,24 +341,30 @@ def get_lite_entry(session: Session, char: str) -> DictLiteResponse:
 
 async def get_dictionary_entry(session: Session, char: str, user_id: int) -> DictionaryResponse:
     from app.services.sino_vn_service import compute_sino_vn
+    from app.services.hanzi_service import get_hanzipy_components
 
     cedict_entries = lookup_cedict(session, char)
 
-    # Get traditional form from first CEDICT entry for EN Wiktionary fallback
+    # Get traditional form from first CEDICT entry for EN Wiktionary fallback.
+    # If char itself is a traditional form (no simplified match), use char directly.
     traditional = next(
         (e.traditional for e in cedict_entries if e.traditional),
         None
     )
 
-    # Compute Hán Việt using numeric pinyin from DB
+    # Compute Hán Việt using numeric pinyin from DB.
+    # If char is a traditional form, look up via the simplified equivalent.
     sino_vn: list[str] = []
     if cedict_entries:
         from app.models.character import CcCedictCharacter
+        lookup_char = cedict_entries[0].simplified if cedict_entries[0].simplified else char
         raw_row = session.exec(
-            select(CcCedictCharacter).where(CcCedictCharacter.simplified == char)
+            select(CcCedictCharacter).where(CcCedictCharacter.simplified == lookup_char)
         ).first()
         if raw_row:
-            sino_vn = await compute_sino_vn(session, char, raw_row.pinyin)
+            sino_vn = await compute_sino_vn(session, lookup_char, raw_row.pinyin)
+
+    hanzipy_components = get_hanzipy_components(char)
 
     return DictionaryResponse(
         char=char,
@@ -352,4 +374,5 @@ async def get_dictionary_entry(session: Session, char: str, user_id: int) -> Dic
         user_note=get_user_note(session, user_id, char),
         hsk_tags=lookup_hsk_tags(session, char),
         sino_vn=sino_vn,
+        hanzipy=HanzipyData(components=hanzipy_components) if hanzipy_components else None,
     )

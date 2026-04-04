@@ -61,6 +61,10 @@ export interface DictLiteResponse {
   sino_vn: string[]
 }
 
+export interface HanzipyData {
+  components: string[]
+}
+
 export interface DictionaryResponse {
   char: string
   cedict: CedictEntry[]
@@ -69,6 +73,7 @@ export interface DictionaryResponse {
   user_note: UserNoteResponse | null
   hsk_tags: string[]
   sino_vn: string[]
+  hanzipy: HanzipyData | null
 }
 
 // ── Radicals ─────────────────────────────────────────────

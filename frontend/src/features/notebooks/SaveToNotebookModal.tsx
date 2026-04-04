@@ -19,9 +19,10 @@ const SORT_OPTIONS: { value: NotebookSortOrder; labelKey: string }[] = [
 interface Props {
   char: string
   onClose: () => void
+  excludeNotebookId?: number
 }
 
-export function SaveToNotebookModal({ char, onClose }: Props) {
+export function SaveToNotebookModal({ char, onClose, excludeNotebookId }: Props) {
   const { t } = useTranslation()
   const [notebooks, setNotebooks] = useState<NotebookResponse[]>([])
   const [sort, setSort] = useState<NotebookSortOrder>('updated_at_desc')
@@ -39,7 +40,8 @@ export function SaveToNotebookModal({ char, onClose }: Props) {
     setLoading(true)
     try {
       const { data } = await api.get<NotebookResponse[]>('/notebooks', { params: { sort: s } })
-      setNotebooks(data)
+      const privateOnly = data.filter((n) => n.type === 'private')
+      setNotebooks(excludeNotebookId != null ? privateOnly.filter((n) => n.id !== excludeNotebookId) : privateOnly)
     } finally {
       setLoading(false)
     }

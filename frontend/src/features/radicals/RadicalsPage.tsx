@@ -1,156 +1,75 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, ArrowLeft } from 'lucide-react'
+import { X, ArrowLeft, BookmarkPlus } from 'lucide-react'
 import { useRadicalList } from './useRadicals'
 import { cn } from '@/lib/cn'
-import type { RadicalSummary } from '@/types'
+import type { DictionaryResponse, RadicalSummary } from '@/types'
 import api from '@/lib/axios'
-
-// ── Types ─────────────────────────────────────────────────
+import { SaveToNotebookModal } from '@/features/notebooks/SaveToNotebookModal'
+import { CharDetailBody } from '@/features/dictionary/CharDetailBody'
 
 interface CharCard { char: string; pinyin: string; meaning_en: string }
-interface CedictEntry { id: number; pinyin: string; traditional: string | null; meaning_en: string; hsk_level: number | null }
-interface CvdictEntry { id: number; pinyin: string; traditional: string | null; meaning_vi: string; hsk_level: number | null }
-interface ExtSource { source: string; label: string; data: { found?: boolean; sections?: { part_of_speech: string; definitions: string[] }[] }; from_cache: boolean }
 
 // ── Char detail panel (inside popup) ─────────────────────
 
 function CharDetail({ char, onBack }: { char: string; onBack: () => void }) {
-  const [cedict, setCedict] = useState<CedictEntry[]>([])
-  const [cvdict, setCvdict] = useState<CvdictEntry[]>([])
-  const [external, setExternal] = useState<ExtSource[]>([])
+  const [entry, setEntry] = useState<DictionaryResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [saveModalOpen, setSaveModalOpen] = useState(false)
 
   useEffect(() => {
     setLoading(true)
-    api.get(`/dictionary/${encodeURIComponent(char)}`).then(({ data }) => {
-      setCedict(data.cedict ?? [])
-      setCvdict(data.cvdict ?? [])
-      setExternal((data.external ?? []).filter((s: ExtSource) => s.data?.found === true))
-    }).finally(() => setLoading(false))
+    setEntry(null)
+    api.get<DictionaryResponse>(`/dictionary/${encodeURIComponent(char)}`)
+      .then(({ data }) => setEntry(data))
+      .finally(() => setLoading(false))
   }, [char])
+
+  const firstCedict = entry?.cedict[0] ?? null
 
   return (
     <div className="flex flex-col h-full">
+      {saveModalOpen && (
+        <SaveToNotebookModal char={char} onClose={() => setSaveModalOpen(false)} />
+      )}
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--color-border)] shrink-0">
         <button onClick={onBack}
           className="p-1.5 rounded-lg hover:bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] transition-colors">
           <ArrowLeft size={16} />
         </button>
-        <div className="flex items-baseline gap-1.5">
+        <div className="flex-1 min-w-0 flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <span className="font-cjk text-4xl text-[var(--color-primary)] leading-none">{char}</span>
-          {cedict[0]?.traditional && cedict[0].traditional !== char && (
-            <span className="font-cjk text-lg text-[var(--color-text-muted)]">({cedict[0].traditional})</span>
+          {firstCedict?.traditional && firstCedict.traditional !== char && (
+            <span className="font-cjk text-lg text-[var(--color-text-muted)]">({firstCedict.traditional})</span>
+          )}
+          {firstCedict && (
+            <span className="text-sm font-medium text-[var(--color-text)]">
+              {firstCedict.pinyin}
+              {entry?.sino_vn && entry.sino_vn.length > 0 && (
+                <span className="ml-1.5 text-[var(--color-text-muted)]">· {entry.sino_vn.join(', ')}</span>
+              )}
+              {firstCedict.hsk_level && (
+                <span className="ml-2 text-xs bg-[var(--color-bg-subtle)] px-2 py-0.5 rounded-full text-[var(--color-primary)]">
+                  HSK {firstCedict.hsk_level}
+                </span>
+              )}
+            </span>
           )}
         </div>
-        {cedict[0] && (
-          <div>
-            <span className="font-medium text-[var(--color-text)]">{cedict[0].pinyin}</span>
-            {cedict[0].hsk_level && (
-              <span className="ml-2 text-xs bg-[var(--color-bg-subtle)] px-2 py-0.5 rounded-full text-[var(--color-primary)]">
-                HSK {cedict[0].hsk_level}
-              </span>
-            )}
-          </div>
-        )}
+        <button
+          onClick={() => setSaveModalOpen(true)}
+          className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-bg-subtle)] transition-colors shrink-0"
+          title="Thêm vào sổ tay"
+        >
+          <BookmarkPlus size={16} />
+        </button>
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-4">
+      <div className="flex-1 overflow-y-auto px-4 py-3">
         {loading && <p className="text-sm text-[var(--color-text-muted)]">Đang tải...</p>}
-
-        {/* CC-CEDICT */}
-        {cedict.length > 0 && (
-          <div>
-            <p className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
-              CC-CEDICT
-            </p>
-            <div className="flex flex-col gap-2">
-              {cedict.map((ce, idx) => (
-                <div key={ce.id} className={cn(
-                  'pl-3 flex flex-col gap-0.5',
-                  cedict.length > 1 && 'border-l-2 border-[var(--color-border-md)]'
-                )}>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {cedict.length > 1 && (
-                      <span className="text-xs font-medium text-[var(--color-primary)]">#{idx + 1}</span>
-                    )}
-                    <span className="font-medium text-[var(--color-text)]">{ce.pinyin}</span>
-                    {ce.traditional && (
-                      <span className="text-xs text-[var(--color-text-muted)]">
-                        繁: <span className="font-cjk">{ce.traditional}</span>
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm text-[var(--color-text-muted)]">{ce.meaning_en}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {!loading && cedict.length === 0 && (
-          <p className="text-sm text-[var(--color-text-muted)] italic">Không có trong CC-CEDICT</p>
-        )}
-
-        {/* CVDICT */}
-        {cvdict.length > 0 && (
-          <div>
-            <p className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
-              CVDICT
-            </p>
-            <div className="flex flex-col gap-2">
-              {cvdict.map((cv, idx) => (
-                <div key={cv.id} className={cn(
-                  'pl-3 flex flex-col gap-0.5',
-                  cvdict.length > 1 && 'border-l-2 border-[var(--color-border-md)]'
-                )}>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {cvdict.length > 1 && (
-                      <span className="text-xs font-medium text-[var(--color-primary)]">#{idx + 1}</span>
-                    )}
-                    <span className="font-medium text-[var(--color-text)]">{cv.pinyin}</span>
-                    {cv.traditional && (
-                      <span className="text-xs text-[var(--color-text-muted)]">
-                        繁: <span className="font-cjk">{cv.traditional}</span>
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm text-[var(--color-text-muted)]">{cv.meaning_vi}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* External sources */}
-        {external.map((src) => (
-          <div key={src.source}>
-            <p className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
-              {src.label}
-            </p>
-            {src.data.sections?.map((sec, i) => (
-              <div key={i} className="flex flex-col gap-1">
-                {sec.part_of_speech && (
-                  <span className="text-xs font-medium text-[var(--color-primary)] uppercase tracking-wide">
-                    {sec.part_of_speech}
-                  </span>
-                )}
-                <ol className="flex flex-col gap-0.5 list-decimal list-inside">
-                  {sec.definitions.map((def, j) => {
-                    const isExample = def.startsWith('→')
-                    return isExample ? (
-                      <li key={j} className="list-none ml-4 text-sm italic" style={{ color: 'var(--color-accent)' }}>{def}</li>
-                    ) : (
-                      <li key={j} className="text-sm text-[var(--color-text)]">{def}</li>
-                    )
-                  })}
-                </ol>
-              </div>
-            ))}
-          </div>
-        ))}
+        {!loading && entry && <CharDetailBody entry={entry} showNotes={false} />}
       </div>
     </div>
   )
@@ -223,21 +142,21 @@ function RadicalPopup({
                 <p className="text-xs text-[var(--color-text-muted)] mb-3">
                   {chars.length} chữ có chứa bộ thủ này
                 </p>
-                <div className="grid grid-cols-5 sm:grid-cols-7 md:grid-cols-9 gap-2">
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
                   {chars.map((c) => (
                     <button
                       key={c.char}
                       onClick={() => setSelectedChar(c.char)}
                       className={cn(
-                        'flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl border transition-all cursor-pointer',
+                        'flex flex-col items-center gap-1 py-3 px-2 rounded-xl border transition-all cursor-pointer',
                         'bg-[var(--color-bg-surface)] border-[var(--color-border)]',
                         'hover:border-[var(--color-primary)] hover:bg-[var(--color-bg-subtle)]',
                         'active:scale-95'
                       )}
                     >
-                      <span className="font-cjk text-xl text-[var(--color-text)] leading-none">{c.char}</span>
+                      <span className="font-cjk text-3xl text-[var(--color-text)] leading-none">{c.char}</span>
                       {c.pinyin && (
-                        <span className="text-[9px] text-[var(--color-text-muted)] leading-tight text-center">
+                        <span className="text-xs text-[var(--color-text-muted)] leading-tight text-center">
                           {c.pinyin}
                         </span>
                       )}
