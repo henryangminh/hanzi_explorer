@@ -12,6 +12,7 @@ class NotebookCreate(BaseModel):
 class NotebookUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    sort_order: Optional[int] = None
 
 
 class NotebookResponse(BaseModel):
@@ -20,6 +21,7 @@ class NotebookResponse(BaseModel):
     description: Optional[str]
     type: str
     owner_id: Optional[int]
+    sort_order: int
     entry_count: int
     created_at: datetime
     updated_at: datetime

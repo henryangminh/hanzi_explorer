@@ -42,6 +42,7 @@ def _to_response(session: Session, nb: Notebook) -> NotebookResponse:
         description=nb.description,
         type=nb.type,
         owner_id=nb.owner_id,
+        sort_order=nb.sort_order,
         entry_count=count,
         created_at=nb.created_at,
         updated_at=nb.updated_at,
@@ -53,12 +54,17 @@ def list_notebooks(
     user_id: int,
     sort: SortOrder = "updated_at_desc",
 ) -> list[NotebookResponse]:
-    stmt = select(Notebook).where(
-        (Notebook.type == "global") | (Notebook.owner_id == user_id)
-    )
-    stmt = _sort_notebooks(stmt, sort)
-    notebooks = session.exec(stmt).all()
-    return [_to_response(session, nb) for nb in notebooks]
+    # Global notebooks: always sorted by sort_order ASC
+    global_stmt = select(Notebook).where(Notebook.type == "global").order_by(Notebook.sort_order.asc())
+    global_notebooks = session.exec(global_stmt).all()
+
+    # Private notebooks: sorted by user-chosen sort param
+    private_stmt = select(Notebook).where(Notebook.owner_id == user_id)
+    private_stmt = _sort_notebooks(private_stmt, sort)
+    private_notebooks = session.exec(private_stmt).all()
+
+    all_notebooks = list(global_notebooks) + list(private_notebooks)
+    return [_to_response(session, nb) for nb in all_notebooks]
 
 
 def get_notebook(session: Session, notebook_id: int, user_id: int) -> Optional[NotebookDetail]:
@@ -120,6 +126,8 @@ def update_notebook(
         nb.name = data.name
     if data.description is not None:
         nb.description = data.description
+    if data.sort_order is not None:
+        nb.sort_order = data.sort_order
     nb.updated_at = datetime.now(timezone.utc)
     session.add(nb)
     session.commit()
