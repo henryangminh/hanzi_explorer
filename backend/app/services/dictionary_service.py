@@ -8,8 +8,7 @@ from sqlmodel import Session, select
 
 from app.core.pinyin import numeric_to_diacritic
 from app.core.cedict_utils import clean_meaning
-from app.models.character import CcCedictCharacter, DictionarySource, ExternalCache
-from app.models.cvdict_character import CvdictCharacter
+from app.models.character import Character, PinyinReading, Definition, DictionarySource, ExternalCache
 from app.models.note import UserNote
 from app.schemas.dictionary import (
     CedictEntry, CvdictEntry, DictLiteResponse, DictionaryResponse, ExternalSource,
@@ -21,68 +20,104 @@ CACHE_TTL_HOURS = 72
 HEADERS = {'User-Agent': 'HanziExplorer/1.0 (personal study tool)'}
 
 
-# ── CC-CEDICT ─────────────────────────────────────────────
+# ── Character lookup helpers ──────────────────────────────
 
-def lookup_cvdict(session: Session, char: str) -> list[CvdictEntry]:
-    rows = session.exec(
-        select(CvdictCharacter)
-        .where(CvdictCharacter.simplified == char)
-        .order_by(CvdictCharacter.id)
+def _get_character(session: Session, char: str) -> Optional[Character]:
+    """Lookup a Character row by simplified, then traditional."""
+    row = session.exec(
+        select(Character).where(Character.simplified == char)
+    ).first()
+    if not row:
+        row = session.exec(
+            select(Character).where(Character.traditional == char)
+        ).first()
+    return row
+
+
+def _get_source(session: Session, name: str) -> Optional[DictionarySource]:
+    return session.exec(
+        select(DictionarySource).where(DictionarySource.name == name)
+    ).first()
+
+
+def _get_pinyins(session: Session, character_id: int) -> list[PinyinReading]:
+    return session.exec(
+        select(PinyinReading)
+        .where(PinyinReading.character_id == character_id)
+        .order_by(PinyinReading.id)
     ).all()
 
-    # Fallback: search by traditional form if no simplified match
-    if not rows:
-        rows = session.exec(
-            select(CvdictCharacter)
-            .where(CvdictCharacter.traditional == char)
-            .order_by(CvdictCharacter.id)
-        ).all()
+
+def _get_definitions(session: Session, character_id: int, source_id: int, language: str) -> list[Definition]:
+    return session.exec(
+        select(Definition)
+        .where(Definition.character_id == character_id)
+        .where(Definition.source_id == source_id)
+        .where(Definition.language == language)
+        .order_by(Definition.id)
+    ).all()
+
+
+# ── CC-CEDICT ─────────────────────────────────────────────
+
+def lookup_cedict(session: Session, char: str) -> list[CedictEntry]:
+    char_row = _get_character(session, char)
+    if not char_row:
+        return []
+
+    source = _get_source(session, 'CC-CEDICT')
+    if not source:
+        return []
+
+    pinyins = _get_pinyins(session, char_row.id)
+    defs = _get_definitions(session, char_row.id, source.id, 'en')
 
     results = []
-    for row in rows:
-        source = session.get(DictionarySource, row.source_id)
-        results.append(CvdictEntry(
-            id=row.id,
-            simplified=row.simplified,
-            traditional=row.traditional,
-            pinyin=numeric_to_diacritic(row.pinyin),
-            meaning_vi=row.meaning_vi,
-            radical=row.radical,
-            stroke_count=row.stroke_count,
-            hsk_level=row.hsk_level,
-            source_name=source.name if source else 'CVDICT',
+    for i, defn in enumerate(defs):
+        pinyin_row = pinyins[i] if i < len(pinyins) else (pinyins[0] if pinyins else None)
+        pinyin_str = pinyin_row.pinyin if pinyin_row else ''
+        results.append(CedictEntry(
+            id=defn.id,
+            simplified=char_row.simplified,
+            traditional=char_row.traditional,
+            pinyin=pinyin_str,
+            meaning_en=clean_meaning(defn.meaning_text),
+            radical=char_row.radical,
+            stroke_count=char_row.stroke_count,
+            hsk_level=char_row.hsk_level,
+            source_name=source.name,
         ))
     return results
 
 
-def lookup_cedict(session: Session, char: str) -> list[CedictEntry]:
-    rows = session.exec(
-        select(CcCedictCharacter)
-        .where(CcCedictCharacter.simplified == char)
-        .order_by(CcCedictCharacter.id)
-    ).all()
+# ── CVDICT ────────────────────────────────────────────────
 
-    # Fallback: search by traditional form if no simplified match
-    if not rows:
-        rows = session.exec(
-            select(CcCedictCharacter)
-            .where(CcCedictCharacter.traditional == char)
-            .order_by(CcCedictCharacter.id)
-        ).all()
+def lookup_cvdict(session: Session, char: str) -> list[CvdictEntry]:
+    char_row = _get_character(session, char)
+    if not char_row:
+        return []
+
+    source = _get_source(session, 'CVDICT')
+    if not source:
+        return []
+
+    pinyins = _get_pinyins(session, char_row.id)
+    defs = _get_definitions(session, char_row.id, source.id, 'vi')
 
     results = []
-    for row in rows:
-        source = session.get(DictionarySource, row.source_id)
-        results.append(CedictEntry(
-            id=row.id,
-            simplified=row.simplified,
-            traditional=row.traditional,
-            pinyin=numeric_to_diacritic(row.pinyin),
-            meaning_en=clean_meaning(row.meaning_en),
-            radical=row.radical,
-            stroke_count=row.stroke_count,
-            hsk_level=row.hsk_level,
-            source_name=source.name if source else 'Unknown',
+    for i, defn in enumerate(defs):
+        pinyin_row = pinyins[i] if i < len(pinyins) else (pinyins[0] if pinyins else None)
+        pinyin_str = pinyin_row.pinyin if pinyin_row else ''
+        results.append(CvdictEntry(
+            id=defn.id,
+            simplified=char_row.simplified,
+            traditional=char_row.traditional,
+            pinyin=pinyin_str,
+            meaning_vi=defn.meaning_text,
+            radical=char_row.radical,
+            stroke_count=char_row.stroke_count,
+            hsk_level=char_row.hsk_level,
+            source_name=source.name,
         ))
     return results
 
@@ -107,10 +142,8 @@ def _get_cache(session: Session, char: str, source: str) -> Optional[dict]:
 
 def _set_cache(session: Session, char: str, source: str, data: dict) -> None:
     """Only cache successful responses (found=True or has Chinese keys)."""
-    # Don't cache error responses
     if 'error' in data and len(data) == 1:
         return
-    # Don't cache parsed "not found" results
     if data.get('found') is False:
         return
 
@@ -135,7 +168,6 @@ def _set_cache(session: Session, char: str, source: str, data: dict) -> None:
 # ── Wiktionary EN ─────────────────────────────────────────
 
 async def _fetch_en_single(char: str) -> dict:
-    """Fetch one character/word from EN Wiktionary REST API."""
     encoded = quote(char, safe='')
     url = f'https://en.wiktionary.org/api/rest_v1/page/definition/{encoded}'
     try:
@@ -149,36 +181,21 @@ async def _fetch_en_single(char: str) -> dict:
 
 
 async def _fetch_wiktionary_en(char: str, traditional: str | None = None) -> dict:
-    """
-    Fetch from EN Wiktionary. If simplified form returns 404,
-    fall back to traditional form (e.g. 睡觉 → 睡覺).
-    """
     result = await _fetch_en_single(char)
-
-    # Fallback to traditional if simplified not found
     if 'error' in result and traditional and traditional != char:
         fallback = await _fetch_en_single(traditional)
         if 'error' not in fallback:
             return fallback
-
     return result
 
 
-# ── Wiktionary VI (MediaWiki Action API) ──────────────────
+# ── Wiktionary VI ─────────────────────────────────────────
 
 async def _fetch_wiktionary_vi(char: str) -> dict:
-    """
-    Fetch raw wikitext from Vietnamese Wiktionary via revisions API.
-    Returns the raw wikitext string or an error dict.
-    """
     url = 'https://vi.wiktionary.org/w/api.php'
     params = {
-        'action': 'query',
-        'prop': 'revisions',
-        'rvprop': 'content',
-        'titles': char,
-        'format': 'json',
-        'utf8': 1,
+        'action': 'query', 'prop': 'revisions', 'rvprop': 'content',
+        'titles': char, 'format': 'json', 'utf8': 1,
     }
     try:
         async with httpx.AsyncClient(timeout=8) as client:
@@ -216,7 +233,6 @@ def _parse_vi_response(data: dict) -> dict:
 async def fetch_external_sources(session: Session, char: str, traditional: str | None = None) -> list[ExternalSource]:
     sources: list[ExternalSource] = []
 
-    # Wiktionary EN — fallback to traditional if simplified not found
     cached_raw = _get_cache(session, char, 'wiktionary_en')
     from_cache = cached_raw is not None
     if not cached_raw:
@@ -231,7 +247,6 @@ async def fetch_external_sources(session: Session, char: str, traditional: str |
         data=parsed_en, from_cache=from_cache,
     ))
 
-    # Wiktionary VI
     cached_vi = _get_cache(session, char, 'wiktionary_vi')
     from_cache_vi = cached_vi is not None
     if not cached_vi:
@@ -293,7 +308,6 @@ def _note_to_response(note: UserNote) -> UserNoteResponse:
 # ── HSK tags (from drkameleon notebook data) ─────────────
 
 def lookup_hsk_tags(session: Session, char: str) -> list[str]:
-    """Return names of global HSK notebooks that contain this character/word."""
     from sqlalchemy import text
     rows = session.execute(
         text("""
@@ -313,23 +327,23 @@ def lookup_hsk_tags(session: Session, char: str) -> list[str]:
 def get_lite_entry(session: Session, char: str) -> DictLiteResponse:
     """Fast lookup — CEDICT + CVDICT only, no external API calls."""
     cedict_entries = lookup_cedict(session, char)
-    # For sino_vn, use numeric pinyin from first cedict entry (sync, no crawl)
+
     from app.services.sino_vn_service import _get_db_readings, _combine
     sino_vn: list[str] = []
     if cedict_entries:
-        first = cedict_entries[0]
-        # Reconstruct numeric pinyin from diacritic (already converted in lookup_cedict)
-        # We need the raw numeric pinyin — re-query the DB row
-        from app.models.character import CcCedictCharacter
-        raw_row = session.exec(
-            select(CcCedictCharacter).where(CcCedictCharacter.simplified == char)
-        ).first()
-        if raw_row:
-            chars = list(char)
-            syllables = raw_row.pinyin.strip().split()
-            if len(chars) == len(syllables):
-                parts = [_get_db_readings(session, c, s) for c, s in zip(chars, syllables)]
-                sino_vn = _combine(parts)
+        char_row = _get_character(session, char)
+        if char_row:
+            first_pinyin = session.exec(
+                select(PinyinReading)
+                .where(PinyinReading.character_id == char_row.id)
+                .order_by(PinyinReading.id)
+            ).first()
+            if first_pinyin and first_pinyin.pinyin_numeric:
+                chars_list = list(char)
+                syllables = first_pinyin.pinyin_numeric.strip().split()
+                if len(chars_list) == len(syllables):
+                    parts = [_get_db_readings(session, c, s) for c, s in zip(chars_list, syllables)]
+                    sino_vn = _combine(parts)
 
     return DictLiteResponse(
         char=char,
@@ -345,24 +359,23 @@ async def get_dictionary_entry(session: Session, char: str, user_id: int) -> Dic
 
     cedict_entries = lookup_cedict(session, char)
 
-    # Get traditional form from first CEDICT entry for EN Wiktionary fallback.
-    # If char itself is a traditional form (no simplified match), use char directly.
     traditional = next(
         (e.traditional for e in cedict_entries if e.traditional),
         None
     )
 
-    # Compute Hán Việt using numeric pinyin from DB.
-    # If char is a traditional form, look up via the simplified equivalent.
     sino_vn: list[str] = []
     if cedict_entries:
-        from app.models.character import CcCedictCharacter
         lookup_char = cedict_entries[0].simplified if cedict_entries[0].simplified else char
-        raw_row = session.exec(
-            select(CcCedictCharacter).where(CcCedictCharacter.simplified == lookup_char)
-        ).first()
-        if raw_row:
-            sino_vn = await compute_sino_vn(session, lookup_char, raw_row.pinyin)
+        char_row = _get_character(session, lookup_char)
+        if char_row:
+            first_pinyin = session.exec(
+                select(PinyinReading)
+                .where(PinyinReading.character_id == char_row.id)
+                .order_by(PinyinReading.id)
+            ).first()
+            if first_pinyin and first_pinyin.pinyin_numeric:
+                sino_vn = await compute_sino_vn(session, lookup_char, first_pinyin.pinyin_numeric)
 
     hanzipy_components = get_hanzipy_components(char)
 

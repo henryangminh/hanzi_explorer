@@ -1,9 +1,12 @@
 """
-Import Sino-Vietnamese (Hán Việt) readings from data/hanviet.csv into the sino_vn table.
+Import Sino-Vietnamese (Hán Việt) readings from data/hanviet.csv into the sino_vietnamese table.
 The CSV has columns: char, hanviet (Python list literal), pinyin (numeric tone)
 
 Rows with empty hanviet lists are skipped.
 Multiple hanviet readings for the same char+pinyin are stored comma-separated.
+
+NOTE: CC-CEDICT must be imported before running this script, because we look up
+      character_id from the characters table (populated by import_cedict.py).
 
 Usage:
     cd backend && python scripts/import_sino_vn.py
@@ -17,7 +20,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import pandas as pd
 from sqlmodel import Session, delete, select
 from app.core.database import engine, init_db
-from app.models.sino_vn import SinoVn
+from app.models.character import Character
+from app.models.sino_vn import SinoVietnamese
 
 CSV_PATH = Path(__file__).parent.parent / 'data' / 'hanviet.csv'
 
@@ -33,12 +37,21 @@ def run():
     print(f'Loaded {len(df)} rows from hanviet.csv')
 
     with Session(engine) as session:
-        deleted = session.exec(delete(SinoVn)).rowcount
+        deleted = session.exec(delete(SinoVietnamese)).rowcount
         session.commit()
-        print(f'Cleared {deleted} existing sino_vn rows')
+        print(f'Cleared {deleted} existing sino_vietnamese rows')
+
+        # Build lookup maps from characters table: simplified→id and traditional→id
+        all_chars = session.exec(select(Character)).all()
+        simp_to_id: dict[str, int] = {c.simplified: c.id for c in all_chars}
+        trad_to_id: dict[str, int] = {
+            c.traditional: c.id for c in all_chars if c.traditional
+        }
 
         inserted = 0
         skipped = 0
+        not_found = 0
+
         for _, row in df.iterrows():
             char = str(row['char']).strip()
             pinyin = str(row['pinyin']).strip()
@@ -60,14 +73,19 @@ def run():
                 skipped += 1
                 continue
 
-            session.add(SinoVn(char=char, pinyin=pinyin, hanviet=hanviet_str))
+            # Resolve character_id — try simplified first, then traditional
+            char_id = simp_to_id.get(char) or trad_to_id.get(char)
+            if not char_id:
+                not_found += 1
+                continue
+
+            session.add(SinoVietnamese(character_id=char_id, pinyin=pinyin, hanviet=hanviet_str))
             inserted += 1
 
         session.commit()
-        print(f'Inserted {inserted} rows, skipped {skipped} empty/invalid rows')
-
-        total = session.exec(select(SinoVn)).all()
-        print(f'Total sino_vn rows: {len(total)}')
+        print(f'Inserted {inserted} rows')
+        print(f'Skipped {skipped} empty/invalid rows')
+        print(f'Not found in characters table: {not_found}')
 
 
 if __name__ == '__main__':

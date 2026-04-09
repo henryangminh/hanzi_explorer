@@ -10,14 +10,14 @@ Each token appears exactly once.
 """
 from typing import List
 from sqlmodel import Session, select
-from app.models.character import CcCedictCharacter
+from app.models.character import Character
 
 MAX_WORD_LEN = 20
 
 
 def _exists(session: Session, text: str) -> bool:
     return session.exec(
-        select(CcCedictCharacter).where(CcCedictCharacter.simplified == text)
+        select(Character).where(Character.simplified == text)
     ).first() is not None
 
 

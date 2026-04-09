@@ -1,6 +1,9 @@
 """
-Import CC-CEDICT into SQLite.
-Supports multiple entries per character (different readings/tones).
+Import CC-CEDICT into SQLite using the new normalized schema.
+Creates/updates rows in: characters, pinyin_readings, definitions.
+
+Supports multiple entries per character (different readings / tones / meanings).
+e.g. 中: zhōng (middle) AND zhòng (to hit a target)
 
 Usage:
     python scripts/import_cedict.py
@@ -18,7 +21,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlmodel import Session, select
 from app.core.database import engine, init_db
-from app.models.character import CcCedictCharacter, DictionarySource
+from app.core.pinyin import numeric_to_diacritic
+from app.models.character import Character, PinyinReading, Definition, DictionarySource
 
 CEDICT_PATH = Path(__file__).parent.parent / 'data' / 'cedict_ts.u8'
 SOURCE_NAME = 'CC-CEDICT'
@@ -33,7 +37,7 @@ def parse_line(line: str) -> dict | None:
     return {
         'traditional': traditional if traditional != simplified else None,
         'simplified': simplified,
-        'pinyin': pinyin_raw.strip(),
+        'pinyin_numeric': pinyin_raw.strip(),
         'meaning_en': '; '.join(meanings_raw.split('/')),
     }
 
@@ -56,11 +60,11 @@ def run():
             session.commit()
             session.refresh(source)
 
-        # Clear existing entries for this source
+        # Delete existing definitions for this source (idempotent re-import)
         from sqlmodel import delete
-        session.exec(delete(CcCedictCharacter).where(CcCedictCharacter.source_id == source.id))
+        session.exec(delete(Definition).where(Definition.source_id == source.id))
         session.commit()
-        print(f'Cleared existing {SOURCE_NAME} entries. Importing...')
+        print(f'Cleared existing {SOURCE_NAME} definitions. Importing...')
 
         inserted = 0
         with open(CEDICT_PATH, encoding='utf-8') as f:
@@ -72,7 +76,45 @@ def run():
                 if not parsed:
                     continue
 
-                session.add(CcCedictCharacter(source_id=source.id, **parsed))
+                simplified = parsed['simplified']
+                traditional = parsed['traditional']
+                pinyin_num = parsed['pinyin_numeric']
+                meaning_en = parsed['meaning_en']
+
+                # Upsert character
+                char_row = session.exec(
+                    select(Character).where(Character.simplified == simplified)
+                ).first()
+                if not char_row:
+                    char_row = Character(simplified=simplified, traditional=traditional)
+                    session.add(char_row)
+                    session.flush()
+                elif traditional and not char_row.traditional:
+                    char_row.traditional = traditional
+                    session.add(char_row)
+                    session.flush()
+
+                # Insert pinyin reading (skip if already exists for this character+numeric pinyin)
+                existing_pinyin = session.exec(
+                    select(PinyinReading)
+                    .where(PinyinReading.character_id == char_row.id)
+                    .where(PinyinReading.pinyin_numeric == pinyin_num)
+                ).first()
+                if not existing_pinyin:
+                    session.add(PinyinReading(
+                        character_id=char_row.id,
+                        pinyin=numeric_to_diacritic(pinyin_num),
+                        pinyin_numeric=pinyin_num,
+                    ))
+                    session.flush()
+
+                # Insert definition
+                session.add(Definition(
+                    character_id=char_row.id,
+                    source_id=source.id,
+                    language='en',
+                    meaning_text=meaning_en,
+                ))
                 inserted += 1
 
                 if inserted % 5000 == 0:

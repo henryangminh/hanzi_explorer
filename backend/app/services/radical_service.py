@@ -2,10 +2,9 @@ from typing import List
 
 from sqlmodel import Session, select, func
 
-from app.models.character import CcCedictCharacter
+from app.models.character import Character, PinyinReading, Definition, DictionarySource
 from app.models.note import RadicalCompound, RadicalGroup
 from app.schemas.radical import CompoundItem, RadicalDetail, RadicalSummary
-from app.core.pinyin import numeric_to_diacritic
 
 
 def list_radicals(session: Session) -> List[RadicalSummary]:
@@ -35,18 +34,35 @@ def get_radical(session: Session, radical: str) -> RadicalDetail | None:
         select(RadicalCompound).where(RadicalCompound.radical_id == group.id)
     ).all()
 
+    # Get CEDICT source for English meaning lookup
+    cedict_source = session.exec(
+        select(DictionarySource).where(DictionarySource.name == 'CC-CEDICT')
+    ).first()
+
     compounds: List[CompoundItem] = []
     for row in compounds_rows:
-        # Get first CEDICT entry for this char
         char = session.exec(
-            select(CcCedictCharacter)
-            .where(CcCedictCharacter.simplified == row.char_simplified)
+            select(Character).where(Character.simplified == row.char_simplified)
         ).first()
         if char:
+            first_pinyin = session.exec(
+                select(PinyinReading)
+                .where(PinyinReading.character_id == char.id)
+                .order_by(PinyinReading.id)
+            ).first()
+            first_def = None
+            if cedict_source:
+                first_def = session.exec(
+                    select(Definition)
+                    .where(Definition.character_id == char.id)
+                    .where(Definition.source_id == cedict_source.id)
+                    .where(Definition.language == 'en')
+                    .order_by(Definition.id)
+                ).first()
             compounds.append(CompoundItem(
                 char=char.simplified,
-                pinyin=numeric_to_diacritic(char.pinyin),
-                meaning_en=char.meaning_en,
+                pinyin=first_pinyin.pinyin if first_pinyin else '',
+                meaning_en=first_def.meaning_text if first_def else '',
                 note=row.note,
             ))
         else:

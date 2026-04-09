@@ -10,7 +10,7 @@ from typing import List, Tuple
 from sqlmodel import Session, select
 from sqlalchemy import func
 
-from app.models.character import CcCedictCharacter
+from app.models.character import Character, PinyinReading
 
 
 def _is_chinese_char(c: str) -> bool:
@@ -23,23 +23,21 @@ def traditional_to_simplified(session: Session, text: str) -> str:
     Characters that are already simplified (or not Chinese) are kept as-is.
     Works character-by-character so mixed input is handled correctly.
     """
-    from app.models.character import CcCedictCharacter
-
     unique_chars = list({c for c in text if _is_chinese_char(c)})
     if not unique_chars:
         return text
 
     # t→s candidates: rows where traditional is one of our chars
     trad_rows = session.exec(
-        select(CcCedictCharacter.traditional, CcCedictCharacter.simplified)
-        .where(CcCedictCharacter.traditional.in_(unique_chars))
+        select(Character.traditional, Character.simplified)
+        .where(Character.traditional.in_(unique_chars))
         .distinct()
     ).all()
 
     # chars that already exist as simplified entries — keep them as-is
     simp_set: set[str] = set(session.exec(
-        select(CcCedictCharacter.simplified)
-        .where(CcCedictCharacter.simplified.in_(unique_chars))
+        select(Character.simplified)
+        .where(Character.simplified.in_(unique_chars))
         .distinct()
     ).all())
 
@@ -86,8 +84,8 @@ def extract_all_words(session: Session, text: str) -> List[str]:
                 positions[sub] = i
 
     existing = set(session.exec(
-        select(CcCedictCharacter.simplified)
-        .where(CcCedictCharacter.simplified.in_(list(possible)))
+        select(Character.simplified)
+        .where(Character.simplified.in_(list(possible)))
         .distinct()
     ).all())
 
@@ -120,7 +118,6 @@ def short_search(session: Session, query: str) -> List[str]:
     Result for 不客气: [不客气, 客气, 不, 客, 气]
     Result for 指导:   [指导, 指导课, 指导员, ..., 指, 导]
     """
-    # Step 1 & 3: sub-word extraction gives multi-char words + individual chars
     sub_result = extract_all_words(session, query)
     seen: set = set(sub_result)
 
@@ -129,8 +126,8 @@ def short_search(session: Session, query: str) -> List[str]:
 
     # Step 2: prefix extensions (words starting with full query, longer than query)
     prefix_rows = session.exec(
-        select(CcCedictCharacter.simplified)
-        .where(CcCedictCharacter.simplified.like(f'{query}%'))
+        select(Character.simplified)
+        .where(Character.simplified.like(f'{query}%'))
         .distinct()
     ).all()
 
@@ -140,12 +137,8 @@ def short_search(session: Session, query: str) -> List[str]:
             extensions.append(word)
             seen.add(word)
 
-    # Sort extensions: shorter first (= higher match ratio = shown before longer ones)
     extensions.sort(key=lambda w: len(w))
 
-    # Put exact match first so the query itself always appears before prefix extensions.
-    # This matters especially for single-char queries where the char would otherwise
-    # end up after all extensions (e.g. searching "指" should show 指 before 指导).
     exact = [w for w in (multi_words + single_chars) if w == query]
     other_multi = [w for w in multi_words if w != query]
     other_singles = [w for w in single_chars if w != query]
@@ -156,7 +149,7 @@ def short_search(session: Session, query: str) -> List[str]:
 # ── Pinyin mode ───────────────────────────────────────────
 
 def _norm_db_pinyin_no_tones(col):
-    """SQLAlchemy expression: lower(pinyin) with spaces and tone digits removed."""
+    """SQLAlchemy expression: lower(col) with spaces and tone digits removed."""
     expr = func.lower(col)
     expr = func.replace(expr, ' ', '')
     for d in '12345':
@@ -165,7 +158,7 @@ def _norm_db_pinyin_no_tones(col):
 
 
 def _norm_db_pinyin_no_spaces(col):
-    """SQLAlchemy expression: lower(pinyin) with only spaces removed."""
+    """SQLAlchemy expression: lower(col) with only spaces removed."""
     return func.replace(func.lower(col), ' ', '')
 
 
@@ -182,13 +175,14 @@ def pinyin_search(session: Session, pinyin_input: str) -> List[str]:
 
     if has_digits:
         normalized_input = re.sub(r'\s', '', raw)
-        norm_db_expr = _norm_db_pinyin_no_spaces(CcCedictCharacter.pinyin)
+        norm_db_expr = _norm_db_pinyin_no_spaces(PinyinReading.pinyin_numeric)
     else:
         normalized_input = re.sub(r'\s', '', raw)
-        norm_db_expr = _norm_db_pinyin_no_tones(CcCedictCharacter.pinyin)
+        norm_db_expr = _norm_db_pinyin_no_tones(PinyinReading.pinyin_numeric)
 
     stmt = (
-        select(CcCedictCharacter.simplified, CcCedictCharacter.pinyin)
+        select(Character.simplified, PinyinReading.pinyin_numeric)
+        .join(PinyinReading, PinyinReading.character_id == Character.id)
         .where(norm_db_expr.like(f'{normalized_input}%'))
         .distinct()
     )
@@ -196,13 +190,15 @@ def pinyin_search(session: Session, pinyin_input: str) -> List[str]:
 
     seen: set = set()
     results: List[Tuple[str, float]] = []
-    for simplified, pinyin in rows:
+    for simplified, pinyin_num in rows:
         if simplified not in seen:
             seen.add(simplified)
+            if not pinyin_num:
+                continue
             if has_digits:
-                db_norm = pinyin.replace(' ', '').lower()
+                db_norm = pinyin_num.replace(' ', '').lower()
             else:
-                db_norm = re.sub(r'[\s0-9]', '', pinyin.lower())
+                db_norm = re.sub(r'[\s0-9]', '', pinyin_num.lower())
 
             if db_norm == normalized_input:
                 score = 100.0

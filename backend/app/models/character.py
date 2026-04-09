@@ -13,24 +13,50 @@ class DictionarySource(SQLModel, table=True):
     imported_at: Optional[str] = Field(default=None)            # ISO datetime
 
 
-class CcCedictCharacter(SQLModel, table=True):
+class Character(SQLModel, table=True):
     """
-    One row per CEDICT entry. A single simplified form may have
-    multiple entries (different readings / tones / meanings).
-    e.g. 中: zhōng (middle) AND zhòng (to hit a target)
+    Single Source of Truth for each Chinese character/word.
+    One row per unique simplified form.
     """
-    __tablename__ = "cc_cedict_characters"
+    __tablename__ = "characters"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    source_id: int = Field(foreign_key="dictionary_sources.id", index=True)
-    simplified: str = Field(index=True, max_length=10)
+    simplified: str = Field(unique=True, index=True, max_length=10)
     traditional: Optional[str] = Field(default=None, max_length=10)
-    pinyin: str = Field(max_length=100)
-    meaning_en: str
     radical: Optional[str] = Field(default=None, max_length=10)
     stroke_count: Optional[int] = None
-    hsk_level: Optional[int] = None
+    hsk_level: Optional[int] = Field(default=None, index=True)
     frequency: Optional[int] = None
+    is_common: bool = Field(default=False)
+
+
+class PinyinReading(SQLModel, table=True):
+    """
+    One row per (character, pinyin) reading.
+    A character can have multiple readings (polyphones), e.g. 中: zhōng and zhòng.
+    """
+    __tablename__ = "pinyin_readings"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    character_id: int = Field(foreign_key="characters.id", index=True)
+    pinyin: str = Field(max_length=100, index=True)          # diacritic form, e.g. "zhōng"
+    pinyin_numeric: Optional[str] = Field(default=None, max_length=100)  # numeric, e.g. "zhong1"
+    tone: Optional[int] = None
+
+
+class Definition(SQLModel, table=True):
+    """
+    Unified definitions from all sources (CC-CEDICT, CVDICT, DrKameleon, etc.).
+    One row per (character, source, meaning entry).
+    """
+    __tablename__ = "definitions"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    character_id: int = Field(foreign_key="characters.id", index=True)
+    source_id: int = Field(foreign_key="dictionary_sources.id", index=True)
+    language: str = Field(max_length=5)     # 'en', 'vi'
+    meaning_text: str
+    pos: Optional[str] = None               # Part of speech (from DrKameleon)
 
 
 class ExternalCache(SQLModel, table=True):

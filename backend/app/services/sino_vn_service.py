@@ -2,7 +2,7 @@
 Sino-Vietnamese (Hán Việt) reading computation.
 
 Strategy for single chars:
-  - Look up sino_vn table by (char, pinyin) — exact match first, then any pinyin.
+  - Look up sino_vietnamese table by character_id + pinyin — exact match first, then any pinyin.
 
 Strategy for 2-char words:
   1. Try crawling hvdic.thivien.net (cached in external_cache with source='hvdic').
@@ -21,8 +21,8 @@ from urllib.parse import quote
 import httpx
 from sqlmodel import Session, select
 
-from app.models.character import CcCedictCharacter, ExternalCache
-from app.models.sino_vn import SinoVn
+from app.models.character import Character, ExternalCache
+from app.models.sino_vn import SinoVietnamese
 
 HVDIC_CACHE_TTL_HOURS = 168  # 1 week
 HEADERS = {'User-Agent': 'HanziExplorer/1.0 (personal study tool)'}
@@ -30,49 +30,46 @@ HEADERS = {'User-Agent': 'HanziExplorer/1.0 (personal study tool)'}
 
 # ── DB lookup ─────────────────────────────────────────────
 
-def _get_traditional(session: Session, simplified: str) -> str | None:
-    """Get the traditional form of a simplified character from CEDICT."""
+def _get_character_id(session: Session, char: str) -> int | None:
+    """Get character_id for a char — try simplified first, then traditional."""
     row = session.exec(
-        select(CcCedictCharacter.traditional)
-        .where(CcCedictCharacter.simplified == simplified)
-        .where(CcCedictCharacter.traditional != simplified)
+        select(Character.id).where(Character.simplified == char)
+    ).first()
+    if row:
+        return row
+
+    # Fallback: char is a traditional form — find the simplified row
+    row = session.exec(
+        select(Character.id).where(Character.traditional == char)
     ).first()
     return row if row else None
 
 
 def _get_db_readings(session: Session, char: str, pinyin_num: str) -> list[str]:
-    """Get Hán Việt readings for a single char from sino_vn table.
+    """Get Hán Việt readings for a single char from sino_vietnamese table.
 
-    Tries exact (char, pinyin) match first; falls back to any pinyin for the char;
-    then tries the traditional form if simplified isn't in sino_vn (CSV uses traditional).
+    Tries exact (character_id, pinyin) match first; falls back to any pinyin for the char;
+    then tries the traditional form if simplified isn't in sino_vietnamese.
     """
+    char_id = _get_character_id(session, char)
+    if not char_id:
+        return []
+
     # Exact match by pinyin
     rows = session.exec(
-        select(SinoVn)
-        .where(SinoVn.char == char)
-        .where(SinoVn.pinyin == pinyin_num)
+        select(SinoVietnamese)
+        .where(SinoVietnamese.character_id == char_id)
+        .where(SinoVietnamese.pinyin == pinyin_num)
     ).all()
     if rows:
         return _extract_readings(rows)
 
-    # Any pinyin for this char (covers wildcard '*' pinyin entries)
-    rows = session.exec(select(SinoVn).where(SinoVn.char == char)).all()
+    # Any pinyin for this char
+    rows = session.exec(
+        select(SinoVietnamese).where(SinoVietnamese.character_id == char_id)
+    ).all()
     if rows:
         return _extract_readings(rows)
-
-    # Fallback: try traditional form (hanviet.csv stores traditional characters)
-    traditional = _get_traditional(session, char)
-    if traditional:
-        rows = session.exec(
-            select(SinoVn)
-            .where(SinoVn.char == traditional)
-            .where(SinoVn.pinyin == pinyin_num)
-        ).all()
-        if rows:
-            return _extract_readings(rows)
-        rows = session.exec(select(SinoVn).where(SinoVn.char == traditional)).all()
-        if rows:
-            return _extract_readings(rows)
 
     return []
 
@@ -144,11 +141,7 @@ def _set_hvdic_cache(session: Session, char: str, readings: list[str]) -> None:
 # ── hvdic crawl ───────────────────────────────────────────
 
 async def _crawl_hvdic(session: Session, char: str) -> list[str] | None:
-    """Crawl hvdic.thivien.net for Hán Việt readings of a multi-char word.
-
-    Returns list of readings on success, None if not found or error.
-    Caches the result (empty list = confirmed not found).
-    """
+    """Crawl hvdic.thivien.net for Hán Việt readings of a multi-char word."""
     cached = _get_hvdic_cache(session, char)
     if cached is not None:
         return cached if cached else None
@@ -204,13 +197,11 @@ async def compute_sino_vn(session: Session, char: str, pinyin_numeric: str) -> l
         crawled = await _crawl_hvdic(session, char)
         if crawled:
             return crawled
-        # Compose from individual chars
         a = _get_db_readings(session, chars[0], syllables[0])
         b = _get_db_readings(session, chars[1], syllables[1])
         return _combine([a, b])
 
     # ── 3+ chars ─────────────────────────────────────────
-    # Try full-word crawl first
     crawled = await _crawl_hvdic(session, char)
     if crawled:
         return crawled
@@ -226,7 +217,6 @@ async def compute_sino_vn(session: Session, char: str, pinyin_numeric: str) -> l
                 parts.append(cached_two)
                 i += 2
                 continue
-        # Single char fallback
         parts.append(_get_db_readings(session, chars[i], syllables[i]))
         i += 1
 
