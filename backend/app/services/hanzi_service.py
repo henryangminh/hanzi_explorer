@@ -17,11 +17,12 @@ def get_characters_with_component(session: Session, component: str) -> list[str]
     queried from characters.components and characters.components_traditional,
     sorted by stroke_count (simplified first, then traditional).
     """
-    # Use json_each to search inside the JSON arrays
+    # Search by radical column AND inside components JSON arrays
     sql = text("""
         SELECT DISTINCT c.simplified, c.stroke_count, c.stroke_count_traditional
         FROM characters c
-        WHERE EXISTS (
+        WHERE c.radical = :comp
+        OR EXISTS (
             SELECT 1 FROM json_each(c.components) je WHERE je.value = :comp
         )
         OR EXISTS (
