@@ -76,28 +76,96 @@ def get_entries_preview(
     from sqlalchemy import text
     from app.core.cedict_utils import clean_meaning
     from app.core.pinyin import numeric_to_diacritic
-    from app.services.sino_vn_service import _get_db_readings, _combine
 
     nb = _get_notebook_or_404(session, notebook_id)
     _assert_can_view(nb, user)
 
-    rows = session.execute(
-        text("""
-            SELECT
-                ne.id, ne.char, ne.added_at,
-                (SELECT meaning_en FROM cc_cedict_characters
-                 WHERE simplified = ne.char ORDER BY id LIMIT 1) AS cedict_raw,
-                (SELECT meaning_vi FROM cvdict_characters
-                 WHERE simplified = ne.char ORDER BY id LIMIT 1) AS cvdict_raw,
-                (SELECT GROUP_CONCAT(pinyin, '|||') FROM (
-                    SELECT DISTINCT pinyin FROM cc_cedict_characters
-                    WHERE simplified = ne.char ORDER BY id
-                )) AS pinyins_raw
-            FROM notebook_entries ne
-            WHERE ne.notebook_id = :nb_id
+    order_clause = {
+        "name_asc":       "nc.simplified ASC",
+        "name_desc":      "nc.simplified DESC",
+        "created_at_asc": "nc.added_at ASC",
+        "updated_at_asc": "nc.added_at ASC",
+        "created_at_desc":"nc.added_at DESC",
+    }.get(sort, "nc.added_at DESC")
+
+    # Pre-fetch source IDs once to avoid subqueries inside the CTE
+    src_row = session.execute(text(
+        "SELECT name, id FROM dictionary_sources WHERE name IN ('CC-CEDICT', 'CVDICT')"
+    )).fetchall()
+    src_ids = {row[0]: row[1] for row in src_row}
+    cedict_id = src_ids.get("CC-CEDICT", -1)
+    cvdict_id  = src_ids.get("CVDICT", -1)
+
+    # CTE-based query: all lookups are set-based (no correlated subqueries),
+    # each auxiliary table is scanned once filtered to only notebook chars.
+    result = session.execute(
+        text(f"""
+            WITH nb_chars AS (
+                SELECT ne.id AS entry_id, c.id AS char_id, c.simplified, ne.added_at
+                FROM notebook_entries ne
+                JOIN characters c ON c.id = ne.char_id
+                WHERE ne.notebook_id = :nb_id
+            ),
+            en_min AS (
+                SELECT character_id, MIN(id) AS min_id
+                FROM definitions
+                WHERE source_id = :cedict_id AND language = 'en'
+                  AND character_id IN (SELECT char_id FROM nb_chars)
+                GROUP BY character_id
+            ),
+            vi_min AS (
+                SELECT character_id, MIN(id) AS min_id
+                FROM definitions
+                WHERE source_id = :cvdict_id AND language = 'vi'
+                  AND character_id IN (SELECT char_id FROM nb_chars)
+                GROUP BY character_id
+            ),
+            py AS (
+                SELECT character_id,
+                       GROUP_CONCAT(pinyin_numeric, '|||') AS pinyins_raw
+                FROM (
+                    SELECT character_id, pinyin_numeric
+                    FROM pinyin_readings
+                    WHERE character_id IN (SELECT char_id FROM nb_chars)
+                    GROUP BY character_id, pinyin_numeric
+                    ORDER BY character_id, MIN(id)
+                )
+                GROUP BY character_id
+            ),
+            first_py AS (
+                SELECT pr.character_id, pr.pinyin_numeric
+                FROM pinyin_readings pr
+                JOIN (
+                    SELECT character_id, MIN(id) AS min_id
+                    FROM pinyin_readings
+                    WHERE character_id IN (SELECT char_id FROM nb_chars)
+                    GROUP BY character_id
+                ) m ON m.character_id = pr.character_id AND m.min_id = pr.id
+            ),
+            sn AS (
+                SELECT sv.character_id,
+                       GROUP_CONCAT(sv.hanviet, '/') AS sino_vn_raw
+                FROM sino_vietnamese sv
+                JOIN first_py fp ON fp.character_id = sv.character_id
+                                 AND sv.pinyin = fp.pinyin_numeric
+                GROUP BY sv.character_id
+            )
+            SELECT nc.entry_id, nc.simplified, nc.added_at,
+                   en_d.meaning_text AS cedict_raw,
+                   vi_d.meaning_text AS cvdict_raw,
+                   py.pinyins_raw,
+                   sn.sino_vn_raw
+            FROM nb_chars nc
+            LEFT JOIN en_min   ON en_min.character_id  = nc.char_id
+            LEFT JOIN definitions en_d ON en_d.id      = en_min.min_id
+            LEFT JOIN vi_min   ON vi_min.character_id  = nc.char_id
+            LEFT JOIN definitions vi_d ON vi_d.id      = vi_min.min_id
+            LEFT JOIN py       ON py.character_id       = nc.char_id
+            LEFT JOIN sn       ON sn.character_id       = nc.char_id
+            ORDER BY {order_clause}
         """),
-        {"nb_id": notebook_id},
-    ).fetchall()
+        {"nb_id": notebook_id, "cedict_id": cedict_id, "cvdict_id": cvdict_id},
+    )
 
     def _cedict_brief(raw: str | None) -> str | None:
         if not raw:
@@ -114,29 +182,13 @@ def get_entries_preview(
             return []
         return [numeric_to_diacritic(p.strip()) for p in raw.split("|||") if p.strip()]
 
-    def _sino_vn(char: str, pinyins_raw: str | None) -> list[str]:
-        if not pinyins_raw:
+    def _sino_vn(raw: str | None) -> list[str]:
+        if not raw:
             return []
-        first_pinyin = pinyins_raw.split("|||")[0].strip()
-        chars = list(char)
-        syllables = first_pinyin.split()
-        if len(chars) != len(syllables):
-            return []
-        parts = [_get_db_readings(session, c, s) for c, s in zip(chars, syllables)]
-        return _combine(parts)
-
-    # Sort rows before streaming so client receives them in the right order
-    if sort == "name_asc":
-        rows = sorted(rows, key=lambda r: r[1])
-    elif sort == "name_desc":
-        rows = sorted(rows, key=lambda r: r[1], reverse=True)
-    elif sort in ("created_at_asc", "updated_at_asc"):
-        rows = sorted(rows, key=lambda r: r[2])
-    else:
-        rows = sorted(rows, key=lambda r: r[2], reverse=True)
+        return [r.strip() for r in raw.split("/") if r.strip()]
 
     def generate():
-        for row in rows:
+        for row in result:
             entry = NotebookEntryPreview(
                 id=row[0],
                 char=row[1],
@@ -144,7 +196,7 @@ def get_entries_preview(
                 cedict_brief=_cedict_brief(row[3]),
                 cvdict_brief=_cvdict_brief(row[4]),
                 pinyins=_pinyins(row[5]),
-                sino_vn=_sino_vn(row[1], row[5]),
+                sino_vn=_sino_vn(row[6]),
             )
             yield entry.model_dump_json() + '\n'
 

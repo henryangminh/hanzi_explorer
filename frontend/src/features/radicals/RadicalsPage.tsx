@@ -8,7 +8,7 @@ import api from '@/lib/axios'
 import { SaveToNotebookModal } from '@/features/notebooks/SaveToNotebookModal'
 import { CharDetailBody } from '@/features/dictionary/CharDetailBody'
 
-interface CharCard { char: string; pinyin: string; meaning_en: string }
+interface CharCard { char: string; pinyin: string; meaning_en: string; stroke_count?: number | null }
 
 // ── Char detail panel (inside popup) ─────────────────────
 
@@ -137,34 +137,54 @@ function RadicalPopup({
             {!loading && chars.length === 0 && (
               <p className="text-sm text-[var(--color-text-muted)] italic">Không có dữ liệu</p>
             )}
-            {!loading && chars.length > 0 && (
-              <>
-                <p className="text-xs text-[var(--color-text-muted)] mb-3">
-                  {chars.length} chữ có chứa bộ thủ này
-                </p>
-                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
-                  {chars.map((c) => (
-                    <button
-                      key={c.char}
-                      onClick={() => setSelectedChar(c.char)}
-                      className={cn(
-                        'flex flex-col items-center gap-1 py-3 px-2 rounded-xl border transition-all cursor-pointer',
-                        'bg-[var(--color-bg-surface)] border-[var(--color-border)]',
-                        'hover:border-[var(--color-primary)] hover:bg-[var(--color-bg-subtle)]',
-                        'active:scale-95'
-                      )}
-                    >
-                      <span className="font-cjk text-3xl text-[var(--color-text)] leading-none">{c.char}</span>
-                      {c.pinyin && (
-                        <span className="text-xs text-[var(--color-text-muted)] leading-tight text-center">
-                          {c.pinyin}
-                        </span>
-                      )}
-                    </button>
+            {!loading && chars.length > 0 && (() => {
+              const sorted = [...chars].sort((a, b) => {
+                if (a.stroke_count == null) return 1
+                if (b.stroke_count == null) return -1
+                return a.stroke_count - b.stroke_count
+              })
+              const groups = sorted.reduce<Record<number, CharCard[]>>((acc, c) => {
+                const key = c.stroke_count ?? 0
+                if (!acc[key]) acc[key] = []
+                acc[key].push(c)
+                return acc
+              }, {})
+              return (
+                <>
+                  <p className="text-xs text-[var(--color-text-muted)] mb-3">
+                    {chars.length} chữ có chứa bộ thủ này
+                  </p>
+                  {Object.entries(groups).map(([strokes, group]) => (
+                    <div key={strokes} className="mb-4">
+                      <p className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
+                        {strokes} nét · {group.length} chữ
+                      </p>
+                      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+                        {group.map((c) => (
+                          <button
+                            key={c.char}
+                            onClick={() => setSelectedChar(c.char)}
+                            className={cn(
+                              'flex flex-col items-center gap-1 py-3 px-2 rounded-xl border transition-all cursor-pointer',
+                              'bg-[var(--color-bg-surface)] border-[var(--color-border)]',
+                              'hover:border-[var(--color-primary)] hover:bg-[var(--color-bg-subtle)]',
+                              'active:scale-95'
+                            )}
+                          >
+                            <span className="font-cjk text-3xl text-[var(--color-text)] leading-none">{c.char}</span>
+                            {c.pinyin && (
+                              <span className="text-xs text-[var(--color-text-muted)] leading-tight text-center">
+                                {c.pinyin}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   ))}
-                </div>
-              </>
-            )}
+                </>
+              )
+            })()}
           </div>
         </>
       )}

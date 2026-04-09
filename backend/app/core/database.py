@@ -1,4 +1,5 @@
 from sqlmodel import SQLModel, create_engine, Session
+from sqlalchemy import event
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -8,6 +9,11 @@ engine = create_engine(
     connect_args={"check_same_thread": False},  # needed for SQLite
     echo=settings.app_env == "development",
 )
+
+
+@event.listens_for(engine, "connect")
+def set_sqlite_journal_mode(dbapi_connection, connection_record):
+    dbapi_connection.execute("PRAGMA journal_mode=DELETE")
 
 
 def init_db() -> None:

@@ -84,7 +84,7 @@ def lookup_cedict(session: Session, char: str) -> list[CedictEntry]:
             meaning_en=clean_meaning(defn.meaning_text),
             radical=char_row.radical,
             stroke_count=char_row.stroke_count,
-            hsk_level=char_row.hsk_level,
+            hsk_level=None,
             source_name=source.name,
         ))
     return results
@@ -116,7 +116,7 @@ def lookup_cvdict(session: Session, char: str) -> list[CvdictEntry]:
             meaning_vi=defn.meaning_text,
             radical=char_row.radical,
             stroke_count=char_row.stroke_count,
-            hsk_level=char_row.hsk_level,
+            hsk_level=None,
             source_name=source.name,
         ))
     return results
@@ -314,7 +314,8 @@ def lookup_hsk_tags(session: Session, char: str) -> list[str]:
             SELECT DISTINCT n.name
             FROM notebooks n
             JOIN notebook_entries ne ON n.id = ne.notebook_id
-            WHERE ne.char = :char AND n.type = 'global'
+            JOIN characters c ON c.id = ne.char_id
+            WHERE (c.simplified = :char OR c.traditional = :char) AND n.type = 'global'
             ORDER BY n.name
         """),
         {"char": char},

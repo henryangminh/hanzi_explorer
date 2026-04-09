@@ -4,6 +4,7 @@ from typing import Literal, Optional
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select, func
 
+from app.models.character import Character
 from app.models.notebook import Notebook, NotebookEntry
 from app.schemas.notebook import (
     AddEntryRequest,
@@ -49,6 +50,18 @@ def _to_response(session: Session, nb: Notebook) -> NotebookResponse:
     )
 
 
+def _get_or_create_character(session: Session, char: str) -> Character:
+    """Lookup character by simplified or traditional form, create stub if not found."""
+    c = session.exec(select(Character).where(Character.simplified == char)).first()
+    if not c:
+        c = session.exec(select(Character).where(Character.traditional == char)).first()
+    if not c:
+        c = Character(simplified=char)
+        session.add(c)
+        session.flush()
+    return c
+
+
 def list_notebooks(
     session: Session,
     user_id: int,
@@ -73,19 +86,20 @@ def get_notebook(session: Session, notebook_id: int, user_id: int) -> Optional[N
         return None
     if nb.type == "private" and nb.owner_id != user_id:
         return None
-    entries = session.exec(
-        select(NotebookEntry)
+    rows = session.exec(
+        select(NotebookEntry, Character)
+        .join(Character, NotebookEntry.char_id == Character.id)
         .where(NotebookEntry.notebook_id == notebook_id)
         .order_by(NotebookEntry.added_at.desc())
     ).all()
     entry_responses = [
         NotebookEntryResponse(
-            id=e.id,
-            notebook_id=e.notebook_id,
-            char=e.char,
-            added_at=e.added_at,
+            id=entry.id,
+            notebook_id=entry.notebook_id,
+            char=char.simplified,
+            added_at=entry.added_at,
         )
-        for e in entries
+        for entry, char in rows
     ]
     return NotebookDetail(
         id=nb.id,
@@ -93,7 +107,7 @@ def get_notebook(session: Session, notebook_id: int, user_id: int) -> Optional[N
         description=nb.description,
         type=nb.type,
         owner_id=nb.owner_id,
-        entry_count=len(entries),
+        entry_count=len(rows),
         created_at=nb.created_at,
         updated_at=nb.updated_at,
         entries=entry_responses,
@@ -152,7 +166,8 @@ def add_entry(
     data: AddEntryRequest,
 ) -> NotebookEntryResponse:
     """Returns the entry. Raises ValueError if already exists."""
-    entry = NotebookEntry(notebook_id=nb.id, char=data.char)
+    char_row = _get_or_create_character(session, data.char)
+    entry = NotebookEntry(notebook_id=nb.id, char_id=char_row.id)
     session.add(entry)
     try:
         session.flush()
@@ -167,15 +182,22 @@ def add_entry(
     return NotebookEntryResponse(
         id=entry.id,
         notebook_id=entry.notebook_id,
-        char=entry.char,
+        char=char_row.simplified,
         added_at=entry.added_at,
     )
 
 
 def remove_entry(session: Session, nb: Notebook, char: str) -> bool:
+    char_row = session.exec(
+        select(Character).where(
+            (Character.simplified == char) | (Character.traditional == char)
+        )
+    ).first()
+    if not char_row:
+        return False
     entry = session.exec(
         select(NotebookEntry)
-        .where(NotebookEntry.notebook_id == nb.id, NotebookEntry.char == char)
+        .where(NotebookEntry.notebook_id == nb.id, NotebookEntry.char_id == char_row.id)
     ).first()
     if entry is None:
         return False

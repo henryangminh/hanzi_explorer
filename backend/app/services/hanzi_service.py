@@ -1,24 +1,38 @@
 """
 Character decomposition service.
-Returns all characters that share the given component, using the hanzi_decomposition DB table.
+Returns all characters that share the given component, using the characters table.
 """
+import json
 from functools import lru_cache
 
-from sqlmodel import Session, select
+from sqlalchemy import text
+from sqlmodel import Session
 
-from app.models.note import HanziDecomposition
+from app.models.character import Character
 
 
 def get_characters_with_component(session: Session, component: str) -> list[str]:
     """
     Return all characters that contain the given component/radical,
-    queried from the hanzi_decomposition table.
+    queried from characters.components and characters.components_traditional,
+    sorted by stroke_count (simplified first, then traditional).
     """
-    rows = session.exec(
-        select(HanziDecomposition.character)
-        .where(HanziDecomposition.component == component)
-    ).all()
-    return list(rows)
+    # Use json_each to search inside the JSON arrays
+    sql = text("""
+        SELECT DISTINCT c.simplified, c.stroke_count, c.stroke_count_traditional
+        FROM characters c
+        WHERE EXISTS (
+            SELECT 1 FROM json_each(c.components) je WHERE je.value = :comp
+        )
+        OR EXISTS (
+            SELECT 1 FROM json_each(c.components_traditional) je WHERE je.value = :comp
+        )
+        ORDER BY
+            COALESCE(c.stroke_count, c.stroke_count_traditional, 9999),
+            c.simplified
+    """)
+    rows = session.execute(sql, {"comp": component}).fetchall()
+    return [row[0] for row in rows]
 
 
 @lru_cache(maxsize=1)

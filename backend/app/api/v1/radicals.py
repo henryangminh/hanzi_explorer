@@ -1,7 +1,9 @@
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
+from sqlmodel import select
 from app.core.deps import CurrentUser, DbSession
+from app.models.character import Character
 from app.schemas.radical import RadicalDetail, RadicalSummary
 from app.services import radical_service
 from app.services.hanzi_service import get_characters_with_component
@@ -15,6 +17,7 @@ class CharCard(BaseModel):
     char: str
     pinyin: str
     meaning_en: str
+    stroke_count: Optional[int] = None
 
 
 class RadicalCharsResponse(BaseModel):
@@ -50,6 +53,8 @@ def get_radical_chars(radical: str, current_user: CurrentUser, session: DbSessio
         if char in seen:
             continue
         seen.add(char)
+        char_row = session.exec(select(Character).where(Character.simplified == char)).first()
+        stroke = char_row.stroke_count if char_row else None
         entries = lookup_cedict(session, char)
         if entries:
             first = entries[0]
@@ -57,9 +62,10 @@ def get_radical_chars(radical: str, current_user: CurrentUser, session: DbSessio
                 char=char,
                 pinyin=first.pinyin,
                 meaning_en=first.meaning_en,
+                stroke_count=stroke,
             ))
         else:
-            result.append(CharCard(char=char, pinyin='', meaning_en=''))
+            result.append(CharCard(char=char, pinyin='', meaning_en='', stroke_count=stroke))
 
     return RadicalCharsResponse(radical=radical, chars=result)
 

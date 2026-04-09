@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, X, ChevronDown, ChevronLeft, BookmarkPlus } from 'lucide-react'
 import api from '@/lib/axios'
@@ -45,9 +45,12 @@ function NotebookEntriesModal({
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [saveModalChar, setSaveModalChar] = useState<string | null>(null)
 
+  const pendingRef = useRef<NotebookEntryPreview[]>([])
+
   useEffect(() => {
     const controller = new AbortController()
     const { signal } = controller
+    pendingRef.current = []
 
     const run = async () => {
       setLoading(true)
@@ -62,6 +65,14 @@ function NotebookEntriesModal({
         const reader = response.body!.getReader()
         const decoder = new TextDecoder()
         let buffer = ''
+
+        // Flush buffered entries to state every 60ms to avoid per-entry re-renders
+        const flushInterval = setInterval(() => {
+          if (pendingRef.current.length === 0) return
+          const batch = pendingRef.current.splice(0)
+          setEntries((prev) => [...prev, ...batch])
+        }, 60)
+
         while (true) {
           const { done, value } = await reader.read()
           if (signal.aborted) { reader.cancel(); break }
@@ -71,14 +82,19 @@ function NotebookEntriesModal({
           buffer = lines.pop() ?? ''
           for (const line of lines) {
             if (line.trim()) {
-              const entry = JSON.parse(line) as NotebookEntryPreview
-              setEntries((prev) => [...prev, entry])
+              pendingRef.current.push(JSON.parse(line) as NotebookEntryPreview)
             }
           }
         }
         if (!signal.aborted && buffer.trim()) {
-          const entry = JSON.parse(buffer) as NotebookEntryPreview
-          setEntries((prev) => [...prev, entry])
+          pendingRef.current.push(JSON.parse(buffer) as NotebookEntryPreview)
+        }
+
+        clearInterval(flushInterval)
+        // Final flush
+        if (!signal.aborted && pendingRef.current.length > 0) {
+          const batch = pendingRef.current.splice(0)
+          setEntries((prev) => [...prev, ...batch])
         }
       } catch (err: any) {
         if (err?.name !== 'AbortError') throw err
