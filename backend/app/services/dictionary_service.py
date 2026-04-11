@@ -113,7 +113,7 @@ def lookup_cvdict(session: Session, char: str) -> list[CvdictEntry]:
             simplified=char_row.simplified,
             traditional=char_row.traditional,
             pinyin=pinyin_str,
-            meaning_vi=defn.meaning_text,
+            meaning_vi=clean_meaning(defn.meaning_text),
             radical=char_row.radical,
             stroke_count=char_row.stroke_count,
             hsk_level=None,

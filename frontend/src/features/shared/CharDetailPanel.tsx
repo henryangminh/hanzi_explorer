@@ -22,7 +22,7 @@ import { cn } from '@/lib/cn'
 import { CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { CvdictSection } from './CvdictSection'
+import { DictionaryList } from './DictionaryList'
 import api from '@/lib/axios'
 import type { DictionaryResponse, DictLiteResponse, UserNoteResponse } from '@/types'
 
@@ -189,56 +189,62 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
         </div>
       )}
 
+      {entry.cedict[0] && (entry.cedict[0].radical || entry.cedict[0].stroke_count) && (
+        <div className="flex flex-wrap gap-3">
+          {entry.cedict[0].radical && (
+            <span className="text-sm text-[var(--color-text-muted)]">
+              {t('dictionary.radical')}: <span className="font-cjk font-medium text-[var(--color-text)]">{entry.cedict[0].radical}</span>
+            </span>
+          )}
+          {entry.cedict[0].stroke_count && (
+            <span className="text-sm text-[var(--color-text-muted)]">
+              {t('dictionary.strokes')}: <span className="font-medium text-[var(--color-text)]">{entry.cedict[0].stroke_count}</span>
+            </span>
+          )}
+        </div>
+      )}
+
 
       {/* CC-CEDICT */}
       {entry.cedict.length > 0 ? (
         <div>
           <CardTitle className="mb-2">{t('dictionary.cedict')}</CardTitle>
-          <div className="flex flex-col gap-3">
-            {entry.cedict.map((ce, idx) => (
-              <div key={ce.id} className={cn(
-                'flex flex-col gap-1 pl-3',
-                entry.cedict.length > 1 && 'border-l-2 border-[var(--color-border-md)]'
-              )}>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {entry.cedict.length > 1 && (
-                    <span className="text-xs font-medium text-[var(--color-primary)]">#{idx + 1}</span>
-                  )}
-                  <span className="font-medium text-[var(--color-text)]">{ce.pinyin}</span>
-                  {ce.traditional && (
-                    <span className="text-xs text-[var(--color-text-muted)]">
-                      繁: <span className="font-cjk">{ce.traditional}</span>
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm text-[var(--color-text-muted)]">{ce.meaning_en}</p>
-                <div className="flex flex-wrap gap-2 mt-0.5">
-                  {ce.radical && (
-                    <span className="text-xs text-[var(--color-text-muted)]">
-                      {t('dictionary.radical')}: <span className="font-cjk">{ce.radical}</span>
-                    </span>
-                  )}
-                  {ce.stroke_count && (
-                    <span className="text-xs text-[var(--color-text-muted)]">
-                      {t('dictionary.strokes')}: {ce.stroke_count}
-                    </span>
-                  )}
-                  {ce.hsk_level && (
-                    <span className="text-xs bg-[var(--color-bg-subtle)] px-2 py-0.5 rounded-full text-[var(--color-primary)]">
-                      HSK {ce.hsk_level}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+          <DictionaryList
+            entries={entry.cedict}
+            renderMeaning={(ce) => (
+              <p className="text-sm text-[var(--color-text-muted)]">{ce.meaning_en}</p>
+            )}
+          />
         </div>
       ) : (
         <p className="text-sm text-[var(--color-text-muted)] italic">{t('dictionary.noResult')}</p>
       )}
 
       {/* CVDICT */}
-      {entry.cvdict?.length > 0 && <CvdictSection entries={entry.cvdict} />}
+      {entry.cvdict?.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
+            CVDICT — Hán Việt
+          </p>
+          <DictionaryList
+            entries={entry.cvdict}
+            renderMeaning={(cv) => (
+              <>
+                {cv.meaning_vi.split('/').filter(Boolean).map((meaning, i) => {
+                  const parts = cv.meaning_vi.split('/').filter(Boolean)
+                  return (
+                    <p key={i} className="text-sm text-[var(--color-text-muted)]">
+                      {parts.length > 1 ? (
+                        <><span className="text-xs text-[var(--color-primary)] mr-1">{i + 1}.</span>{meaning.trim()}</>
+                      ) : meaning.trim()}
+                    </p>
+                  )
+                })}
+              </>
+            )}
+          />
+        </div>
+      )}
 
       {/* Wiktionary — loading placeholder */}
       {loadingFull && (
