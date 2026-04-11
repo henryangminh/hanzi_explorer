@@ -5,6 +5,7 @@ import { LoginPage } from '@/features/auth/LoginPage'
 import { RadicalsPage } from '@/features/radicals/RadicalsPage'
 import { DictionaryPage } from '@/features/dictionary/DictionaryPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
+import { ChangePasswordPage } from '@/features/settings/ChangePasswordPage'
 import { ProfilePage } from '@/features/auth/ProfilePage'
 import { NotebooksPage } from '@/features/notebooks/NotebooksPage'
 
@@ -26,6 +27,7 @@ export const router = createBrowserRouter([
       { path: 'dictionary', element: <DictionaryPage /> },
       { path: 'notebooks', element: <NotebooksPage /> },
       { path: 'settings', element: <SettingsPage /> },
+      { path: 'settings/change-password', element: <ChangePasswordPage /> },
       { path: 'profile', element: <ProfilePage /> },
     ],
   },

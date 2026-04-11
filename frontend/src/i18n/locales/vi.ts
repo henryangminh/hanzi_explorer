@@ -8,6 +8,8 @@ export default {
       settings: 'Cài đặt',
       profile: 'Hồ sơ',
       logout: 'Đăng xuất',
+      lightMode: 'Giao diện sáng',
+      darkMode: 'Giao diện tối',
     },
     // auth
     auth: {
@@ -26,6 +28,14 @@ export default {
       light: 'Sáng',
       dark: 'Tối',
       saved: 'Đã lưu',
+      security: 'Bảo mật',
+      changePassword: 'Đổi mật khẩu',
+      newPassword: 'Mật khẩu mới',
+      confirmPassword: 'Nhập lại mật khẩu mới',
+      passwordMismatch: 'Mật khẩu nhập lại không khớp',
+      passwordTooShort: 'Mật khẩu cần ít nhất 6 ký tự',
+      passwordChanged: 'Đổi mật khẩu thành công!',
+      changePasswordHint: 'Nhập mật khẩu mới cho tài khoản của bạn',
     },
     // radicals
     radicals: {

@@ -11,6 +11,84 @@ const NAV_ITEMS = [
   { to: '/notebooks', labelKey: 'nav.notebooks', icon: NotebookText },
 ]
 
+/** Small icon button with a tooltip label that appears below on hover */
+function NavIconButton({
+  label,
+  active,
+  onClick,
+  children,
+}: {
+  label: string
+  active?: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="relative group">
+      <button
+        onClick={onClick}
+        className={cn(
+          'p-2 rounded-lg transition-colors',
+          active
+            ? 'text-[var(--color-primary)]'
+            : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text)]'
+        )}
+      >
+        {children}
+      </button>
+      {/* Tooltip */}
+      <span className="
+        pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1
+        px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap
+        bg-[var(--color-bg-surface)] border border-[var(--color-border)]
+        text-[var(--color-text-muted)] shadow-sm
+        opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50
+      ">
+        {label}
+      </span>
+    </div>
+  )
+}
+
+/** Small icon link with a tooltip label that appears below on hover */
+function NavIconLink({
+  to,
+  label,
+  active,
+  children,
+}: {
+  to: string
+  label: string
+  active?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <div className="relative group">
+      <Link
+        to={to}
+        className={cn(
+          'p-2 rounded-lg transition-colors block',
+          active
+            ? 'text-[var(--color-primary)]'
+            : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text)]'
+        )}
+      >
+        {children}
+      </Link>
+      {/* Tooltip */}
+      <span className="
+        pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1
+        px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap
+        bg-[var(--color-bg-surface)] border border-[var(--color-border)]
+        text-[var(--color-text-muted)] shadow-sm
+        opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50
+      ">
+        {label}
+      </span>
+    </div>
+  )
+}
+
 export function Navbar() {
   const { t } = useTranslation()
   const { pathname } = useLocation()
@@ -51,49 +129,35 @@ export function Navbar() {
         {/* Right actions */}
         <div className="flex items-center gap-1">
           {/* Theme toggle */}
-          <button
+          <NavIconButton
+            label={theme === 'light' ? t('nav.darkMode') : t('nav.lightMode')}
             onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-            className="p-2 rounded-lg text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text)] transition-colors"
-            aria-label="Toggle theme"
           >
             {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
-          </button>
+          </NavIconButton>
 
           {/* Settings */}
-          <Link
+          <NavIconLink
             to="/settings"
-            className={cn(
-              'p-2 rounded-lg transition-colors',
-              pathname === '/settings'
-                ? 'text-[var(--color-primary)]'
-                : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text)]'
-            )}
+            label={t('nav.settings')}
+            active={pathname.startsWith('/settings')}
           >
             <Settings size={16} />
-          </Link>
+          </NavIconLink>
 
           {/* Profile */}
-          <Link
+          <NavIconLink
             to="/profile"
-            className={cn(
-              'p-2 rounded-lg transition-colors',
-              pathname === '/profile'
-                ? 'text-[var(--color-primary)]'
-                : 'text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text)]'
-            )}
-            title={user?.display_name}
+            label={user?.display_name ?? t('nav.profile')}
+            active={pathname === '/profile'}
           >
             <User size={16} />
-          </Link>
+          </NavIconLink>
 
           {/* Logout */}
-          <button
-            onClick={logout}
-            className="p-2 rounded-lg text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text)] transition-colors"
-            title={t('nav.logout')}
-          >
+          <NavIconButton label={t('nav.logout')} onClick={logout}>
             <LogOut size={16} />
-          </button>
+          </NavIconButton>
         </div>
       </div>
     </header>

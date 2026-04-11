@@ -11,8 +11,6 @@ export function ProfilePage() {
   const { user, fetchMe } = useAuthStore()
 
   const [displayName, setDisplayName] = useState(user?.display_name ?? '')
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
@@ -24,13 +22,9 @@ export function ProfilePage() {
     try {
       await api.patch('/users/profile', {
         display_name: displayName,
-        current_password: currentPassword || undefined,
-        new_password: newPassword || undefined,
       })
       await fetchMe()
       setSaved(true)
-      setCurrentPassword('')
-      setNewPassword('')
       setTimeout(() => setSaved(false), 2000)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })
@@ -65,22 +59,6 @@ export function ProfilePage() {
             label={t('profile.displayName')}
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-          />
-          <Input
-            id="currentPassword"
-            label={t('profile.currentPassword')}
-            type="password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            autoComplete="current-password"
-          />
-          <Input
-            id="newPassword"
-            label={t('profile.newPassword')}
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            autoComplete="new-password"
           />
           {error && <p className="text-sm text-red-500">{error}</p>}
           <Button type="submit" isLoading={saving}>

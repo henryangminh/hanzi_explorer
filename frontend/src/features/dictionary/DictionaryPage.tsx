@@ -39,21 +39,26 @@ function EntryCard({
         <SaveToNotebookModal char={lite.char} onClose={() => setSaveModalOpen(false)} />
       )}
 
-      {/* Header */}
-      <button
-        onClick={() => setCollapsed((v) => !v)}
-        className="w-full flex items-center gap-3 px-4 py-3 bg-[var(--color-bg-surface)] hover:bg-[var(--color-bg-subtle)] transition-colors text-left"
+      {/* Header — text is selectable; blank-area click toggles expand */}
+      <div
+        className="relative flex items-center gap-3 px-4 py-3 bg-[var(--color-bg-surface)] hover:bg-[var(--color-bg-subtle)] transition-colors cursor-pointer"
+        onClick={() => {
+          // Don't toggle if user is selecting text
+          if (window.getSelection()?.toString()) return
+          setCollapsed((v) => !v)
+        }}
       >
-        <div className="flex-1 min-w-0 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        {/* Text content — selectable, propagation flows up to parent toggle */}
+        <div className="flex-1 min-w-0 flex flex-wrap items-baseline gap-x-2 gap-y-1 select-text">
           <span className={cn(
-            'font-cjk leading-none',
+            'font-cjk leading-none cursor-text',
             isMultiChar ? 'text-3xl text-[var(--color-primary)]' : 'text-2xl text-[var(--color-text)]'
           )}>
             {lite.char}
           </span>
           {firstCedict?.traditional && firstCedict.traditional !== lite.char && (
             <span className={cn(
-              'font-cjk leading-none text-[var(--color-text-muted)]',
+              'font-cjk leading-none text-[var(--color-text-muted)] cursor-text',
               isMultiChar ? 'text-3xl' : 'text-2xl'
             )}>
               ({firstCedict.traditional})
@@ -61,7 +66,7 @@ function EntryCard({
           )}
           {firstCedict ? (
             <div className="w-full text-sm">
-              <span className="font-medium text-[var(--color-text)]">
+              <span className="font-medium text-[var(--color-text)] cursor-text">
                 {firstCedict.pinyin}
                 {lite.sino_vn?.length > 0 && (
                   <span className="ml-1.5 text-[var(--color-text-muted)]">
@@ -74,7 +79,7 @@ function EntryCard({
                   </span>
                 )}
               </span>
-              <p className="text-xs text-[var(--color-text-muted)] truncate mt-0.5">
+              <p className="text-xs text-[var(--color-text-muted)] truncate mt-0.5 cursor-text">
                 {firstCedict.meaning_en}
               </p>
             </div>
@@ -85,28 +90,31 @@ function EntryCard({
           )}
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Right actions */}
+        <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
           {firstCedict?.hsk_level && (
             <span className="text-xs bg-[var(--color-bg-subtle)] px-2 py-0.5 rounded-full text-[var(--color-text-muted)]">
               HSK {firstCedict.hsk_level}
             </span>
           )}
-          <span
-            role="button"
-            onClick={(e) => { e.stopPropagation(); setSaveModalOpen(true) }}
+          <button
+            onClick={() => setSaveModalOpen(true)}
             className="p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-bg-subtle)] transition-colors"
             title={t('notebooks.saveToNotebook')}
           >
             <BookmarkPlus size={14} />
-          </span>
-          {collapsed
-            ? <ChevronDown size={14} className="text-[var(--color-text-muted)]" />
-            : <ChevronUp size={14} className="text-[var(--color-text-muted)]" />
-          }
+          </button>
+          <button
+            onClick={() => setCollapsed((v) => !v)}
+            className="p-1 rounded text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] transition-colors"
+          >
+            {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+          </button>
         </div>
-      </button>
+      </div>
 
-      {/* Body — CharDetailPanel mounts once when first expanded (lazy), stays mounted after */}
+
+      {/* Body */}
       {!collapsed && (
         <div className="px-4 pb-4 pt-2 bg-[var(--color-bg-surface)] border-t border-[var(--color-border)]">
           <CharDetailPanel
@@ -118,6 +126,7 @@ function EntryCard({
         </div>
       )}
     </div>
+
   )
 }
 
@@ -190,7 +199,7 @@ export function DictionaryPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="vd: 我可以游泳, 指导, bukeqi, ming2tian1"
+            placeholder="Nhập từ cần tra (vd: 我可以游泳, 指导, bukeqi, ming2tian1)"
             className={cn(
               'w-full pl-9 pr-3 py-2 rounded-lg text-sm font-cjk',
               'bg-[var(--color-bg-surface)] text-[var(--color-text)]',

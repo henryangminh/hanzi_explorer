@@ -7,6 +7,8 @@ export default {
       settings: 'Settings',
       profile: 'Profile',
       logout: 'Logout',
+      lightMode: 'Light mode',
+      darkMode: 'Dark mode',
     },
     auth: {
       login: 'Login',
@@ -23,6 +25,14 @@ export default {
       light: 'Light',
       dark: 'Dark',
       saved: 'Saved',
+      security: 'Security',
+      changePassword: 'Change password',
+      newPassword: 'New password',
+      confirmPassword: 'Confirm new password',
+      passwordMismatch: 'Passwords do not match',
+      passwordTooShort: 'Password must be at least 6 characters',
+      passwordChanged: 'Password changed successfully!',
+      changePasswordHint: 'Enter a new password for your account',
     },
     radicals: {
       title: 'Radicals',

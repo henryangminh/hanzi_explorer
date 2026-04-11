@@ -31,8 +31,8 @@
   --color-bg:          var(--brown-900);
   --color-bg-surface:  var(--brown-800);
   --color-bg-subtle:   #3a2a1e;
-  --color-border:      #3a2a1e;
-  --color-border-md:   var(--brown-700);
+  --color-border:      var(--brown-500);
+  --color-border-md:   var(--brown-400);
   --color-text:        var(--brown-50);
   --color-text-muted:  var(--brown-400);
   --color-primary:     var(--brown-400);
@@ -40,6 +40,8 @@
   --color-primary-fg:  var(--brown-900);
   --color-accent:      var(--brown-500);
 }
+
+
 
 /* ── Base ───────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }

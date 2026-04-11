@@ -150,7 +150,7 @@ function RadicalPopup({
                       </p>
                       <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
                         {group.map((c) => (
-                          <button
+                          <div
                             key={c.char}
                             onClick={() => setSelectedChar(c.char)}
                             className={cn(
@@ -160,13 +160,19 @@ function RadicalPopup({
                               'active:scale-95'
                             )}
                           >
-                            <span className="font-cjk text-3xl text-[var(--color-text)] leading-none">{c.char}</span>
+                            <span
+                              className="font-cjk text-3xl text-[var(--color-text)] leading-none select-text cursor-text"
+                              onClick={(e) => e.stopPropagation()}
+                            >{c.char}</span>
                             {c.pinyin && (
-                              <span className="text-xs text-[var(--color-text-muted)] leading-tight text-center">
+                              <span
+                                className="text-xs text-[var(--color-text-muted)] leading-tight text-center select-text cursor-text"
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 {c.pinyin}
                               </span>
                             )}
-                          </button>
+                          </div>
                         ))}
                       </div>
                     </div>

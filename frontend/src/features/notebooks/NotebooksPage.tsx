@@ -233,16 +233,20 @@ function NotebookEntriesModal({
               <>
                 <div className="grid grid-cols-2 gap-2 pt-2">
                   {entries.map((entry) => (
-                    <button
+                    <div
                       key={entry.id}
                       onClick={() => handleSelectChar(entry.char)}
-                      className="text-left flex flex-col gap-1 px-3 py-2.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)] hover:border-[var(--color-primary)] transition-colors"
+                      className="text-left flex flex-col gap-1 px-3 py-2.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)] hover:border-[var(--color-primary)] transition-colors cursor-pointer"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-baseline gap-1.5 flex-wrap min-w-0">
-                          <span className="font-cjk text-2xl text-[var(--color-text)] leading-none">{entry.char}</span>
+                        {/* Selectable char + traditional */}
+                        <div
+                          className="flex items-baseline gap-1.5 flex-wrap min-w-0 select-text"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <span className="font-cjk text-2xl text-[var(--color-text)] leading-none cursor-text">{entry.char}</span>
                           {entry.traditional && (
-                            <span className="font-cjk text-2xl text-[var(--color-text-muted)] leading-none">({entry.traditional})</span>
+                            <span className="font-cjk text-2xl text-[var(--color-text-muted)] leading-none cursor-text">({entry.traditional})</span>
                           )}
                         </div>
                         {canEdit && (
@@ -256,27 +260,33 @@ function NotebookEntriesModal({
                           </button>
                         )}
                       </div>
-                      {entry.pinyins.length > 0 && (
-                        <p className="text-xs text-[var(--color-text-muted)] leading-tight">
-                          {entry.pinyins.join(', ')}
-                          {entry.sino_vn?.length > 0 && (
-                            <span className="text-[var(--color-primary)]"> · {entry.sino_vn.join(', ')}</span>
-                          )}
-                        </p>
-
-                      )}
-                      {entry.cedict_brief && (
-                        <p className="text-xs text-[var(--color-text-muted)] line-clamp-1 leading-tight">
-                          {entry.cedict_brief}
-                        </p>
-                      )}
-                      {entry.cvdict_brief && (
-                        <p className="text-xs text-[var(--color-primary)] line-clamp-1 leading-tight">
-                          {entry.cvdict_brief}
-                        </p>
-                      )}
-                    </button>
+                      {/* Selectable pinyin / sino_vn / meanings */}
+                      <div
+                        className="select-text"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {entry.pinyins.length > 0 && (
+                          <p className="text-xs text-[var(--color-text-muted)] leading-tight cursor-text">
+                            {entry.pinyins.join(', ')}
+                            {entry.sino_vn?.length > 0 && (
+                              <span className="text-[var(--color-primary)]"> · {entry.sino_vn.join(', ')}</span>
+                            )}
+                          </p>
+                        )}
+                        {entry.cedict_brief && (
+                          <p className="text-xs text-[var(--color-text-muted)] line-clamp-1 leading-tight cursor-text">
+                            {entry.cedict_brief}
+                          </p>
+                        )}
+                        {entry.cvdict_brief && (
+                          <p className="text-xs text-[var(--color-primary)] line-clamp-1 leading-tight cursor-text">
+                            {entry.cvdict_brief}
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   ))}
+
                 </div>
                 {loading && (
                   <div className="flex items-center gap-2.5 px-1 py-3 text-sm text-[var(--color-text-muted)]">

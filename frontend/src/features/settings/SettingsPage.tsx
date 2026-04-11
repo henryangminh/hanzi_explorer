@@ -1,6 +1,10 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { KeyRound } from 'lucide-react'
 import { useSettingsStore } from '@/store/settings.store'
 import { Card } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
 
 function OptionButton({
@@ -30,6 +34,7 @@ function OptionButton({
 export function SettingsPage() {
   const { t, i18n } = useTranslation()
   const { theme, language, setTheme, setLanguage, syncToServer } = useSettingsStore()
+  const navigate = useNavigate()
 
   const handleTheme = (t: 'light' | 'dark') => {
     setTheme(t)
@@ -77,6 +82,21 @@ export function SettingsPage() {
               🇬🇧 English
             </OptionButton>
           </div>
+        </Card>
+
+        {/* Password */}
+        <Card>
+          <p className="text-sm font-medium text-[var(--color-text)] mb-3">
+            {t('settings.security')}
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => navigate('/settings/change-password')}
+            className="flex items-center gap-2 w-fit"
+          >
+            <KeyRound size={15} />
+            {t('settings.changePassword')}
+          </Button>
         </Card>
       </div>
     </div>
