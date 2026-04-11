@@ -101,7 +101,7 @@ def get_entries_preview(
     result = session.execute(
         text(f"""
             WITH nb_chars AS (
-                SELECT ne.id AS entry_id, c.id AS char_id, c.simplified, ne.added_at
+                SELECT ne.id AS entry_id, c.id AS char_id, c.simplified, c.traditional, ne.added_at
                 FROM notebook_entries ne
                 JOIN characters c ON c.id = ne.char_id
                 WHERE ne.notebook_id = :nb_id
@@ -151,6 +151,7 @@ def get_entries_preview(
                 GROUP BY sv.character_id
             )
             SELECT nc.entry_id, nc.simplified, nc.added_at,
+                   nc.traditional,
                    en_d.meaning_text AS cedict_raw,
                    vi_d.meaning_text AS cvdict_raw,
                    py.pinyins_raw,
@@ -193,10 +194,11 @@ def get_entries_preview(
                 id=row[0],
                 char=row[1],
                 added_at=str(row[2]),
-                cedict_brief=_cedict_brief(row[3]),
-                cvdict_brief=_cvdict_brief(row[4]),
-                pinyins=_pinyins(row[5]),
-                sino_vn=_sino_vn(row[6]),
+                traditional=row[3] if row[3] and row[3] != row[1] else None,
+                cedict_brief=_cedict_brief(row[4]),
+                cvdict_brief=_cvdict_brief(row[5]),
+                pinyins=_pinyins(row[6]),
+                sino_vn=_sino_vn(row[7]),
             )
             yield entry.model_dump_json() + '\n'
 

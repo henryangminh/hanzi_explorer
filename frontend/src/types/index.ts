@@ -135,6 +135,7 @@ export interface NotebookEntryResponse {
 export interface NotebookEntryPreview {
   id: number
   char: string
+  traditional: string | null
   added_at: string
   pinyins: string[]
   sino_vn: string[]

@@ -6,9 +6,9 @@ import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useAuthStore } from '@/store/auth.store'
-import { CharDetailBody } from '@/features/dictionary/CharDetailBody'
+import { CharDetailPanel } from '@/features/shared/CharDetailPanel'
 import { SaveToNotebookModal } from '@/features/notebooks/SaveToNotebookModal'
-import type { DictionaryResponse, NotebookEntryPreview, NotebookResponse, NotebookSortOrder } from '@/types'
+import type { NotebookEntryPreview, NotebookResponse, NotebookSortOrder } from '@/types'
 
 const SORT_OPTIONS: { value: NotebookSortOrder; labelKey: string }[] = [
   { value: 'updated_at_desc', labelKey: 'notebooks.sortUpdatedDesc' },
@@ -41,8 +41,6 @@ function NotebookEntriesModal({
   const [deleting, setDeleting] = useState(false)
   // inline detail view
   const [selectedChar, setSelectedChar] = useState<string | null>(null)
-  const [charDetail, setCharDetail] = useState<DictionaryResponse | null>(null)
-  const [loadingDetail, setLoadingDetail] = useState(false)
   const [saveModalChar, setSaveModalChar] = useState<string | null>(null)
 
   const pendingRef = useRef<NotebookEntryPreview[]>([])
@@ -107,21 +105,12 @@ function NotebookEntriesModal({
     return () => controller.abort()
   }, [notebook.id, sort])
 
-  const handleSelectChar = async (char: string) => {
+  const handleSelectChar = (char: string) => {
     if (selectedChar === char) {
       setSelectedChar(null)
-      setCharDetail(null)
       return
     }
     setSelectedChar(char)
-    setCharDetail(null)
-    setLoadingDetail(true)
-    try {
-      const { data } = await api.get<DictionaryResponse>(`/dictionary/${encodeURIComponent(char)}`)
-      setCharDetail(data)
-    } finally {
-      setLoadingDetail(false)
-    }
   }
 
   const handleRemoveEntry = async (entry: NotebookEntryPreview) => {
@@ -216,7 +205,7 @@ function NotebookEntriesModal({
               {/* Back + save */}
               <div className="flex items-center justify-between">
                 <button
-                  onClick={() => { setSelectedChar(null); setCharDetail(null) }}
+                  onClick={() => { setSelectedChar(null) }}
                   className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
                 >
                   <ChevronLeft size={14} />
@@ -231,30 +220,8 @@ function NotebookEntriesModal({
                 </button>
               </div>
 
-              {loadingDetail ? (
-                <p className="text-sm text-[var(--color-text-muted)] py-4 text-center">{t('common.loading')}</p>
-              ) : charDetail ? (
-                <>
-                  {/* Char header */}
-                  <div className="flex items-baseline gap-2 flex-wrap">
-                    <span className="font-cjk text-3xl text-[var(--color-text)]">{charDetail.char}</span>
-                    {charDetail.cedict[0]?.traditional && charDetail.cedict[0].traditional !== charDetail.char && (
-                      <span className="font-cjk text-3xl leading-none text-[var(--color-text-muted)]">
-                        ({charDetail.cedict[0].traditional})
-                      </span>
-                    )}
-                    {charDetail.cedict[0] && (
-                      <span className="text-sm text-[var(--color-text-muted)]">
-                        {charDetail.cedict[0].pinyin}
-                        {charDetail.sino_vn?.length > 0 && (
-                          <span className="text-[var(--color-primary)]"> · {charDetail.sino_vn.join(', ')}</span>
-                        )}
-                      </span>
-                    )}
-                  </div>
-                  <CharDetailBody entry={charDetail} showNotes={false} />
-                </>
-              ) : null}
+              {/* CharDetailPanel self-manages: shows DB data first, then lazy-loads Wiktionary */}
+              <CharDetailPanel char={selectedChar} showNotes={false} />
             </div>
           ) : (
             /* ── Grid view ── */
@@ -272,7 +239,12 @@ function NotebookEntriesModal({
                       className="text-left flex flex-col gap-1 px-3 py-2.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)] hover:border-[var(--color-primary)] transition-colors"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <span className="font-cjk text-2xl text-[var(--color-text)]">{entry.char}</span>
+                        <div className="flex items-baseline gap-1.5 flex-wrap min-w-0">
+                          <span className="font-cjk text-2xl text-[var(--color-text)] leading-none">{entry.char}</span>
+                          {entry.traditional && (
+                            <span className="font-cjk text-2xl text-[var(--color-text-muted)] leading-none">({entry.traditional})</span>
+                          )}
+                        </div>
                         {canEdit && (
                           <button
                             onClick={(e) => { e.stopPropagation(); handleRemoveEntry(entry) }}
@@ -291,6 +263,7 @@ function NotebookEntriesModal({
                             <span className="text-[var(--color-primary)]"> · {entry.sino_vn.join(', ')}</span>
                           )}
                         </p>
+
                       )}
                       {entry.cedict_brief && (
                         <p className="text-xs text-[var(--color-text-muted)] line-clamp-1 leading-tight">

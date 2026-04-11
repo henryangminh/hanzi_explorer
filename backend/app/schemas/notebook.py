@@ -48,6 +48,7 @@ class NotebookEntryPreview(BaseModel):
     """Entry with brief CEDICT / CVDICT meanings for the notebook grid view."""
     id: int
     char: str
+    traditional: Optional[str] = None
     added_at: str
     pinyins: list[str] = []
     sino_vn: list[str] = []

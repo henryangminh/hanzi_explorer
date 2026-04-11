@@ -147,22 +147,25 @@ def _set_cache(session: Session, char: str, source: str, data: dict) -> None:
     if data.get('found') is False:
         return
 
-    existing = session.exec(
-        select(ExternalCache)
-        .where(ExternalCache.char == char)
-        .where(ExternalCache.source == source)
-    ).first()
-    payload = json.dumps(data, ensure_ascii=False)
-    if existing:
-        existing.payload_json = payload
-        existing.cached_at = datetime.now(timezone.utc).isoformat()
-        session.add(existing)
-    else:
-        session.add(ExternalCache(
-            char=char, source=source, payload_json=payload,
-            cached_at=datetime.now(timezone.utc).isoformat(),
-        ))
-    session.commit()
+    try:
+        existing = session.exec(
+            select(ExternalCache)
+            .where(ExternalCache.char == char)
+            .where(ExternalCache.source == source)
+        ).first()
+        payload = json.dumps(data, ensure_ascii=False)
+        if existing:
+            existing.payload_json = payload
+            existing.cached_at = datetime.now(timezone.utc).isoformat()
+            session.add(existing)
+        else:
+            session.add(ExternalCache(
+                char=char, source=source, payload_json=payload,
+                cached_at=datetime.now(timezone.utc).isoformat(),
+            ))
+        session.commit()
+    except Exception:
+        session.rollback()
 
 
 # ── Wiktionary EN ─────────────────────────────────────────

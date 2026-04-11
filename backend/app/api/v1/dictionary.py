@@ -28,8 +28,9 @@ async def search_phrase(q: str, current_user: CurrentUser, session: DbSession):
     - short (1-3 Chinese chars): prefix search with match score
     - pinyin (no Chinese chars): search by pinyin, supports tone numbers (ming2tian1) or no-tone (bukeqi)
 
-    Streams results as NDJSON (one JSON object per line) so the client can render
-    each entry as soon as it arrives rather than waiting for the full response.
+    Streams LITE results (CEDICT + CVDICT only, no Wiktionary) as NDJSON so the
+    client can render each entry immediately. Use GET /full/{char} to fetch the
+    full entry with Wiktionary data when the user expands a card.
     """
     from app.services.search_service import detect_search_mode, extract_all_words, short_search, pinyin_search, traditional_to_simplified
 
@@ -51,10 +52,17 @@ async def search_phrase(q: str, current_user: CurrentUser, session: DbSession):
 
     async def generate():
         for token in tokens:
-            entry = await dictionary_service.get_dictionary_entry(session, token, current_user.id)
+            entry = dictionary_service.get_lite_entry(session, token)
             yield entry.model_dump_json() + '\n'
 
     return StreamingResponse(generate(), media_type='application/x-ndjson')
+
+
+@router.get("/full/{char}", response_model=DictionaryResponse)
+async def get_char_full(char: str, current_user: CurrentUser, session: DbSession):
+    """Full dictionary entry with Wiktionary data (uses cache). Called lazily when user expands a card."""
+    return await dictionary_service.get_dictionary_entry(session, char, current_user.id)
+
 
 @router.get("/{char}", response_model=DictionaryResponse)
 async def get_char(char: str, current_user: CurrentUser, session: DbSession):

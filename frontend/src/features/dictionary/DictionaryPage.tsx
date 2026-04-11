@@ -1,30 +1,34 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Search, ChevronDown, ChevronUp, BookmarkPlus } from 'lucide-react'
-import type { DictionaryResponse, UserNoteResponse } from '@/types'
-import { CharDetailBody } from './CharDetailBody'
+import type { DictLiteResponse, DictionaryResponse, UserNoteResponse } from '@/types'
+import { CharDetailPanel } from '@/features/shared/CharDetailPanel'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
 import { SaveToNotebookModal } from '@/features/notebooks/SaveToNotebookModal'
 
 // ── Single entry card ─────────────────────────────────────
 
+/**
+ * EntryCard nhận DictLiteResponse từ search stream.
+ * Khi expand, CharDetailPanel tự fetch Wiktionary (lazy, cache phía server).
+ * Card đầu tiên (autoExpand=true) mở sẵn và CharDetailPanel bắt đầu fetch Wiktionary ngay.
+ */
 function EntryCard({
-  entry,
-  isMultiChar,
+  lite,
+  autoExpand = false,
   onNoteSaved,
-  initialCollapsed = false,
 }: {
-  entry: DictionaryResponse
-  isMultiChar: boolean
+  lite: DictLiteResponse
+  autoExpand?: boolean
   onNoteSaved: (note: UserNoteResponse) => void
-  initialCollapsed?: boolean
 }) {
   const { t } = useTranslation()
-  const [collapsed, setCollapsed] = useState(initialCollapsed)
+  const [collapsed, setCollapsed] = useState(!autoExpand)
   const [saveModalOpen, setSaveModalOpen] = useState(false)
 
-  const firstCedict = entry.cedict[0] ?? null
+  const isMultiChar = lite.char.length > 1
+  const firstCedict = lite.cedict[0] ?? null
 
   return (
     <div className={cn(
@@ -32,8 +36,9 @@ function EntryCard({
       isMultiChar && 'border-[var(--color-accent)]'
     )}>
       {saveModalOpen && (
-        <SaveToNotebookModal char={entry.char} onClose={() => setSaveModalOpen(false)} />
+        <SaveToNotebookModal char={lite.char} onClose={() => setSaveModalOpen(false)} />
       )}
+
       {/* Header */}
       <button
         onClick={() => setCollapsed((v) => !v)}
@@ -44,9 +49,9 @@ function EntryCard({
             'font-cjk leading-none',
             isMultiChar ? 'text-3xl text-[var(--color-primary)]' : 'text-2xl text-[var(--color-text)]'
           )}>
-            {entry.char}
+            {lite.char}
           </span>
-          {firstCedict?.traditional && firstCedict.traditional !== entry.char && (
+          {firstCedict?.traditional && firstCedict.traditional !== lite.char && (
             <span className={cn(
               'font-cjk leading-none text-[var(--color-text-muted)]',
               isMultiChar ? 'text-3xl' : 'text-2xl'
@@ -58,14 +63,14 @@ function EntryCard({
             <div className="w-full text-sm">
               <span className="font-medium text-[var(--color-text)]">
                 {firstCedict.pinyin}
-                {entry.sino_vn?.length > 0 && (
+                {lite.sino_vn?.length > 0 && (
                   <span className="ml-1.5 text-[var(--color-text-muted)]">
-                    · {entry.sino_vn.join(', ')}
+                    · {lite.sino_vn.join(', ')}
                   </span>
                 )}
-                {entry.cedict.length > 1 && (
+                {lite.cedict.length > 1 && (
                   <span className="ml-1.5 text-xs text-[var(--color-text-muted)]">
-                    +{entry.cedict.length - 1} cách đọc
+                    +{lite.cedict.length - 1} cách đọc
                   </span>
                 )}
               </span>
@@ -101,10 +106,15 @@ function EntryCard({
         </div>
       </button>
 
-      {/* Body */}
+      {/* Body — CharDetailPanel mounts once when first expanded (lazy), stays mounted after */}
       {!collapsed && (
         <div className="px-4 pb-4 pt-2 bg-[var(--color-bg-surface)] border-t border-[var(--color-border)]">
-          <CharDetailBody entry={entry} showNotes onNoteSaved={onNoteSaved} />
+          <CharDetailPanel
+            char={lite.char}
+            initialEntry={lite}
+            showNotes
+            onNoteSaved={onNoteSaved}
+          />
         </div>
       )}
     </div>
@@ -116,7 +126,7 @@ function EntryCard({
 export function DictionaryPage() {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<DictionaryResponse[]>([])
+  const [results, setResults] = useState<DictLiteResponse[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -152,13 +162,13 @@ export function DictionaryPage() {
         buffer = lines.pop() ?? ''
         for (const line of lines) {
           if (line.trim()) {
-            const entry = JSON.parse(line) as DictionaryResponse
+            const entry = JSON.parse(line) as DictLiteResponse
             setResults((prev) => [...prev, entry])
           }
         }
       }
       if (buffer.trim()) {
-        const entry = JSON.parse(buffer) as DictionaryResponse
+        const entry = JSON.parse(buffer) as DictLiteResponse
         setResults((prev) => [...prev, entry])
       }
     } catch {
@@ -166,10 +176,6 @@ export function DictionaryPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleNoteSaved = (char: string, note: UserNoteResponse) => {
-    setResults((prev) => prev.map((r) => (r.char === char ? { ...r, user_note: note } : r)))
   }
 
   return (
@@ -200,13 +206,12 @@ export function DictionaryPage() {
 
       {results.length > 0 && (
         <div className="flex flex-col gap-2">
-          {results.map((entry, idx) => (
+          {results.map((lite, idx) => (
             <EntryCard
-              key={entry.char}
-              entry={entry}
-              isMultiChar={entry.char.length > 1}
-              initialCollapsed={idx > 0}
-              onNoteSaved={(note) => handleNoteSaved(entry.char, note)}
+              key={lite.char}
+              lite={lite}
+              autoExpand={idx === 0}
+              onNoteSaved={(_note) => {}}
             />
           ))}
           {loading && (

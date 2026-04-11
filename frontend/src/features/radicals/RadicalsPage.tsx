@@ -3,29 +3,19 @@ import { useTranslation } from 'react-i18next'
 import { X, ArrowLeft, BookmarkPlus } from 'lucide-react'
 import { useRadicalList } from './useRadicals'
 import { cn } from '@/lib/cn'
-import type { DictionaryResponse, RadicalSummary } from '@/types'
+import type { RadicalSummary } from '@/types'
 import api from '@/lib/axios'
 import { SaveToNotebookModal } from '@/features/notebooks/SaveToNotebookModal'
-import { CharDetailBody } from '@/features/dictionary/CharDetailBody'
+import { CharDetailPanel } from '@/features/shared/CharDetailPanel'
 
 interface CharCard { char: string; pinyin: string; meaning_en: string; stroke_count?: number | null }
 
 // ── Char detail panel (inside popup) ─────────────────────
+// Dùng CharDetailPanel shared — tự fetch DB data + Wiktionary lazy
 
 function CharDetail({ char, onBack }: { char: string; onBack: () => void }) {
-  const [entry, setEntry] = useState<DictionaryResponse | null>(null)
-  const [loading, setLoading] = useState(true)
   const [saveModalOpen, setSaveModalOpen] = useState(false)
-
-  useEffect(() => {
-    setLoading(true)
-    setEntry(null)
-    api.get<DictionaryResponse>(`/dictionary/${encodeURIComponent(char)}`)
-      .then(({ data }) => setEntry(data))
-      .finally(() => setLoading(false))
-  }, [char])
-
-  const firstCedict = entry?.cedict[0] ?? null
+  const [headerInfo, setHeaderInfo] = useState<{ pinyin: string; sinoVn: string[] } | null>(null)
 
   return (
     <div className="flex flex-col h-full">
@@ -38,21 +28,13 @@ function CharDetail({ char, onBack }: { char: string; onBack: () => void }) {
           className="p-1.5 rounded-lg hover:bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] transition-colors">
           <ArrowLeft size={16} />
         </button>
-        <div className="flex-1 min-w-0 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <div className="flex-1 min-w-0 flex items-baseline gap-x-2.5 flex-wrap">
           <span className="font-cjk text-4xl text-[var(--color-primary)] leading-none">{char}</span>
-          {firstCedict?.traditional && firstCedict.traditional !== char && (
-            <span className="font-cjk text-lg text-[var(--color-text-muted)]">({firstCedict.traditional})</span>
-          )}
-          {firstCedict && (
-            <span className="text-sm font-medium text-[var(--color-text)]">
-              {firstCedict.pinyin}
-              {entry?.sino_vn && entry.sino_vn.length > 0 && (
-                <span className="ml-1.5 text-[var(--color-text-muted)]">· {entry.sino_vn.join(', ')}</span>
-              )}
-              {firstCedict.hsk_level && (
-                <span className="ml-2 text-xs bg-[var(--color-bg-subtle)] px-2 py-0.5 rounded-full text-[var(--color-primary)]">
-                  HSK {firstCedict.hsk_level}
-                </span>
+          {headerInfo && (
+            <span className="text-sm text-[var(--color-text-muted)]">
+              {headerInfo.pinyin}
+              {headerInfo.sinoVn.length > 0 && (
+                <span className="ml-1.5 text-[var(--color-primary)]">· {headerInfo.sinoVn.join(', ')}</span>
               )}
             </span>
           )}
@@ -66,14 +48,21 @@ function CharDetail({ char, onBack }: { char: string; onBack: () => void }) {
         </button>
       </div>
 
-      {/* Body */}
+      {/* Body — CharDetailPanel handles all loading: DB data first, then Wiktionary */}
       <div className="flex-1 overflow-y-auto px-4 py-3">
-        {loading && <p className="text-sm text-[var(--color-text-muted)]">Đang tải...</p>}
-        {!loading && entry && <CharDetailBody entry={entry} showNotes={false} />}
+        <CharDetailPanel
+          char={char}
+          showNotes={false}
+          onDataLoaded={(entry) => setHeaderInfo({
+            pinyin: entry.cedict[0]?.pinyin ?? '',
+            sinoVn: entry.sino_vn ?? [],
+          })}
+        />
       </div>
     </div>
   )
 }
+
 
 // ── Radical char grid popup ───────────────────────────────
 
@@ -206,7 +195,10 @@ function RadicalCard({ radical, onClick }: { radical: RadicalSummary; onClick: (
         'active:scale-95'
       )}
     >
-      <span className="font-cjk text-3xl text-[var(--color-text)] leading-none mt-1">{displayRadical}</span>
+      <span className={cn(
+        'font-cjk text-[var(--color-text)] leading-none mt-1',
+        displayRadical.length >= 5 ? 'text-lg' : displayRadical.length >= 3 ? 'text-2xl' : 'text-3xl'
+      )}>{displayRadical}</span>
       <span className="text-xs text-[var(--color-primary)] font-medium">{radical.pinyin}</span>
       <span className="text-xs text-[var(--color-text-muted)] text-center leading-tight line-clamp-1">
         {radical.meaning_en ?? radical.meaning_vi}
