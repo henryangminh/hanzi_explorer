@@ -5,6 +5,8 @@ export interface User {
   language: 'vi' | 'en'
   theme: 'light' | 'dark'
   is_admin: boolean
+  is_active: boolean
+  is_deleted: boolean
   created_at: string
 }
 

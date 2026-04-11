@@ -8,6 +8,11 @@ import { SettingsPage } from '@/features/settings/SettingsPage'
 import { ChangePasswordPage } from '@/features/settings/ChangePasswordPage'
 import { ProfilePage } from '@/features/auth/ProfilePage'
 import { NotebooksPage } from '@/features/notebooks/NotebooksPage'
+import { AdminRoute } from './AdminRoute'
+import { UserRoute } from './UserRoute'
+import { AdminLayout } from '@/components/layout/AdminLayout'
+import { DashboardPage } from '@/features/admin/DashboardPage'
+import { UsersPage } from '@/features/admin/UsersPage'
 
 export const router = createBrowserRouter([
   {
@@ -22,13 +27,34 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      { index: true, element: <Navigate to="/radicals" replace /> },
-      { path: 'radicals', element: <RadicalsPage /> },
-      { path: 'dictionary', element: <DictionaryPage /> },
-      { path: 'notebooks', element: <NotebooksPage /> },
+      {
+        element: <UserRoute />,
+        children: [
+          { index: true, element: <Navigate to="/radicals" replace /> },
+          { path: 'radicals', element: <RadicalsPage /> },
+          { path: 'dictionary', element: <DictionaryPage /> },
+          { path: 'notebooks', element: <NotebooksPage /> },
+        ],
+      },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'settings/change-password', element: <ChangePasswordPage /> },
       { path: 'profile', element: <ProfilePage /> },
+    ],
+  },
+  {
+    path: '/admin',
+    element: (
+      <AdminRoute>
+        <AdminLayout />
+      </AdminRoute>
+    ),
+    children: [
+      { index: true, element: <Navigate to="dashboard" replace /> },
+      { path: 'dashboard', element: <DashboardPage /> },
+      { path: 'users', element: <UsersPage /> },
+      { path: 'data', element: <div>Quản trị Dữ Liệu - Coming Soon</div> },
+      { path: 'moderation', element: <div>Kiểm duyệt - Coming Soon</div> },
+      { path: 'notebooks', element: <div>Sổ tay chung - Coming Soon</div> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

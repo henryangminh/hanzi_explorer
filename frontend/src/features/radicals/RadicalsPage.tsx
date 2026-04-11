@@ -25,6 +25,7 @@ function CharDetail({ char, onBack }: { char: string; onBack: () => void }) {
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--color-border)] shrink-0">
         <button onClick={onBack}
+          title={t('common.back')}
           className="p-1.5 rounded-lg hover:bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] transition-colors">
           <ArrowLeft size={16} />
         </button>
@@ -113,6 +114,7 @@ function RadicalPopup({
               </div>
             </div>
             <button onClick={onClose}
+              title="Đóng"
               className="p-2 rounded-lg hover:bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] transition-colors">
               <X size={18} />
             </button>

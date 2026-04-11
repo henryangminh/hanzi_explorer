@@ -167,6 +167,7 @@ function NotebookEntriesModal({
               </button>
             )}
             <button
+              title="Đóng / Close"
               onClick={onClose}
               className="p-2 rounded-lg text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] transition-colors"
             >
@@ -205,6 +206,7 @@ function NotebookEntriesModal({
               {/* Back + save */}
               <div className="flex items-center justify-between">
                 <button
+                  title={t('common.back')}
                   onClick={() => { setSelectedChar(null) }}
                   className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
                 >
@@ -529,6 +531,7 @@ export function NotebooksPage() {
           {globalNotebooks.length > 0 && (
             <section className="flex flex-col gap-3">
               <button
+                title="Mở rộng / Thu gọn"
                 onClick={() => setGlobalExpanded((v) => !v)}
                 className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider hover:text-[var(--color-text)] transition-colors w-fit"
               >
@@ -554,6 +557,7 @@ export function NotebooksPage() {
           {/* Private notebooks */}
           <section className="flex flex-col gap-3">
             <button
+              title="Mở rộng / Thu gọn"
               onClick={() => setPrivateExpanded((v) => !v)}
               className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider hover:text-[var(--color-text)] transition-colors w-fit"
             >

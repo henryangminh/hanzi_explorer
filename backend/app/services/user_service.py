@@ -9,7 +9,7 @@ from app.schemas.user import UserUpdate
 
 
 def get_by_username(session: Session, username: str) -> Optional[User]:
-    return session.exec(select(User).where(User.username == username)).first()
+    return session.exec(select(User).where(User.username == username, User.is_deleted == False)).first()
 
 
 def authenticate(session: Session, username: str, password: str) -> Optional[User]:

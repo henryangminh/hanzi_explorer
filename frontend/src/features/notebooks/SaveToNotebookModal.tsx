@@ -104,6 +104,7 @@ export function SaveToNotebookModal({ char, onClose, excludeNotebookId }: Props)
             <p className="text-sm text-[var(--color-text-muted)] font-cjk mt-0.5">{char}</p>
           </div>
           <button
+            title="Đóng"
             onClick={onClose}
             className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] transition-colors"
           >

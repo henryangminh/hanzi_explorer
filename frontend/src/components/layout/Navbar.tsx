@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { BookOpen, Search, NotebookText, Settings, LogOut, User, Sun, Moon } from 'lucide-react'
+import { BookOpen, Search, NotebookText, Settings, LogOut, User, Sun, Moon, Shield } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { cn } from '@/lib/cn'
@@ -100,7 +100,7 @@ export function Navbar() {
       <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
 
         {/* Logo */}
-        <Link to="/radicals" className="flex items-center gap-2 shrink-0">
+        <Link to={user?.is_admin ? '/admin/dashboard' : '/radicals'} className="flex items-center gap-2 shrink-0">
           <span className="font-cjk text-xl font-bold text-[var(--color-primary)]">漢</span>
           <span className="hidden sm:block text-sm font-semibold text-[var(--color-text)]">
             Hanzi Explorer
@@ -108,23 +108,25 @@ export function Navbar() {
         </Link>
 
         {/* Nav links */}
-        <nav className="flex items-center gap-1">
-          {NAV_ITEMS.map(({ to, labelKey, icon: Icon }) => (
-            <Link
-              key={to}
-              to={to}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors',
-                pathname.startsWith(to)
-                  ? 'bg-[var(--color-bg-subtle)] text-[var(--color-primary)] font-medium'
-                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)]'
-              )}
-            >
-              <Icon size={15} />
-              <span className="hidden sm:block">{t(labelKey)}</span>
-            </Link>
-          ))}
-        </nav>
+        {!user?.is_admin && (
+          <nav className="flex items-center gap-1">
+            {NAV_ITEMS.map(({ to, labelKey, icon: Icon }) => (
+              <Link
+                key={to}
+                to={to}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors',
+                  pathname.startsWith(to)
+                    ? 'bg-[var(--color-bg-subtle)] text-[var(--color-primary)] font-medium'
+                    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)]'
+                )}
+              >
+                <Icon size={15} />
+                <span className="hidden sm:block">{t(labelKey)}</span>
+              </Link>
+            ))}
+          </nav>
+        )}
 
         {/* Right actions */}
         <div className="flex items-center gap-1">
@@ -144,6 +146,17 @@ export function Navbar() {
           >
             <Settings size={16} />
           </NavIconLink>
+
+          {/* Admin Link */}
+          {user?.is_admin && (
+            <NavIconLink
+              to="/admin/users"
+              label="Admin"
+              active={pathname.startsWith('/admin')}
+            >
+              <Shield size={16} />
+            </NavIconLink>
+          )}
 
           {/* Profile */}
           <NavIconLink

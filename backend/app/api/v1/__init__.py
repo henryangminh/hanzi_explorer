@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1 import auth, users, dictionary, radicals, settings, notebooks
+from app.api.v1 import auth, users, dictionary, radicals, settings, notebooks, admin
 
 router = APIRouter(prefix="/api/v1")
 
@@ -9,3 +9,4 @@ router.include_router(dictionary.router)
 router.include_router(radicals.router)
 router.include_router(settings.router)
 router.include_router(notebooks.router)
+router.include_router(admin.router)

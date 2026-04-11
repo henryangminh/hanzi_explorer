@@ -7,7 +7,7 @@ interface AuthState {
   user: User | null
   token: string | null
   isLoading: boolean
-  login: (username: string, password: string) => Promise<void>
+  login: (username: string, password: string) => Promise<User>
   logout: () => void
   fetchMe: () => Promise<void>
 }
@@ -27,6 +27,7 @@ export const useAuthStore = create<AuthState>()(
           set({ token: data.access_token })
           const { data: user } = await api.get('/auth/me')
           set({ user, isLoading: false })
+          return user
         } catch (err) {
           set({ isLoading: false })
           throw err

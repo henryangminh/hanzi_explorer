@@ -14,5 +14,6 @@ class User(SQLModel, table=True):
     theme: str = Field(default="light", max_length=10)  # "light" | "dark"
     is_active: bool = Field(default=True)
     is_admin: bool = Field(default=False)
+    is_deleted: bool = Field(default=False)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

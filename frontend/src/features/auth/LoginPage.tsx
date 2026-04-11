@@ -18,8 +18,12 @@ export function LoginPage() {
     e.preventDefault()
     setError('')
     try {
-      await login(username, password)
-      navigate('/radicals', { replace: true })
+      const user = await login(username, password)
+      if (user.is_admin) {
+        navigate('/admin/dashboard', { replace: true })
+      } else {
+        navigate('/radicals', { replace: true })
+      }
     } catch {
       setError(t('auth.loginError'))
     }

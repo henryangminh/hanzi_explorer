@@ -105,6 +105,7 @@ function EntryCard({
             <BookmarkPlus size={14} />
           </button>
           <button
+            title="Mở rộng / Thu gọn"
             onClick={() => setCollapsed((v) => !v)}
             className="p-1 rounded text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] transition-colors"
           >
