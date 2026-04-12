@@ -354,6 +354,7 @@ def get_lite_entry(session: Session, char: str) -> DictLiteResponse:
         cedict=cedict_entries,
         cvdict=lookup_cvdict(session, char),
         sino_vn=sino_vn,
+        hsk_tags=lookup_hsk_tags(session, char),
     )
 
 

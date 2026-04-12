@@ -61,6 +61,7 @@ export interface DictLiteResponse {
   cedict: CedictEntry[]
   cvdict: CvdictEntry[]
   sino_vn: string[]
+  hsk_tags: string[]
 }
 
 export interface HanzipyData {

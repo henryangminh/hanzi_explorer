@@ -47,6 +47,7 @@ class DictLiteResponse(BaseModel):
     cedict: List[CedictEntry]
     cvdict: List[CvdictEntry] = []
     sino_vn: List[str] = []     # Hán Việt readings, e.g. ["phán đoán"]
+    hsk_tags: List[str] = []
 
 
 class HanzipyData(BaseModel):

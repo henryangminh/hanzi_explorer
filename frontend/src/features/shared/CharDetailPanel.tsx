@@ -145,7 +145,7 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
         sino_vn: liteSource.sino_vn,
         external: [],
         user_note: null,
-        hsk_tags: [],
+        hsk_tags: liteSource.hsk_tags ?? [],
         hanzipy: null,
       } satisfies DictionaryResponse
     : null)
@@ -265,9 +265,6 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
           <div key={src.source}>
             <div className="flex items-center justify-between mb-2">
               <CardTitle>{src.label}</CardTitle>
-              {src.from_cache && (
-                <span className="text-xs text-[var(--color-text-muted)]">{t('dictionary.fromCache')}</span>
-              )}
             </div>
             <div className="flex flex-col gap-2">
               {d.sections?.map((sec, i) => (
