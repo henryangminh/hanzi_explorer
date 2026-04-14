@@ -33,6 +33,7 @@ async def search_phrase(q: str, current_user: CurrentUser, session: DbSession):
     full entry with Wiktionary data when the user expands a card.
     """
     from app.services.search_service import detect_search_mode, extract_all_words, short_search, pinyin_search, traditional_to_simplified
+    from app.services import search_history_service
 
     q = q.strip()
     if not q:
@@ -49,6 +50,10 @@ async def search_phrase(q: str, current_user: CurrentUser, session: DbSession):
         tokens = short_search(session, q)
     else:  # pinyin
         tokens = pinyin_search(session, q)[:30]
+
+    # Save to search history for regular (non-admin) users
+    if not current_user.is_admin:
+        search_history_service.record_search(session, current_user.id, q)
 
     async def generate():
         for token in tokens:

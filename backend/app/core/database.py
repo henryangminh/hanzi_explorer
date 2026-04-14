@@ -13,12 +13,13 @@ engine = create_engine(
 
 @event.listens_for(engine, "connect")
 def set_sqlite_journal_mode(dbapi_connection, connection_record):
-    dbapi_connection.execute("PRAGMA journal_mode=DELETE")
+    dbapi_connection.execute("PRAGMA journal_mode=WAL")
+    dbapi_connection.execute("PRAGMA busy_timeout=5000")
 
 
 def init_db() -> None:
     # Import all models here so SQLModel metadata is fully populated
-    from app.models import user, character, note, notebook, sino_vn  # noqa: F401
+    from app.models import user, character, note, notebook, sino_vn, search_history  # noqa: F401
     SQLModel.metadata.create_all(engine)
 
 

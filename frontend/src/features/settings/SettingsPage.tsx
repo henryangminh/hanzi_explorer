@@ -76,10 +76,12 @@ export function SettingsPage() {
           </p>
           <div className="flex gap-2">
             <OptionButton active={language === 'vi'} onClick={() => handleLanguage('vi')}>
-              🇻🇳 Tiếng Việt
+              <img src="https://flagcdn.com/vn.svg" alt="VN" className="inline w-5 h-3.5 object-cover rounded-[2px] mr-1.5 align-middle" />
+              Tiếng Việt
             </OptionButton>
             <OptionButton active={language === 'en'} onClick={() => handleLanguage('en')}>
-              🇬🇧 English
+              <img src="https://flagcdn.com/gb.svg" alt="GB" className="inline w-5 h-3.5 object-cover rounded-[2px] mr-1.5 align-middle" />
+              English
             </OptionButton>
           </div>
         </Card>

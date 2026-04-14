@@ -157,3 +157,15 @@ export type NotebookSortOrder =
   | 'created_at_asc'
   | 'name_asc'
   | 'name_desc'
+
+// ── Search History ────────────────────────────────────────
+
+export interface SearchHistoryItem {
+  id: number
+  char: string
+  searched_at: string
+}
+
+export interface SearchHistoryListResponse {
+  items: SearchHistoryItem[]
+}

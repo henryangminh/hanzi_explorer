@@ -14,6 +14,7 @@ interface CharCard { char: string; pinyin: string; meaning_en: string; stroke_co
 // Dùng CharDetailPanel shared — tự fetch DB data + Wiktionary lazy
 
 function CharDetail({ char, onBack }: { char: string; onBack: () => void }) {
+  const { t } = useTranslation()
   const [saveModalOpen, setSaveModalOpen] = useState(false)
   const [headerInfo, setHeaderInfo] = useState<{ pinyin: string; sinoVn: string[] } | null>(null)
 

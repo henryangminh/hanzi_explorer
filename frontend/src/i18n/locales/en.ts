@@ -103,6 +103,16 @@ export default {
       alreadyExists: 'Word already in notebook',
       removeEntry: 'Remove',
       updatedAt: 'Updated',
+      editNotebook: 'Edit notebook',
+      editTitle: 'Edit Notebook',
+      save: 'Save',
+      saving: 'Saving...',
+    },
+    searchHistory: {
+      title: 'Search History',
+      deleteAll: 'Clear all',
+      empty: 'No search history yet.',
+      deleteItem: 'Remove "{{char}}"',
     },
     admin: {
       layout: {

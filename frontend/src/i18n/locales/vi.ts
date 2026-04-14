@@ -110,6 +110,16 @@ export default {
       alreadyExists: 'Từ này đã tồn tại trong sổ tay',
       removeEntry: 'Xoá từ',
       updatedAt: 'Cập nhật',
+      editNotebook: 'Sửa sổ tay',
+      editTitle: 'Sửa Sổ Tay',
+      save: 'Lưu',
+      saving: 'Đang lưu...',
+    },
+    searchHistory: {
+      title: 'Lịch sử tra từ',
+      deleteAll: 'Xóa toàn bộ',
+      empty: 'Chưa có lịch sử tra từ.',
+      deleteItem: 'Xóa "{{char}}"',
     },
     admin: {
       layout: {

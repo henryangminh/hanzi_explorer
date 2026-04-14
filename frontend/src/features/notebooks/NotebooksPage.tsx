@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash2, X, ChevronDown, ChevronLeft, BookmarkPlus } from 'lucide-react'
+import { Plus, Trash2, X, ChevronDown, ChevronLeft, BookmarkPlus, Pencil } from 'lucide-react'
 import api from '@/lib/axios'
 import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui/Button'
@@ -26,11 +26,13 @@ function NotebookEntriesModal({
   canEdit,
   onClose,
   onDeleted,
+  onEdit,
 }: {
   notebook: NotebookResponse
   canEdit: boolean
   onClose: () => void
   onDeleted: () => void
+  onEdit?: () => void
 }) {
   const { t } = useTranslation()
   const [entries, setEntries] = useState<NotebookEntryPreview[]>([])
@@ -157,6 +159,15 @@ function NotebookEntriesModal({
             </p>
           </div>
           <div className="flex items-center gap-1 ml-3 shrink-0">
+            {canEdit && onEdit && (
+              <button
+                onClick={onEdit}
+                className="p-2 rounded-lg text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] transition-colors"
+                title={t('notebooks.editNotebook')}
+              >
+                <Pencil size={15} />
+              </button>
+            )}
             {canEdit && (
               <button
                 onClick={() => setConfirmDelete(true)}
@@ -331,6 +342,80 @@ function NotebookEntriesModal({
   )
 }
 
+// ── Edit notebook modal ───────────────────────────────────
+
+function EditNotebookModal({
+  notebook,
+  onClose,
+  onSaved,
+}: {
+  notebook: NotebookResponse
+  onClose: () => void
+  onSaved: (nb: NotebookResponse) => void
+}) {
+  const { t } = useTranslation()
+  const [name, setName] = useState(notebook.name)
+  const [desc, setDesc] = useState(notebook.description ?? '')
+  const [saving, setSaving] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) return
+    setSaving(true)
+    try {
+      const { data } = await api.patch<NotebookResponse>(`/notebooks/${notebook.id}`, {
+        name: name.trim(),
+        description: desc.trim() || null,
+      })
+      onSaved(data)
+      onClose()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <form
+        onSubmit={handleSubmit}
+        className="w-full max-w-sm bg-[var(--color-bg-surface)] rounded-xl shadow-2xl p-5 flex flex-col gap-4"
+      >
+        <h3 className="text-sm font-semibold text-[var(--color-text)]">{t('notebooks.editTitle')}</h3>
+        <Input
+          id="edit-nb-name"
+          label={t('notebooks.nameLabel')}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          autoFocus
+        />
+        <Input
+          id="edit-nb-desc"
+          label={t('notebooks.descLabel')}
+          value={desc}
+          onChange={(e) => setDesc(e.target.value.slice(0, 150))}
+          maxLength={150}
+        />
+        <div className="flex gap-2 justify-end">
+          <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            type="submit"
+            size="sm"
+            isLoading={saving}
+            disabled={!name.trim()}
+          >
+            {saving ? t('notebooks.saving') : t('notebooks.save')}
+          </Button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
 // ── Create notebook form ──────────────────────────────────
 
 function CreateNotebookForm({
@@ -382,7 +467,8 @@ function CreateNotebookForm({
         id="nb-desc"
         label={t('notebooks.descLabel')}
         value={desc}
-        onChange={(e) => setDesc(e.target.value)}
+        onChange={(e) => setDesc(e.target.value.slice(0, 150))}
+        maxLength={150}
         placeholder="vd: Các từ cần ôn tập"
       />
       {isAdmin && (
@@ -420,24 +506,35 @@ function NotebookCard({
   notebook,
   canEdit,
   onClick,
+  onEdit,
 }: {
   notebook: NotebookResponse
   canEdit: boolean
   onClick: () => void
+  onEdit?: () => void
 }) {
   const { t } = useTranslation()
   return (
-    <button
+    <div
       onClick={onClick}
-      className="w-full text-left flex flex-col gap-1 px-3 py-2.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-surface)] hover:border-[var(--color-primary)] hover:bg-[var(--color-bg-subtle)] transition-colors"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick() }}
+      className="w-full text-left flex flex-col gap-1 px-3 py-2.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-surface)] hover:border-[var(--color-primary)] hover:bg-[var(--color-bg-subtle)] transition-colors cursor-pointer"
     >
       <div className="flex items-start justify-between gap-1.5">
         <p className="text-sm font-semibold text-[var(--color-text)] truncate">{notebook.name}</p>
-        {canEdit && (
-          <span className="shrink-0 text-[10px] text-[var(--color-text-muted)] border border-[var(--color-border)] rounded px-1 py-0.5 leading-none">
-            {t('notebooks.typePrivate')}
-          </span>
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          {canEdit && onEdit && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onEdit() }}
+              className="p-0.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-primary)] transition-colors cursor-pointer"
+              title={t('notebooks.editNotebook')}
+            >
+              <Pencil size={11} />
+            </button>
+          )}
+        </div>
       </div>
       {notebook.description && (
         <p className="text-xs text-[var(--color-text-muted)] truncate">{notebook.description}</p>
@@ -445,7 +542,7 @@ function NotebookCard({
       <p className="text-xs text-[var(--color-text-muted)]">
         {notebook.entry_count} {t('notebooks.entries')}
       </p>
-    </button>
+    </div>
   )
 }
 
@@ -459,6 +556,7 @@ export function NotebooksPage() {
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [openNotebook, setOpenNotebook] = useState<NotebookResponse | null>(null)
+  const [editingNotebook, setEditingNotebook] = useState<NotebookResponse | null>(null)
   const [globalExpanded, setGlobalExpanded] = useState(false)
   const [privateExpanded, setPrivateExpanded] = useState(false)
 
@@ -479,6 +577,11 @@ export function NotebooksPage() {
   const handleCreated = (nb: NotebookResponse) => {
     setNotebooks((prev) => [nb, ...prev])
     setShowCreate(false)
+  }
+
+  const handleNotebookSaved = (updated: NotebookResponse) => {
+    setNotebooks((prev) => prev.map((n) => n.id === updated.id ? updated : n))
+    setOpenNotebook((prev) => prev?.id === updated.id ? updated : prev)
   }
 
   const globalNotebooks = notebooks.filter((n) => n.type === 'global')
@@ -579,6 +682,7 @@ export function NotebooksPage() {
                     notebook={nb}
                     canEdit={canEdit(nb)}
                     onClick={() => setOpenNotebook(nb)}
+                    onEdit={canEdit(nb) ? () => setEditingNotebook(nb) : undefined}
                   />
                 ))}
               </div>
@@ -595,6 +699,15 @@ export function NotebooksPage() {
           onDeleted={() => {
             setNotebooks((prev) => prev.filter((n) => n.id !== openNotebook.id))
           }}
+          onEdit={canEdit(openNotebook) ? () => setEditingNotebook(openNotebook) : undefined}
+        />
+      )}
+
+      {editingNotebook && (
+        <EditNotebookModal
+          notebook={editingNotebook}
+          onClose={() => setEditingNotebook(null)}
+          onSaved={handleNotebookSaved}
         />
       )}
     </div>

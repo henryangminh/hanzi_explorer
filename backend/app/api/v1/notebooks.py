@@ -98,7 +98,7 @@ def get_entries_preview(
 
     # CTE-based query: all lookups are set-based (no correlated subqueries),
     # each auxiliary table is scanned once filtered to only notebook chars.
-    result = session.execute(
+    rows = session.execute(
         text(f"""
             WITH nb_chars AS (
                 SELECT ne.id AS entry_id, c.id AS char_id, c.simplified, c.traditional, ne.added_at
@@ -166,7 +166,7 @@ def get_entries_preview(
             ORDER BY {order_clause}
         """),
         {"nb_id": notebook_id, "cedict_id": cedict_id, "cvdict_id": cvdict_id},
-    )
+    ).fetchall()  # fetch all rows now so the DB connection is released before streaming
 
     def _cedict_brief(raw: str | None) -> str | None:
         if not raw:
@@ -189,7 +189,7 @@ def get_entries_preview(
         return [r.strip() for r in raw.split("/") if r.strip()]
 
     def generate():
-        for row in result:
+        for row in rows:
             entry = NotebookEntryPreview(
                 id=row[0],
                 char=row[1],
