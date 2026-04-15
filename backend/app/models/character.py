@@ -30,6 +30,7 @@ class Character(SQLModel, table=True):
     stroke_count_traditional: Optional[int] = None
     frequency: Optional[int] = None
     is_common: bool = Field(default=False)
+    is_separable: bool = Field(default=False)
     components: Optional[str] = Field(default=None)            # JSON array of component chars (simplified)
     components_traditional: Optional[str] = Field(default=None)  # JSON array of component chars (traditional)
 

@@ -27,6 +27,7 @@ export interface CedictEntry {
   stroke_count: number | null
   hsk_level: number | null
   source_name: string
+  is_separable: boolean
 }
 
 export interface ExternalSource {
@@ -54,6 +55,7 @@ export interface CvdictEntry {
   stroke_count: number | null
   hsk_level: number | null
   source_name: string
+  is_separable: boolean
 }
 
 export interface DictLiteResponse {
@@ -144,6 +146,7 @@ export interface NotebookEntryPreview {
   sino_vn: string[]
   cedict_brief: string | null
   cvdict_brief: string | null
+  is_separable: boolean
 }
 
 export interface NotebookDetail extends NotebookResponse {

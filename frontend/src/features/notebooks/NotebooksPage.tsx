@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useAuthStore } from '@/store/auth.store'
+import { useNotebookStore } from '@/store/notebook.store'
 import { CharDetailPanel } from '@/features/shared/CharDetailPanel'
 import { SaveToNotebookModal } from '@/features/notebooks/SaveToNotebookModal'
 import type { NotebookEntryPreview, NotebookResponse, NotebookSortOrder } from '@/types'
@@ -273,30 +274,38 @@ function NotebookEntriesModal({
                           </button>
                         )}
                       </div>
-                      {/* Selectable pinyin / sino_vn / meanings */}
-                      <div
-                        className="select-text"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {entry.pinyins.length > 0 && (
-                          <p className="text-xs text-[var(--color-text-muted)] leading-tight cursor-text">
-                            {entry.pinyins.join(', ')}
-                            {entry.sino_vn?.length > 0 && (
-                              <span className="text-[var(--color-primary)]"> · {entry.sino_vn.join(', ')}</span>
-                            )}
-                          </p>
-                        )}
-                        {entry.cedict_brief && (
-                          <p className="text-xs text-[var(--color-text-muted)] line-clamp-1 leading-tight cursor-text">
-                            {entry.cedict_brief}
-                          </p>
-                        )}
-                        {entry.cvdict_brief && (
-                          <p className="text-xs text-[var(--color-primary)] line-clamp-1 leading-tight cursor-text">
-                            {entry.cvdict_brief}
-                          </p>
-                        )}
-                      </div>
+                      {/* Selectable pinyin / sino_vn / meanings — w-fit so only text area is selectable */}
+                      {entry.pinyins.length > 0 && (
+                        <p
+                          className="w-fit text-xs text-[var(--color-text-muted)] leading-tight cursor-text select-text"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {entry.pinyins.map((p) => {
+                            if (!entry.is_separable) return p
+                            const idx = p.indexOf(' ')
+                            return idx === -1 ? p : p.slice(0, idx) + '//' + p.slice(idx + 1)
+                          }).join(', ')}
+                          {entry.sino_vn?.length > 0 && (
+                            <span className="text-[var(--color-primary)]"> · {entry.sino_vn.join(', ')}</span>
+                          )}
+                        </p>
+                      )}
+                      {entry.cedict_brief && (
+                        <p
+                          className="w-fit max-w-full text-xs text-[var(--color-text-muted)] line-clamp-1 leading-tight cursor-text select-text"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {entry.cedict_brief}
+                        </p>
+                      )}
+                      {entry.cvdict_brief && (
+                        <p
+                          className="w-fit max-w-full text-xs text-[var(--color-primary)] line-clamp-1 leading-tight cursor-text select-text"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {entry.cvdict_brief}
+                        </p>
+                      )}
                     </div>
                   ))}
 
@@ -551,6 +560,7 @@ function NotebookCard({
 export function NotebooksPage() {
   const { t } = useTranslation()
   const { user } = useAuthStore()
+  const notebookVersion = useNotebookStore((s) => s.version)
   const [notebooks, setNotebooks] = useState<NotebookResponse[]>([])
   const [sort, setSort] = useState<NotebookSortOrder>('updated_at_desc')
   const [loading, setLoading] = useState(true)
@@ -572,7 +582,7 @@ export function NotebooksPage() {
 
   useEffect(() => {
     fetchNotebooks(sort)
-  }, [fetchNotebooks, sort])
+  }, [fetchNotebooks, sort, notebookVersion])
 
   const handleCreated = (nb: NotebookResponse) => {
     setNotebooks((prev) => [nb, ...prev])

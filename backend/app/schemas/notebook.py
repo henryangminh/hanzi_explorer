@@ -54,6 +54,7 @@ class NotebookEntryPreview(BaseModel):
     sino_vn: list[str] = []
     cedict_brief: Optional[str] = None
     cvdict_brief: Optional[str] = None
+    is_separable: bool = False
 
 
 class AddEntryRequest(BaseModel):

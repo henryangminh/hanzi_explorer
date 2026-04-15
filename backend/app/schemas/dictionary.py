@@ -12,6 +12,7 @@ class CedictEntry(BaseModel):
     stroke_count: Optional[int]
     hsk_level: Optional[int]
     source_name: str   # "CC-CEDICT"
+    is_separable: bool = False
 
 
 class ExternalSource(BaseModel):
@@ -39,6 +40,7 @@ class CvdictEntry(BaseModel):
     stroke_count: Optional[int]
     hsk_level: Optional[int]
     source_name: str
+    is_separable: bool = False
 
 
 class DictLiteResponse(BaseModel):

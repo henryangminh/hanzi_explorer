@@ -101,7 +101,8 @@ def get_entries_preview(
     rows = session.execute(
         text(f"""
             WITH nb_chars AS (
-                SELECT ne.id AS entry_id, c.id AS char_id, c.simplified, c.traditional, ne.added_at
+                SELECT ne.id AS entry_id, c.id AS char_id, c.simplified, c.traditional, ne.added_at,
+                       COALESCE(c.is_separable, 0) AS is_separable
                 FROM notebook_entries ne
                 JOIN characters c ON c.id = ne.char_id
                 WHERE ne.notebook_id = :nb_id
@@ -155,7 +156,8 @@ def get_entries_preview(
                    en_d.meaning_text AS cedict_raw,
                    vi_d.meaning_text AS cvdict_raw,
                    py.pinyins_raw,
-                   sn.sino_vn_raw
+                   sn.sino_vn_raw,
+                   nc.is_separable
             FROM nb_chars nc
             LEFT JOIN en_min   ON en_min.character_id  = nc.char_id
             LEFT JOIN definitions en_d ON en_d.id      = en_min.min_id
@@ -199,6 +201,7 @@ def get_entries_preview(
                 cvdict_brief=_cvdict_brief(row[5]),
                 pinyins=_pinyins(row[6]),
                 sino_vn=_sino_vn(row[7]),
+                is_separable=bool(row[8]),
             )
             yield entry.model_dump_json() + '\n'
 

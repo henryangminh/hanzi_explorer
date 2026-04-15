@@ -274,18 +274,25 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
                       {sec.part_of_speech}
                     </span>
                   )}
-                  <ol className="mt-1 flex flex-col gap-1 list-decimal list-inside">
-                    {sec.definitions.map((def, j) => {
-                      const isExample = def.startsWith('→')
-                      return isExample ? (
-                        <li key={j} className="list-none ml-4 text-sm italic" style={{ color: 'var(--color-accent)' }}>
-                          {def}
-                        </li>
-                      ) : (
-                        <li key={j} className="text-sm text-[var(--color-text)]">{def}</li>
-                      )
-                    })}
-                  </ol>
+                  <div className="mt-1 flex flex-col gap-1">
+                    {(() => {
+                      let count = 0
+                      return sec.definitions.map((def, j) => {
+                        const isExample = def.startsWith('→')
+                        if (!isExample) count++
+                        return isExample ? (
+                          <div key={j} className="ml-4 text-sm italic" style={{ color: 'var(--color-accent)' }}>
+                            {def}
+                          </div>
+                        ) : (
+                          <div key={j} className="flex gap-1.5 text-sm text-[var(--color-text)]">
+                            <span className="shrink-0 text-[var(--color-text-muted)]">{count}.</span>
+                            <span>{def}</span>
+                          </div>
+                        )
+                      })
+                    })()}
+                  </div>
                 </div>
               ))}
             </div>

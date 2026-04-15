@@ -5,6 +5,7 @@ import api from '@/lib/axios'
 import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { useNotebookStore } from '@/store/notebook.store'
 import type { NotebookResponse, NotebookSortOrder } from '@/types'
 
 const SORT_OPTIONS: { value: NotebookSortOrder; labelKey: string }[] = [
@@ -24,6 +25,7 @@ interface Props {
 
 export function SaveToNotebookModal({ char, onClose, excludeNotebookId }: Props) {
   const { t } = useTranslation()
+  const invalidateNotebooks = useNotebookStore((s) => s.invalidate)
   const [notebooks, setNotebooks] = useState<NotebookResponse[]>([])
   const [sort, setSort] = useState<NotebookSortOrder>('updated_at_desc')
   const [loading, setLoading] = useState(true)
@@ -57,10 +59,11 @@ export function SaveToNotebookModal({ char, onClose, excludeNotebookId }: Props)
     try {
       await api.post(`/notebooks/${notebook.id}/entries`, { char })
       setFeedback({ id: notebook.id, type: 'ok' })
-      // refresh entry count
+      // refresh entry count locally and signal NotebooksPage to re-fetch
       setNotebooks((prev) =>
         prev.map((n) => (n.id === notebook.id ? { ...n, entry_count: n.entry_count + 1 } : n))
       )
+      invalidateNotebooks()
     } catch (err: any) {
       if (err?.response?.status === 409) {
         setFeedback({ id: notebook.id, type: 'dup' })

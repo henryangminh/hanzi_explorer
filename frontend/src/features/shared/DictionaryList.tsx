@@ -4,6 +4,14 @@ interface CoreDictEntry {
   id: number
   pinyin: string
   hsk_level: number | null
+  is_separable?: boolean
+}
+
+function formatPinyin(pinyin: string, isSeparable?: boolean): string {
+  if (!isSeparable) return pinyin
+  const spaceIdx = pinyin.indexOf(' ')
+  if (spaceIdx === -1) return pinyin
+  return pinyin.slice(0, spaceIdx) + '//' + pinyin.slice(spaceIdx + 1)
 }
 
 interface DictionaryListProps<T extends CoreDictEntry> {
@@ -34,7 +42,7 @@ export function DictionaryList<T extends CoreDictEntry>({
               </span>
             )}
             <span className="font-medium text-[var(--color-text)]">
-              {entry.pinyin}
+              {formatPinyin(entry.pinyin, entry.is_separable)}
             </span>
           </div>
 

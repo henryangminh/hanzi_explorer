@@ -86,6 +86,7 @@ def lookup_cedict(session: Session, char: str) -> list[CedictEntry]:
             stroke_count=char_row.stroke_count,
             hsk_level=None,
             source_name=source.name,
+            is_separable=char_row.is_separable,
         ))
     return results
 
@@ -118,6 +119,7 @@ def lookup_cvdict(session: Session, char: str) -> list[CvdictEntry]:
             stroke_count=char_row.stroke_count,
             hsk_level=None,
             source_name=source.name,
+            is_separable=char_row.is_separable,
         ))
     return results
 

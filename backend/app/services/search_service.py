@@ -12,6 +12,22 @@ from sqlalchemy import func
 
 from app.models.character import Character, PinyinReading
 
+_NO_FREQ = 999_999  # sentinel for NULL frequency — sort last
+
+
+def _freq_map(session: Session, words: List[str]) -> dict[str, int]:
+    """Bulk-fetch frequency for a list of simplified words. NULL → _NO_FREQ."""
+    if not words:
+        return {}
+    rows = session.exec(
+        select(Character.simplified, Character.frequency)
+        .where(Character.simplified.in_(words))
+    ).all()
+    return {
+        simp: (freq if freq is not None else _NO_FREQ)
+        for simp, freq in rows
+    }
+
 
 def _is_chinese_char(c: str) -> bool:
     return '\u4e00' <= c <= '\u9fff' or '\u3400' <= c <= '\u4dbf'
@@ -89,18 +105,23 @@ def extract_all_words(session: Session, text: str) -> List[str]:
         .distinct()
     ).all())
 
+    freq = _freq_map(session, list(existing) + [c for c in text if _is_chinese_char(c)])
+
     candidates: List[Tuple[int, int, str]] = [
         (positions[w], len(w), w) for w in existing
     ]
-    candidates.sort(key=lambda x: (-x[1], x[0]))
+    candidates.sort(key=lambda x: (-x[1], x[0], freq.get(x[2], _NO_FREQ)))
 
     result: List[str] = [c[2] for c in candidates]
     seen: set = set(result)
 
+    trailing: List[str] = []
     for c in text:
         if c not in seen:
-            result.append(c)
+            trailing.append(c)
             seen.add(c)
+    trailing.sort(key=lambda c: freq.get(c, _NO_FREQ))
+    result.extend(trailing)
 
     return result
 
@@ -137,7 +158,8 @@ def short_search(session: Session, query: str) -> List[str]:
             extensions.append(word)
             seen.add(word)
 
-    extensions.sort(key=lambda w: len(w))
+    ext_freq = _freq_map(session, extensions)
+    extensions.sort(key=lambda w: (len(w), ext_freq.get(w, _NO_FREQ)))
 
     exact = [w for w in (multi_words + single_chars) if w == query]
     other_multi = [w for w in multi_words if w != query]
@@ -209,5 +231,6 @@ def pinyin_search(session: Session, pinyin_input: str) -> List[str]:
 
             results.append((simplified, score))
 
-    results.sort(key=lambda x: (-x[1], len(x[0])))
+    freq = _freq_map(session, [r[0] for r in results])
+    results.sort(key=lambda x: (-x[1], len(x[0]), freq.get(x[0], _NO_FREQ)))
     return [r[0] for r in results]
