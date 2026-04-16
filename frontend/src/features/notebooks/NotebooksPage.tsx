@@ -11,6 +11,9 @@ import { useNotebookStore } from '@/store/notebook.store'
 import { CharDetailPanel } from '@/features/shared/CharDetailPanel'
 import { SaveToNotebookModal } from '@/features/shared/SaveToNotebookModal'
 import type { NotebookEntryPreview, NotebookResponse, NotebookSortOrder } from '@/types'
+import { useUIStore } from '@/store/ui.store'
+import { useNavigate } from 'react-router-dom'
+import { useDictionaryStore } from '@/store/dictionary.store'
 
 const SORT_OPTIONS: { value: NotebookSortOrder; labelKey: string }[] = [
   { value: 'updated_at_desc', labelKey: 'notebooks.sortUpdatedDesc' },
@@ -44,8 +47,20 @@ function NotebookEntriesModal({
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   // inline detail view
-  const [selectedChar, setSelectedChar] = useState<string | null>(null)
+  const { selectedNotebookChar: selectedChar, setSelectedNotebookChar: setSelectedChar } = useUIStore()
+  const navigate = useNavigate()
+  const { tabs, setActiveTabId } = useDictionaryStore()
   const [saveModalChar, setSaveModalChar] = useState<string | null>(null)
+
+  const handleGoToDict = (word: string) => {
+    const existingTab = tabs.find((t) => t.query === word && t.results.length > 0)
+    if (existingTab) {
+      setActiveTabId(existingTab.id)
+      navigate('/dictionary')
+    } else {
+      navigate(`/dictionary?q=${encodeURIComponent(word)}`)
+    }
+  }
 
   const pendingRef = useRef<NotebookEntryPreview[]>([])
 
@@ -141,7 +156,7 @@ function NotebookEntriesModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="fixed top-14 inset-x-0 bottom-0 z-[39] flex items-center justify-center bg-black/60 p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div className="w-full max-w-3xl h-full max-h-[90vh] bg-[var(--color-bg-surface)] rounded-2xl shadow-2xl flex flex-col">
@@ -237,7 +252,7 @@ function NotebookEntriesModal({
               </div>
 
               {/* CharDetailPanel self-manages: shows DB data first, then lazy-loads Wiktionary */}
-              <CharDetailPanel char={selectedChar} showNotes={true} />
+              <CharDetailPanel char={selectedChar} showNotes={true} onWordClick={handleGoToDict} />
             </div>
           ) : (
             /* ── Grid view ── */
@@ -387,7 +402,7 @@ function EditNotebookModal({
 
   return (
     <div
-      className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4"
+      className="fixed top-14 inset-x-0 bottom-0 z-[39] flex items-center justify-center bg-black/60 p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <form
@@ -567,7 +582,7 @@ export function NotebooksPage() {
   const [sort, setSort] = useState<NotebookSortOrder>('updated_at_desc')
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
-  const [openNotebook, setOpenNotebook] = useState<NotebookResponse | null>(null)
+  const { openNotebook, setOpenNotebook } = useUIStore()
   const [editingNotebook, setEditingNotebook] = useState<NotebookResponse | null>(null)
   const [globalExpanded, setGlobalExpanded] = useState(false)
   const [privateExpanded, setPrivateExpanded] = useState(false)

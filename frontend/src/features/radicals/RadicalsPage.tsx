@@ -7,6 +7,9 @@ import type { RadicalSummary } from '@/types'
 import api from '@/lib/axios'
 import { SaveToNotebookModal } from '@/features/shared/SaveToNotebookModal'
 import { CharDetailPanel } from '@/features/shared/CharDetailPanel'
+import { useUIStore } from '@/store/ui.store'
+import { useNavigate } from 'react-router-dom'
+import { useDictionaryStore } from '@/store/dictionary.store'
 
 interface CharCard { char: string; pinyin: string; meaning_en: string; stroke_count?: number | null }
 
@@ -15,8 +18,20 @@ interface CharCard { char: string; pinyin: string; meaning_en: string; stroke_co
 
 function CharDetail({ char, onBack }: { char: string; onBack: () => void }) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
+  const { tabs, setActiveTabId } = useDictionaryStore()
   const [saveModalOpen, setSaveModalOpen] = useState(false)
   const [headerInfo, setHeaderInfo] = useState<{ pinyin: string; sinoVn: string[] } | null>(null)
+
+  const handleGoToDict = (word: string) => {
+    const existingTab = tabs.find((t) => t.query === word && t.results.length > 0)
+    if (existingTab) {
+      setActiveTabId(existingTab.id)
+      navigate('/dictionary')
+    } else {
+      navigate(`/dictionary?q=${encodeURIComponent(word)}`)
+    }
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -59,6 +74,7 @@ function CharDetail({ char, onBack }: { char: string; onBack: () => void }) {
             pinyin: entry.cedict[0]?.pinyin ?? '',
             sinoVn: entry.sino_vn ?? [],
           })}
+          onWordClick={handleGoToDict}
         />
       </div>
     </div>
@@ -77,11 +93,10 @@ function RadicalPopup({
 }) {
   const [chars, setChars] = useState<CharCard[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedChar, setSelectedChar] = useState<string | null>(null)
+  const { selectedRadicalChar, setSelectedRadicalChar } = useUIStore()
 
   useEffect(() => {
     setLoading(true)
-    setSelectedChar(null)
     api.get(`/radicals/${encodeURIComponent(radical.radical)}/chars`)
       .then(({ data }) => setChars(data.chars ?? []))
       .finally(() => setLoading(false))
@@ -89,8 +104,8 @@ function RadicalPopup({
 
   return (
     <div className="flex flex-col h-full">
-      {selectedChar ? (
-        <CharDetail char={selectedChar} onBack={() => setSelectedChar(null)} />
+      {selectedRadicalChar ? (
+        <CharDetail char={selectedRadicalChar} onBack={() => setSelectedRadicalChar(null)} />
       ) : (
         <>
           {/* Header */}
@@ -155,7 +170,7 @@ function RadicalPopup({
                         {group.map((c) => (
                           <div
                             key={c.char}
-                            onClick={() => setSelectedChar(c.char)}
+                            onClick={() => setSelectedRadicalChar(c.char)}
                             className={cn(
                               'flex flex-col items-center gap-1 py-3 px-2 rounded-xl border transition-all cursor-pointer',
                               'bg-[var(--color-bg-surface)] border-[var(--color-border)]',
@@ -221,15 +236,15 @@ function RadicalCard({ radical, onClick }: { radical: RadicalSummary; onClick: (
 function Modal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className="fixed top-14 inset-x-0 bottom-0 z-[39] flex items-end sm:items-center justify-center p-0 sm:p-4"
       style={{ background: 'rgba(0,0,0,0.5)' }}
       onClick={onClose}
     >
       <div
         className={cn(
-          'w-full sm:max-w-2xl bg-[var(--color-bg-surface)] flex flex-col',
+          'w-full sm:max-w-2xl bg-[var(--color-bg-surface)] flex flex-col overflow-hidden',
           'rounded-t-2xl sm:rounded-2xl border border-[var(--color-border)]',
-          'h-[92vh] sm:h-[85vh]'
+          'h-full sm:max-h-[90vh]'
         )}
         onClick={(e) => e.stopPropagation()}
       >
@@ -244,7 +259,7 @@ function Modal({ children, onClose }: { children: React.ReactNode; onClose: () =
 export function RadicalsPage() {
   const { t } = useTranslation()
   const { radicals, loading } = useRadicalList()
-  const [selected, setSelected] = useState<RadicalSummary | null>(null)
+  const { selectedRadical, setSelectedRadical, setSelectedRadicalChar } = useUIStore()
 
   const sorted = [...radicals].sort((a, b) => {
     if (a.stroke_count == null) return 1
@@ -276,16 +291,16 @@ export function RadicalsPage() {
             </p>
             <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
               {items.map((r) => (
-                <RadicalCard key={r.id} radical={r} onClick={() => setSelected(r)} />
+                <RadicalCard key={r.id} radical={r} onClick={() => { setSelectedRadical(r); setSelectedRadicalChar(null); }} />
               ))}
             </div>
           </div>
         ))}
       </div>
 
-      {selected && (
-        <Modal onClose={() => setSelected(null)}>
-          <RadicalPopup radical={selected} onClose={() => setSelected(null)} />
+      {selectedRadical && (
+        <Modal onClose={() => { setSelectedRadical(null); setSelectedRadicalChar(null); }}>
+          <RadicalPopup radical={selectedRadical} onClose={() => { setSelectedRadical(null); setSelectedRadicalChar(null); }} />
         </Modal>
       )}
     </div>

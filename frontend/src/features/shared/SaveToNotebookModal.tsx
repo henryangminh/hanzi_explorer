@@ -95,7 +95,7 @@ export function SaveToNotebookModal({ char, onClose, excludeNotebookId }: Props)
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      className="fixed top-14 inset-x-0 bottom-0 z-[39] flex items-center justify-center bg-black/50"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div className="relative w-full max-w-md mx-4 bg-[var(--color-bg-surface)] rounded-2xl shadow-xl flex flex-col max-h-[80vh]">

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input'
 import api from '@/lib/axios'
 import type { UserNoteResponse } from '@/types'
 import { useDictionaryStore } from '@/store/dictionary.store'
+import { useUIStore } from '@/store/ui.store'
 
 // ── Expanded note panel (square, fixed overlay) ────────────
 
@@ -59,7 +60,7 @@ function ExpandedNotePanel({
   return (
     /* Backdrop — desktop only (hidden on mobile, inline panel used instead) */
     <div
-      className="hidden sm:flex fixed inset-0 z-50 items-center justify-center p-4"
+      className="hidden sm:flex fixed top-14 inset-x-0 bottom-0 z-[39] items-center justify-center p-4"
       onClick={onClose}
     >
       {/* Semi-transparent overlay */}
@@ -430,10 +431,10 @@ export function MyNotesPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { tabs, setActiveTabId } = useDictionaryStore()
+  const { expandedNote, setExpandedNote } = useUIStore()
 
   const [notes, setNotes] = useState<UserNoteResponse[]>([])
   const [loading, setLoading] = useState(true)
-  const [expandedNote, setExpandedNote] = useState<UserNoteResponse | null>(null)
 
   useEffect(() => {
     api
@@ -443,7 +444,6 @@ export function MyNotesPage() {
   }, [])
 
   const handleGoToDict = (char: string) => {
-    setExpandedNote(null)
     // If a tab already has results for this char, switch to it and navigate
     const existingTab = tabs.find((t) => t.query === char && t.results.length > 0)
     if (existingTab) {

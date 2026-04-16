@@ -262,7 +262,7 @@ export function UsersPage() {
       </div>
 
       {changingPasswordUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={(e) => { if (e.target === e.currentTarget) { setChangingPasswordUser(null); setNewPassword(''); setConfirmNewPassword(''); } }}>
+        <div className="fixed top-14 inset-x-0 bottom-0 z-[39] flex items-center justify-center bg-black/50" onClick={(e) => { if (e.target === e.currentTarget) { setChangingPasswordUser(null); setNewPassword(''); setConfirmNewPassword(''); } }}>
           <div className="bg-[var(--color-bg-surface)] p-6 rounded-2xl border border-[var(--color-border)] shadow-xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <h2 className="text-lg font-semibold mb-1 text-[var(--color-text)]">
               {t('admin.users.changePasswordModalTitle', { account: changingPasswordUser.username })}

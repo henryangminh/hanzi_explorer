@@ -160,7 +160,7 @@ export function SearchHistoryPopup({ onSearch, refreshKey, onClose }: SearchHist
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40"
+      className="fixed top-14 inset-x-0 bottom-0 z-[39] flex items-end sm:items-center justify-center bg-black/40"
       onClick={onClose}
     >
       <div
