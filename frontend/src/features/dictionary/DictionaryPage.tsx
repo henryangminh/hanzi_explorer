@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
-import { Search, ChevronDown, ChevronUp, BookmarkPlus } from 'lucide-react'
+import { Search, ChevronDown, ChevronUp, BookmarkPlus, X } from 'lucide-react'
+import { useState } from 'react'
 import type { DictLiteResponse } from '@/types'
 import { CharDetailPanel } from '@/features/shared/CharDetailPanel'
 import { Button } from '@/components/ui/Button'
@@ -17,10 +18,12 @@ function EntryCard({
   lite,
   autoExpand = false,
   onNoteSaved,
+  onWordClick,
 }: {
   lite: DictLiteResponse
   autoExpand?: boolean
   onNoteSaved: () => void
+  onWordClick?: (word: string) => void
 }) {
   const { t } = useTranslation()
   const [collapsed, setCollapsed] = useState(!autoExpand)
@@ -122,6 +125,7 @@ function EntryCard({
             initialEntry={lite}
             showNotes
             onNoteSaved={onNoteSaved}
+            onWordClick={onWordClick}
           />
         </div>
       )}
@@ -137,23 +141,40 @@ export function DictionaryPage() {
   const isAdmin = user?.is_admin ?? false
   const [searchParams] = useSearchParams()
 
-  const { query, results, setQuery, setResults, appendResult } = useDictionaryStore()
+  const {
+    query,
+    tabs,
+    activeTabId,
+    setQuery,
+    addTab,
+    setActiveTabId,
+    closeTab,
+    appendResultToTab,
+    finishTab,
+  } = useDictionaryStore()
 
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
   const [historyPopupOpen, setHistoryPopupOpen] = useState(false)
 
-  // Track whether we've already handled the URL param on this mount
   const handledParamRef = useRef(false)
+
+  const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null
 
   const runSearch = async (q: string) => {
     const trimmed = q.trim()
     if (!trimmed) return
-    setLoading(true)
-    setError('')
     setQuery(trimmed)
-    setResults([])
+
+    // If a tab with this query already exists, switch to it and stop
+    const existing = useDictionaryStore.getState().tabs.find((t) => t.query === trimmed)
+    if (existing) {
+      setActiveTabId(existing.id)
+      return
+    }
+
+    const tabId = `tab-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    addTab({ id: tabId, query: trimmed, results: [], loading: true, error: '' })
+
     try {
       const token = localStorage.getItem('access_token')
       const response = await fetch(
@@ -179,28 +200,26 @@ export function DictionaryPage() {
         buffer = lines.pop() ?? ''
         for (const line of lines) {
           if (line.trim()) {
-            appendResult(JSON.parse(line) as DictLiteResponse)
+            appendResultToTab(tabId, JSON.parse(line) as DictLiteResponse)
           }
         }
       }
       if (buffer.trim()) {
-        appendResult(JSON.parse(buffer) as DictLiteResponse)
+        appendResultToTab(tabId, JSON.parse(buffer) as DictLiteResponse)
       }
       if (!isAdmin) setHistoryRefreshKey((k) => k + 1)
+      finishTab(tabId)
     } catch {
-      setError(t('dictionary.noResult'))
-    } finally {
-      setLoading(false)
+      finishTab(tabId, t('dictionary.noResult'))
     }
   }
 
-  // On mount: check URL ?q= param. If different from stored query → search.
-  // If no param but store has results → just restore (no re-search needed).
+  // On mount: check URL ?q= param → search if present
   useEffect(() => {
     if (handledParamRef.current) return
     handledParamRef.current = true
     const paramQ = searchParams.get('q')?.trim() ?? ''
-    if (paramQ && paramQ !== query) {
+    if (paramQ) {
       runSearch(paramQ)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -219,7 +238,7 @@ export function DictionaryPage() {
   return (
     <div className="flex gap-6 items-start">
       {/* ── Left: search area ── */}
-      <div className="flex flex-col gap-5 flex-1 min-w-0 max-w-2xl">
+      <div className="flex flex-col gap-4 flex-1 min-w-0 max-w-2xl">
         <h1 className="text-xl font-semibold text-[var(--color-text)]">
           {t('dictionary.title')}
         </h1>
@@ -239,7 +258,9 @@ export function DictionaryPage() {
               )}
             />
           </div>
-          <Button type="submit" isLoading={loading}>{t('dictionary.title')}</Button>
+          <Button type="submit" isLoading={activeTab?.loading && activeTab.results.length === 0}>
+            {t('dictionary.title')}
+          </Button>
           {!isAdmin && (
             <Button
               type="button"
@@ -252,19 +273,71 @@ export function DictionaryPage() {
           )}
         </form>
 
-        {error && <p className="text-sm text-red-500">{error}</p>}
+        {/* ── Tabs ── */}
+        {tabs.length > 0 && (
+          <div className="flex items-end gap-0.5 border-b border-[var(--color-border)] overflow-x-auto overflow-y-hidden">
+            {tabs.map((tab) => (
+              <div
+                key={tab.id}
+                onClick={() => setActiveTabId(tab.id)}
+                className={cn(
+                  'group flex items-center gap-1.5 px-3 py-1.5 text-sm font-cjk rounded-t-lg border border-b-0 cursor-pointer shrink-0 transition-colors select-none',
+                  tab.id === activeTabId
+                    ? 'bg-[var(--color-bg-surface)] border-[var(--color-border)] text-[var(--color-text)] -mb-px pb-2'
+                    : 'bg-transparent border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)]'
+                )}
+              >
+                {tab.loading && tab.results.length === 0 ? (
+                  <span className="inline-flex gap-0.5 items-center shrink-0">
+                    <span className="w-1 h-1 rounded-full bg-current animate-bounce [animation-delay:-0.3s]" />
+                    <span className="w-1 h-1 rounded-full bg-current animate-bounce [animation-delay:-0.15s]" />
+                    <span className="w-1 h-1 rounded-full bg-current animate-bounce" />
+                  </span>
+                ) : null}
+                <span className="truncate max-w-[200px]">{tab.query}</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    closeTab(tab.id)
+                  }}
+                  className={cn(
+                    'flex items-center justify-center w-4 h-4 rounded transition-colors shrink-0',
+                    'text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)]',
+                    tab.id === activeTabId ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                  )}
+                  title="Đóng tab"
+                >
+                  <X size={11} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
-        {results.length > 0 && (
+        {/* ── Active tab content ── */}
+        {activeTab && (
           <div className="flex flex-col gap-2">
-            {results.map((lite, idx) => (
+            {!activeTab.loading && !activeTab.error && activeTab.results.length > 0 && (
+              <p className="text-xs text-[var(--color-text-muted)]">
+                {t('dictionary.tabResultCount', { count: activeTab.results.length, query: activeTab.query })}
+              </p>
+            )}
+
+            {activeTab.error && (
+              <p className="text-sm text-red-500">{activeTab.error}</p>
+            )}
+
+            {activeTab.results.map((lite, idx) => (
               <EntryCard
-                key={lite.char}
+                key={`${activeTab.id}-${lite.char}`}
                 lite={lite}
                 autoExpand={idx === 0}
                 onNoteSaved={() => {}}
+                onWordClick={runSearch}
               />
             ))}
-            {loading && (
+
+            {activeTab.loading && (
               <div className="flex items-center gap-2.5 px-1 py-2 text-sm text-[var(--color-text-muted)]">
                 <span>{t('common.streamingLoading')}</span>
                 <div className="flex gap-1">

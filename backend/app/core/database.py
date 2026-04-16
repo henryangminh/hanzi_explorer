@@ -19,7 +19,7 @@ def set_sqlite_journal_mode(dbapi_connection, connection_record):
 
 def init_db() -> None:
     # Import all models here so SQLModel metadata is fully populated
-    from app.models import user, character, note, notebook, sino_vn, search_history  # noqa: F401
+    from app.models import user, character, note, notebook, sino_vn, search_history, synonym_antonym  # noqa: F401
     SQLModel.metadata.create_all(engine)
 
 

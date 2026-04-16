@@ -71,6 +71,13 @@ class XdhyEntry(BaseModel):
     source_name: str
 
 
+class WordInfo(BaseModel):
+    """A word with its pinyin and Hán Việt reading — used for synonym/antonym entries."""
+    word: str
+    pinyin: str = ''
+    hanviet: str = ''
+
+
 class DictLiteResponse(BaseModel):
     """CEDICT + CVDICT + XDHY only — no external sources, no user note."""
     char: str
@@ -79,6 +86,8 @@ class DictLiteResponse(BaseModel):
     xdhy: List[XdhyEntry] = []
     sino_vn: List[str] = []     # Hán Việt readings, e.g. ["phán đoán"]
     hsk_tags: List[str] = []
+    synonyms: List[WordInfo] = []
+    antonyms: List[WordInfo] = []
 
 
 class HanzipyData(BaseModel):
@@ -95,3 +104,5 @@ class DictionaryResponse(BaseModel):
     hsk_tags: List[str] = []    # HSK notebook names from drkameleon DB
     sino_vn: List[str] = []     # Hán Việt readings, e.g. ["phán đoán"]
     hanzipy: Optional[HanzipyData] = None
+    synonyms: List[WordInfo] = []
+    antonyms: List[WordInfo] = []

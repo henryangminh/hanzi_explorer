@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Loader2, StickyNote, X, Pencil, Trash2 } from 'lucide-react'
@@ -57,9 +57,9 @@ function ExpandedNotePanel({
   }
 
   return (
-    /* Backdrop */
+    /* Backdrop — desktop only (hidden on mobile, inline panel used instead) */
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="hidden sm:flex fixed inset-0 z-50 items-center justify-center p-4"
       onClick={onClose}
     >
       {/* Semi-transparent overlay */}
@@ -217,7 +217,7 @@ function NoteCard({
         'group flex flex-col text-left gap-1.5 p-3 rounded-xl border',
         'bg-[var(--color-bg-subtle)] border-[var(--color-border)]',
         'hover:border-[var(--color-primary)] hover:shadow-sm transition-all',
-        'aspect-square overflow-hidden'
+        'sm:aspect-square overflow-hidden'
       )}
     >
       {/* Character + pinyin + hán việt: char bên trái, pinyin/HV xếp dọc bên phải */}
@@ -259,12 +259,177 @@ function NoteCard({
   )
 }
 
+// ── Inline note detail — mobile only ──────────────────────
+
+function InlineNoteDetail({
+  note,
+  onClose,
+  onUpdated,
+  onDeleted,
+  onGoToDict,
+}: {
+  note: UserNoteResponse
+  onClose: () => void
+  onUpdated: (updated: UserNoteResponse) => void
+  onDeleted: (id: number) => void
+  onGoToDict: (char: string) => void
+}) {
+  const { t } = useTranslation()
+  const [editing, setEditing] = useState(false)
+  const [editTitle, setEditTitle] = useState(note.title)
+  const [editDetail, setEditDetail] = useState(note.detail ?? '')
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  const handleSave = async () => {
+    if (!editTitle.trim()) return
+    setSaving(true)
+    try {
+      const { data } = await api.put<UserNoteResponse>(
+        `/dictionary/${encodeURIComponent(note.char)}/notes/${note.id}`,
+        { title: editTitle.trim(), detail: editDetail.trim() || null }
+      )
+      onUpdated(data)
+      setEditing(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    try {
+      await api.delete(`/dictionary/${encodeURIComponent(note.char)}/notes/${note.id}`)
+      onDeleted(note.id)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <div className="col-span-full rounded-xl border border-[var(--color-primary)]/40 bg-[var(--color-bg-surface)] shadow-sm flex flex-col gap-0 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-start justify-between px-4 pt-4 pb-3 border-b border-[var(--color-border)]">
+        <div className="flex flex-col gap-0.5">
+          <button
+            onClick={() => onGoToDict(note.char)}
+            className="font-cjk text-2xl font-bold text-[var(--color-primary)] hover:opacity-75 transition-opacity leading-none text-left"
+            title={t('myNotes.goToDictionary')}
+          >
+            {note.char}
+          </button>
+          {note.pinyin && (
+            <span className="text-sm font-medium text-[var(--color-text)]">{note.pinyin}</span>
+          )}
+          {note.sino_vn?.length > 0 && (
+            <span className="text-sm text-[var(--color-text-muted)]">{note.sino_vn.join(', ')}</span>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          className="p-1 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors"
+        >
+          <X size={15} />
+        </button>
+      </div>
+
+      {/* Body */}
+      <div className="px-4 py-3 flex flex-col gap-2">
+        {editing ? (
+          <>
+            <div className="flex flex-col gap-1">
+              <Input
+                id="inline-edit-title"
+                label={t('dictionary.noteTitle')}
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value.slice(0, 50))}
+                placeholder={t('dictionary.noteTitlePlaceholder')}
+                autoFocus
+                maxLength={50}
+              />
+              <span className="text-xs text-[var(--color-text-muted)] text-right">
+                {t('dictionary.charCount', { current: editTitle.length, max: 50 })}
+              </span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-[var(--color-text)]">
+                {t('dictionary.noteDetail')}
+              </label>
+              <textarea
+                value={editDetail}
+                onChange={(e) => setEditDetail(e.target.value.slice(0, 250))}
+                placeholder={t('dictionary.noteDetailPlaceholder')}
+                rows={3}
+                maxLength={250}
+                className={cn(
+                  'w-full px-3 py-2 rounded-lg text-sm resize-none',
+                  'bg-[var(--color-bg-subtle)] text-[var(--color-text)]',
+                  'border border-[var(--color-border)] focus:border-[var(--color-primary)]',
+                  'outline-none transition-colors placeholder:text-[var(--color-text-muted)]'
+                )}
+              />
+              <span className="text-xs text-[var(--color-text-muted)] text-right">
+                {t('dictionary.charCount', { current: editDetail.length, max: 250 })}
+              </span>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-sm font-semibold text-[var(--color-text)] break-words leading-snug">
+              {note.title}
+            </p>
+            {note.detail && (
+              <p className="text-sm text-[var(--color-text-muted)] break-words whitespace-pre-wrap leading-relaxed">
+                {note.detail}
+              </p>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="px-4 pb-4 pt-2 flex gap-2 justify-between border-t border-[var(--color-border)]">
+        {editing ? (
+          <>
+            <Button size="sm" variant="ghost" onClick={() => { setEditing(false); setEditTitle(note.title); setEditDetail(note.detail ?? '') }}>
+              {t('common.cancel')}
+            </Button>
+            <Button size="sm" onClick={handleSave} isLoading={saving} disabled={!editTitle.trim()}>
+              {saving ? t('dictionary.saving') : t('dictionary.save')}
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex items-center gap-1.5"
+              onClick={() => setEditing(true)}
+            >
+              <Pencil size={12} />
+              {t('dictionary.editNote')}
+            </Button>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-40"
+              title={t('dictionary.deleteNote')}
+            >
+              {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Main page ──────────────────────────────────────────────
 
 export function MyNotesPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { query: dictQuery, results: dictResults } = useDictionaryStore()
+  const { tabs, setActiveTabId } = useDictionaryStore()
 
   const [notes, setNotes] = useState<UserNoteResponse[]>([])
   const [loading, setLoading] = useState(true)
@@ -279,9 +444,10 @@ export function MyNotesPage() {
 
   const handleGoToDict = (char: string) => {
     setExpandedNote(null)
-    // If dictionary already has this char as the current query, just navigate
-    // without re-searching (store state will restore results)
-    if (dictQuery === char && dictResults.length > 0) {
+    // If a tab already has results for this char, switch to it and navigate
+    const existingTab = tabs.find((t) => t.query === char && t.results.length > 0)
+    if (existingTab) {
+      setActiveTabId(existingTab.id)
       navigate('/dictionary')
     } else {
       navigate(`/dictionary?q=${encodeURIComponent(char)}`)
@@ -324,13 +490,26 @@ export function MyNotesPage() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
+        <div className="flex flex-col gap-2.5 sm:grid sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {notes.map((note) => (
-            <NoteCard
-              key={note.id}
-              note={note}
-              onClick={() => setExpandedNote(note)}
-            />
+            <Fragment key={note.id}>
+              <NoteCard
+                note={note}
+                onClick={() => setExpandedNote(expandedNote?.id === note.id ? null : note)}
+              />
+              {/* Inline detail — mobile only, appears right below the tapped card */}
+              {expandedNote?.id === note.id && (
+                <div className="sm:hidden">
+                  <InlineNoteDetail
+                    note={expandedNote}
+                    onClose={() => setExpandedNote(null)}
+                    onUpdated={handleNoteUpdated}
+                    onDeleted={handleNoteDeleted}
+                    onGoToDict={handleGoToDict}
+                  />
+                </div>
+              )}
+            </Fragment>
           ))}
         </div>
       )}

@@ -15,7 +15,7 @@
  *   showNotes      — hiện section "Ghi chú của tôi" (chỉ dùng ở Tra từ). Mặc định false.
  *   onNoteSaved    — callback khi lưu/xoá ghi chú thành công
  */
-import { useState, useEffect, useRef, useLayoutEffect } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect, Fragment } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Loader2, Plus, Minus, Pencil, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
@@ -24,10 +24,73 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { DictionaryList } from './DictionaryList'
 import api from '@/lib/axios'
-import type { DictionaryResponse, DictLiteResponse, UserNoteResponse, XdhyEntry } from '@/types'
+import type { DictionaryResponse, DictLiteResponse, UserNoteResponse, WordInfo, XdhyEntry } from '@/types'
 
 // DictLiteResponse also has char/cedict/cvdict/sino_vn. We accept both.
 type InitialEntry = DictLiteResponse | DictionaryResponse
+
+// ── See/Xem reference renderer ────────────────────────────
+// Detects "see 汉字[pinyin]" or "xem 汉字[pinyin]" patterns and makes
+// the Chinese characters clickable. Supports traditional|simplified format.
+const SEE_PATTERN = /((see|xem)\s+)([\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]+(?:\|[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]+)?(?:\[[^\]]*\])?)/g
+
+function renderWithSeeRefs(
+  text: string,
+  onWordClick?: (word: string) => void
+): React.ReactNode {
+  if (!onWordClick) return text
+
+  SEE_PATTERN.lastIndex = 0
+  const parts: React.ReactNode[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  let key = 0
+
+  while ((match = SEE_PATTERN.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(<Fragment key={key++}>{text.slice(lastIndex, match.index)}</Fragment>)
+    }
+
+    const trigger = match[1]          // "see " or "xem "
+    const charsAndMore = match[3]     // e.g. "大夫[dai4 fu5]" or "老闆|老板[lao3 ban3]"
+
+    // Derive the search word: simplified form (after "|") if present, else chars before "["
+    const pipeIdx = charsAndMore.indexOf('|')
+    const bracketIdx = charsAndMore.indexOf('[')
+    let searchWord: string
+    if (pipeIdx !== -1) {
+      searchWord = bracketIdx !== -1
+        ? charsAndMore.slice(pipeIdx + 1, bracketIdx)
+        : charsAndMore.slice(pipeIdx + 1)
+    } else {
+      searchWord = bracketIdx !== -1
+        ? charsAndMore.slice(0, bracketIdx)
+        : charsAndMore
+    }
+
+    parts.push(<Fragment key={key++}>{trigger}</Fragment>)
+    parts.push(
+      <span
+        key={key++}
+        role="button"
+        tabIndex={0}
+        onClick={() => onWordClick(searchWord)}
+        onKeyDown={(e) => e.key === 'Enter' && onWordClick(searchWord)}
+        className="cursor-pointer hover:opacity-70 transition-opacity font-cjk"
+      >
+        {charsAndMore}
+      </span>
+    )
+
+    lastIndex = match.index + match[0].length
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(<Fragment key={key++}>{text.slice(lastIndex)}</Fragment>)
+  }
+
+  return parts.length > 0 ? <>{parts}</> : text
+}
 
 // Group consecutive definitions that share the same part-of-speech
 type PosGroup = { pos: string | null; defs: XdhyEntry['defs'] }
@@ -79,9 +142,10 @@ interface Props {
   showNotes?: boolean
   onDataLoaded?: (entry: DictionaryResponse) => void
   onNoteSaved?: () => void
+  onWordClick?: (word: string) => void
 }
 
-export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataLoaded, onNoteSaved }: Props) {
+export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataLoaded, onNoteSaved, onWordClick }: Props) {
   const { t } = useTranslation()
 
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
@@ -256,6 +320,8 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
         user_notes: [],
         hsk_tags: liteSource.hsk_tags ?? [],
         hanzipy: null,
+        synonyms: liteSource.synonyms ?? [],
+        antonyms: liteSource.antonyms ?? [],
       } satisfies DictionaryResponse
     : null)
 
@@ -270,7 +336,7 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
   }
 
 
-  const hskTags = full?.hsk_tags ?? []
+  const hskTags = entry.hsk_tags ?? []
 
   return (
     <div className="flex flex-col gap-4">
@@ -325,7 +391,9 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
               <DictionaryList
                 entries={entry.cedict}
                 renderMeaning={(ce) => (
-                  <p className="text-sm text-[var(--color-text-muted)]">{ce.meaning_en}</p>
+                  <p className="text-sm text-[var(--color-text-muted)]">
+                    {renderWithSeeRefs(ce.meaning_en, onWordClick)}
+                  </p>
                 )}
               />
             </div>
@@ -349,11 +417,12 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
                   <>
                     {cv.meaning_vi.split('/').filter(Boolean).map((meaning, i) => {
                       const parts = cv.meaning_vi.split('/').filter(Boolean)
+                      const trimmed = meaning.trim()
                       return (
                         <p key={i} className="text-sm text-[var(--color-text-muted)]">
                           {parts.length > 1 ? (
-                            <><span className="text-xs text-[var(--color-primary)] mr-1">{i + 1}.</span>{meaning.trim()}</>
-                          ) : meaning.trim()}
+                            <><span className="text-xs text-[var(--color-primary)] mr-1">{i + 1}.</span>{renderWithSeeRefs(trimmed, onWordClick)}</>
+                          ) : renderWithSeeRefs(trimmed, onWordClick)}
                         </p>
                       )
                     })}
@@ -427,6 +496,58 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
         </div>
       )}
 
+      {/* Từ đồng nghĩa */}
+      {entry.synonyms?.length > 0 && (
+        <div>
+          <SectionHeader collapsed={!!collapsed['synonyms']} onToggle={() => toggle('synonyms')} className="mb-2">
+            {t('dictionary.synonyms')}
+          </SectionHeader>
+          {!collapsed['synonyms'] && (
+            <div className="pl-4 flex flex-col gap-1">
+              {entry.synonyms.map((w: WordInfo, i: number) => (
+                <button
+                  key={w.word}
+                  type="button"
+                  onClick={() => onWordClick?.(w.word)}
+                  className="flex items-baseline gap-3 text-left cursor-pointer hover:opacity-70 transition-opacity w-fit"
+                >
+                  <span className="text-sm text-[var(--color-text-muted)] shrink-0 w-5 text-right">{i + 1}.</span>
+                  <span className="font-cjk text-sm text-[var(--color-text)]">{w.word}</span>
+                  {w.pinyin && <span className="text-sm text-[var(--color-text-muted)]">{w.pinyin}</span>}
+                  {w.hanviet && <span className="text-sm text-[var(--color-primary)]">{w.hanviet}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Từ trái nghĩa */}
+      {entry.antonyms?.length > 0 && (
+        <div>
+          <SectionHeader collapsed={!!collapsed['antonyms']} onToggle={() => toggle('antonyms')} className="mb-2">
+            {t('dictionary.antonyms')}
+          </SectionHeader>
+          {!collapsed['antonyms'] && (
+            <div className="pl-4 flex flex-col gap-1">
+              {entry.antonyms.map((w: WordInfo, i: number) => (
+                <button
+                  key={w.word}
+                  type="button"
+                  onClick={() => onWordClick?.(w.word)}
+                  className="flex items-baseline gap-3 text-left cursor-pointer hover:opacity-70 transition-opacity w-fit"
+                >
+                  <span className="text-sm text-[var(--color-text-muted)] shrink-0 w-5 text-right">{i + 1}.</span>
+                  <span className="font-cjk text-sm text-[var(--color-text)]">{w.word}</span>
+                  {w.pinyin && <span className="text-sm text-[var(--color-text-muted)]">{w.pinyin}</span>}
+                  {w.hanviet && <span className="text-sm text-[var(--color-primary)]">{w.hanviet}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Wiktionary — loading placeholder */}
       {loadingFull && (
         <div className="flex items-center gap-2 py-1 text-sm text-[var(--color-text-muted)]">
@@ -495,128 +616,123 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
               {notes.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {notes.map((note) => (
-                    <div
-                      key={note.id}
-                      className={cn(
-                        'flex flex-col gap-1 p-3 rounded-lg border cursor-pointer transition-colors min-w-0',
-                        selectedNoteId === note.id
-                          ? 'border-[var(--color-primary)] bg-[var(--color-bg-subtle)]'
-                          : 'border-[var(--color-border)] bg-[var(--color-bg-subtle)] hover:border-[var(--color-primary)]'
-                      )}
-                      onClick={() => {
-                        setSelectedNoteId(selectedNoteId === note.id ? null : note.id)
-                        setEditingNoteId(null)
-                        setAddingNote(false)
-                      }}
-                    >
-                      <p className="text-sm font-semibold text-[var(--color-text)] line-clamp-1 break-words min-w-0">
-                        {note.title}
-                      </p>
-                      {note.detail && (
-                        <p className="text-sm text-[var(--color-text-muted)] line-clamp-2 break-words min-w-0">
-                          {note.detail}
+                    <Fragment key={note.id}>
+                      <div
+                        className={cn(
+                          'flex flex-col gap-1 p-3 rounded-lg border cursor-pointer transition-colors min-w-0',
+                          selectedNoteId === note.id
+                            ? 'border-[var(--color-primary)] bg-[var(--color-bg-subtle)]'
+                            : 'border-[var(--color-border)] bg-[var(--color-bg-subtle)] hover:border-[var(--color-primary)]'
+                        )}
+                        onClick={() => {
+                          setSelectedNoteId(selectedNoteId === note.id ? null : note.id)
+                          setEditingNoteId(null)
+                          setAddingNote(false)
+                        }}
+                      >
+                        <p className="text-sm font-semibold text-[var(--color-text)] line-clamp-1 break-words min-w-0">
+                          {note.title}
                         </p>
+                        {note.detail && (
+                          <p className="text-sm text-[var(--color-text-muted)] line-clamp-2 break-words min-w-0">
+                            {note.detail}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Detail panel */}
+                      {selectedNoteId === note.id && editingNoteId === null && (
+                        <div ref={detailPanelRef} className="col-span-1 sm:col-span-3 sm:order-last w-full flex flex-col gap-2 p-3 rounded-lg border border-[var(--color-primary)] bg-[var(--color-bg-subtle)] min-w-0">
+                          <p className="text-sm font-semibold text-[var(--color-text)] break-words min-w-0">
+                            {note.title}
+                          </p>
+                          {note.detail && (
+                            <p className="text-sm text-[var(--color-text-muted)] break-words whitespace-pre-wrap min-w-0">
+                              {note.detail}
+                            </p>
+                          )}
+                          <div className="flex gap-2 mt-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex items-center gap-1"
+                              onClick={() => handleStartEdit(note)}
+                            >
+                              <Pencil size={12} />
+                              {t('dictionary.editNote')}
+                            </Button>
+                            <button
+                              onClick={() => handleDeleteNote(note.id)}
+                              disabled={deletingNoteId === note.id}
+                              className="p-1.5 rounded text-[var(--color-text-muted)] hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-40"
+                              title={t('dictionary.deleteNote')}
+                            >
+                              {deletingNoteId === note.id
+                                ? <Loader2 size={13} className="animate-spin" />
+                                : <Trash2 size={13} />
+                              }
+                            </button>
+                          </div>
+                        </div>
                       )}
-                    </div>
+
+                      {/* Edit form */}
+                      {editingNoteId === note.id && (
+                        <div className="col-span-1 sm:col-span-3 sm:order-last w-full flex flex-col gap-2 p-3 rounded-lg border border-[var(--color-primary)] bg-[var(--color-bg-subtle)] min-w-0">
+                          <div className="flex flex-col gap-1.5">
+                            <Input
+                              id={`edit-title-${editingNoteId}`}
+                              label={t('dictionary.noteTitle')}
+                              value={editTitle}
+                              onChange={(e) => setEditTitle(e.target.value.slice(0, 50))}
+                              placeholder={t('dictionary.noteTitlePlaceholder')}
+                              autoFocus
+                              maxLength={50}
+                            />
+                            <span className="text-xs text-[var(--color-text-muted)] text-right">
+                              {t('dictionary.charCount', { current: editTitle.length, max: 50 })}
+                            </span>
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-sm font-medium text-[var(--color-text)]">
+                              {t('dictionary.noteDetail')}
+                            </label>
+                            <textarea
+                              value={editDetail}
+                              onChange={(e) => setEditDetail(e.target.value.slice(0, 250))}
+                              placeholder={t('dictionary.noteDetailPlaceholder')}
+                              rows={3}
+                              maxLength={250}
+                              className={cn(
+                                'w-full px-3 py-2 rounded-lg text-sm resize-none',
+                                'bg-[var(--color-bg-surface)] text-[var(--color-text)]',
+                                'border border-[var(--color-border)] focus:border-[var(--color-primary)]',
+                                'outline-none transition-colors placeholder:text-[var(--color-text-muted)]'
+                              )}
+                            />
+                            <span className="text-xs text-[var(--color-text-muted)] text-right">
+                              {t('dictionary.charCount', { current: editDetail.length, max: 250 })}
+                            </span>
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <Button size="sm" variant="ghost" onClick={handleCancelEdit}>
+                              {t('common.cancel')}
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleSaveEdit(editingNoteId)}
+                              isLoading={savingEdit}
+                              disabled={!editTitle.trim()}
+                            >
+                              {savingEdit ? t('dictionary.saving') : t('dictionary.save')}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </Fragment>
                   ))}
                 </div>
               )}
-
-              {/* Detail panel — full width, shown below grid when a card is selected */}
-              {selectedNoteId !== null && editingNoteId === null && (() => {
-                const note = notes.find((n) => n.id === selectedNoteId)
-                if (!note) return null
-                return (
-                  <div ref={detailPanelRef} className="w-full flex flex-col gap-2 p-3 rounded-lg border border-[var(--color-primary)] bg-[var(--color-bg-subtle)] min-w-0">
-                    <p className="text-sm font-semibold text-[var(--color-text)] break-words min-w-0">
-                      {note.title}
-                    </p>
-                    {note.detail && (
-                      <p className="text-sm text-[var(--color-text-muted)] break-words whitespace-pre-wrap min-w-0">
-                        {note.detail}
-                      </p>
-                    )}
-                    <div className="flex gap-2 mt-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex items-center gap-1"
-                        onClick={() => handleStartEdit(note)}
-                      >
-                        <Pencil size={12} />
-                        {t('dictionary.editNote')}
-                      </Button>
-                      <button
-                        onClick={() => handleDeleteNote(note.id)}
-                        disabled={deletingNoteId === note.id}
-                        className="p-1.5 rounded text-[var(--color-text-muted)] hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-40"
-                        title={t('dictionary.deleteNote')}
-                      >
-                        {deletingNoteId === note.id
-                          ? <Loader2 size={13} className="animate-spin" />
-                          : <Trash2 size={13} />
-                        }
-                      </button>
-                    </div>
-                  </div>
-                )
-              })()}
-
-              {/* Edit form — full width, replaces detail panel */}
-              {editingNoteId !== null && (() => {
-                return (
-                  <div className="w-full flex flex-col gap-2 p-3 rounded-lg border border-[var(--color-primary)] bg-[var(--color-bg-subtle)]">
-                    <div className="flex flex-col gap-1.5">
-                      <Input
-                        id={`edit-title-${editingNoteId}`}
-                        label={t('dictionary.noteTitle')}
-                        value={editTitle}
-                        onChange={(e) => setEditTitle(e.target.value.slice(0, 50))}
-                        placeholder={t('dictionary.noteTitlePlaceholder')}
-                        autoFocus
-                        maxLength={50}
-                      />
-                      <span className="text-xs text-[var(--color-text-muted)] text-right">
-                        {t('dictionary.charCount', { current: editTitle.length, max: 50 })}
-                      </span>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-sm font-medium text-[var(--color-text)]">
-                        {t('dictionary.noteDetail')}
-                      </label>
-                      <textarea
-                        value={editDetail}
-                        onChange={(e) => setEditDetail(e.target.value.slice(0, 250))}
-                        placeholder={t('dictionary.noteDetailPlaceholder')}
-                        rows={3}
-                        maxLength={250}
-                        className={cn(
-                          'w-full px-3 py-2 rounded-lg text-sm resize-none',
-                          'bg-[var(--color-bg-surface)] text-[var(--color-text)]',
-                          'border border-[var(--color-border)] focus:border-[var(--color-primary)]',
-                          'outline-none transition-colors placeholder:text-[var(--color-text-muted)]'
-                        )}
-                      />
-                      <span className="text-xs text-[var(--color-text-muted)] text-right">
-                        {t('dictionary.charCount', { current: editDetail.length, max: 250 })}
-                      </span>
-                    </div>
-                    <div className="flex gap-2 justify-end">
-                      <Button size="sm" variant="ghost" onClick={handleCancelEdit}>
-                        {t('common.cancel')}
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => handleSaveEdit(editingNoteId)}
-                        isLoading={savingEdit}
-                        disabled={!editTitle.trim()}
-                      >
-                        {savingEdit ? t('dictionary.saving') : t('dictionary.save')}
-                      </Button>
-                    </div>
-                  </div>
-                )
-              })()}
 
               {/* Add note form */}
               {addingNote ? (

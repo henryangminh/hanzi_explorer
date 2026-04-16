@@ -434,6 +434,7 @@ def get_lite_entry(session: Session, char: str) -> DictLiteResponse:
     cedict_entries = lookup_cedict(session, char)
 
     from app.services.sino_vn_service import _get_db_readings, _combine
+    from app.services.synonym_antonym_service import lookup_synonyms, lookup_antonyms
     sino_vn: list[str] = []
     if cedict_entries:
         char_row = _get_character(session, char)
@@ -457,6 +458,8 @@ def get_lite_entry(session: Session, char: str) -> DictLiteResponse:
         xdhy=lookup_xdhy(session, char),
         sino_vn=sino_vn,
         hsk_tags=lookup_hsk_tags(session, char),
+        synonyms=lookup_synonyms(session, char),
+        antonyms=lookup_antonyms(session, char),
     )
 
 
@@ -486,6 +489,8 @@ async def get_dictionary_entry(session: Session, char: str, user_id: int) -> Dic
 
     hanzipy_components = get_hanzipy_components(char)
 
+    from app.services.synonym_antonym_service import lookup_synonyms, lookup_antonyms
+
     return DictionaryResponse(
         char=char,
         cedict=cedict_entries,
@@ -496,4 +501,6 @@ async def get_dictionary_entry(session: Session, char: str, user_id: int) -> Dic
         hsk_tags=lookup_hsk_tags(session, char),
         sino_vn=sino_vn,
         hanzipy=HanzipyData(components=hanzipy_components) if hanzipy_components else None,
+        synonyms=lookup_synonyms(session, char),
+        antonyms=lookup_antonyms(session, char),
     )

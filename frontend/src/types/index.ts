@@ -76,6 +76,12 @@ export interface XdhyEntry {
   source_name: string
 }
 
+export interface WordInfo {
+  word: string
+  pinyin: string
+  hanviet: string
+}
+
 export interface DictLiteResponse {
   char: string
   cedict: CedictEntry[]
@@ -83,6 +89,8 @@ export interface DictLiteResponse {
   xdhy: XdhyEntry[]
   sino_vn: string[]
   hsk_tags: string[]
+  synonyms: WordInfo[]
+  antonyms: WordInfo[]
 }
 
 export interface HanzipyData {
@@ -99,6 +107,8 @@ export interface DictionaryResponse {
   hsk_tags: string[]
   sino_vn: string[]
   hanzipy: HanzipyData | null
+  synonyms: WordInfo[]
+  antonyms: WordInfo[]
 }
 
 // ── Radicals ─────────────────────────────────────────────
