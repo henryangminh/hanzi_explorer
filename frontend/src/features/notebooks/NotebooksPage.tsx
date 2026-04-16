@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { useAuthStore } from '@/store/auth.store'
 import { useNotebookStore } from '@/store/notebook.store'
+import { useUIStore } from '@/store/ui.store'
 import { CharDetailPanel } from '@/features/shared/CharDetailPanel'
 import { SaveToNotebookModal } from '@/features/shared/SaveToNotebookModal'
 import type { NotebookEntryPreview, NotebookResponse, NotebookSortOrder } from '@/types'
@@ -43,8 +44,9 @@ function NotebookEntriesModal({
   const [removingChar, setRemovingChar] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  // inline detail view
-  const [selectedChar, setSelectedChar] = useState<string | null>(null)
+  // inline detail view — stack for back navigation (synonyms/antonyms/see push new chars)
+  const [charStack, setCharStack] = useState<string[]>([])
+  const selectedChar = charStack.length > 0 ? charStack[charStack.length - 1] : null
   const [saveModalChar, setSaveModalChar] = useState<string | null>(null)
 
   const pendingRef = useRef<NotebookEntryPreview[]>([])
@@ -110,11 +112,7 @@ function NotebookEntriesModal({
   }, [notebook.id, sort])
 
   const handleSelectChar = (char: string) => {
-    if (selectedChar === char) {
-      setSelectedChar(null)
-      return
-    }
-    setSelectedChar(char)
+    setCharStack([char])
   }
 
   const handleRemoveEntry = async (entry: NotebookEntryPreview) => {
@@ -122,7 +120,7 @@ function NotebookEntriesModal({
     try {
       await api.delete(`/notebooks/${notebook.id}/entries/${encodeURIComponent(entry.char)}`)
       setEntries((prev) => prev.filter((e) => e.id !== entry.id))
-      if (selectedChar === entry.char) { setSelectedChar(null) }
+      if (selectedChar === entry.char) { setCharStack([]) }
     } finally {
       setRemovingChar(null)
     }
@@ -141,7 +139,8 @@ function NotebookEntriesModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-x-0 bottom-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      style={{ top: '56px' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div className="w-full max-w-3xl h-full max-h-[90vh] bg-[var(--color-bg-surface)] rounded-2xl shadow-2xl flex flex-col">
@@ -221,7 +220,7 @@ function NotebookEntriesModal({
               <div className="flex items-center justify-between">
                 <button
                   title={t('common.back')}
-                  onClick={() => { setSelectedChar(null) }}
+                  onClick={() => { setCharStack(prev => prev.slice(0, -1)) }}
                   className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
                 >
                   <ChevronLeft size={14} />
@@ -237,7 +236,12 @@ function NotebookEntriesModal({
               </div>
 
               {/* CharDetailPanel self-manages: shows DB data first, then lazy-loads Wiktionary */}
-              <CharDetailPanel char={selectedChar} showNotes={true} />
+              <CharDetailPanel
+                key={selectedChar}
+                char={selectedChar}
+                showNotes={true}
+                onWordClick={(word) => setCharStack(prev => [...prev, word])}
+              />
             </div>
           ) : (
             /* ── Grid view ── */
@@ -567,7 +571,7 @@ export function NotebooksPage() {
   const [sort, setSort] = useState<NotebookSortOrder>('updated_at_desc')
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
-  const [openNotebook, setOpenNotebook] = useState<NotebookResponse | null>(null)
+  const { notebooksOpen: openNotebook, setNotebooksOpen: setOpenNotebook } = useUIStore()
   const [editingNotebook, setEditingNotebook] = useState<NotebookResponse | null>(null)
   const [globalExpanded, setGlobalExpanded] = useState(false)
   const [privateExpanded, setPrivateExpanded] = useState(false)
@@ -593,7 +597,7 @@ export function NotebooksPage() {
 
   const handleNotebookSaved = (updated: NotebookResponse) => {
     setNotebooks((prev) => prev.map((n) => n.id === updated.id ? updated : n))
-    setOpenNotebook((prev) => prev?.id === updated.id ? updated : prev)
+    if (openNotebook?.id === updated.id) setOpenNotebook(updated)
   }
 
   const globalNotebooks = notebooks.filter((n) => n.type === 'global')

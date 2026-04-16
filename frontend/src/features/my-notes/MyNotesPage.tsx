@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input'
 import api from '@/lib/axios'
 import type { UserNoteResponse } from '@/types'
 import { useDictionaryStore } from '@/store/dictionary.store'
+import { useUIStore } from '@/store/ui.store'
 
 // ── Expanded note panel (square, fixed overlay) ────────────
 
@@ -431,15 +432,23 @@ export function MyNotesPage() {
   const navigate = useNavigate()
   const { tabs, setActiveTabId } = useDictionaryStore()
 
+  const { myNotesExpanded: expandedNote, setMyNotesExpanded: setExpandedNote } = useUIStore()
   const [notes, setNotes] = useState<UserNoteResponse[]>([])
   const [loading, setLoading] = useState(true)
-  const [expandedNote, setExpandedNote] = useState<UserNoteResponse | null>(null)
 
   useEffect(() => {
     api
       .get<UserNoteResponse[]>('/dictionary/notes')
-      .then(({ data }) => setNotes(data))
+      .then(({ data }) => {
+        setNotes(data)
+        // Sync expanded note with fresh data (handle updates/deletes from other sessions)
+        setExpandedNote(
+          expandedNote ? (data.find((n) => n.id === expandedNote.id) ?? null) : null
+        )
+      })
       .finally(() => setLoading(false))
+  // expandedNote intentionally excluded — only run on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleGoToDict = (char: string) => {

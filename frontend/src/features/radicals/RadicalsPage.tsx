@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { X, ArrowLeft, BookmarkPlus } from 'lucide-react'
 import { useRadicalList } from './useRadicals'
 import { cn } from '@/lib/cn'
@@ -7,14 +8,19 @@ import type { RadicalSummary } from '@/types'
 import api from '@/lib/axios'
 import { SaveToNotebookModal } from '@/features/shared/SaveToNotebookModal'
 import { CharDetailPanel } from '@/features/shared/CharDetailPanel'
+import { useUIStore } from '@/store/ui.store'
 
 interface CharCard { char: string; pinyin: string; meaning_en: string; stroke_count?: number | null }
 
 // ── Char detail panel (inside popup) ─────────────────────
 // Dùng CharDetailPanel shared — tự fetch DB data + Wiktionary lazy
 
-function CharDetail({ char, onBack }: { char: string; onBack: () => void }) {
+function CharDetail({ char, onBack }: {
+  char: string
+  onBack: () => void
+}) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const [saveModalOpen, setSaveModalOpen] = useState(false)
   const [headerInfo, setHeaderInfo] = useState<{ pinyin: string; sinoVn: string[] } | null>(null)
 
@@ -53,12 +59,14 @@ function CharDetail({ char, onBack }: { char: string; onBack: () => void }) {
       {/* Body — CharDetailPanel handles all loading: DB data first, then Wiktionary */}
       <div className="flex-1 overflow-y-auto px-4 py-3">
         <CharDetailPanel
+          key={char}
           char={char}
           showNotes={true}
           onDataLoaded={(entry) => setHeaderInfo({
             pinyin: entry.cedict[0]?.pinyin ?? '',
             sinoVn: entry.sino_vn ?? [],
           })}
+          onWordClick={(word) => navigate(`/dictionary?q=${encodeURIComponent(word)}`)}
         />
       </div>
     </div>
@@ -75,13 +83,12 @@ function RadicalPopup({
   radical: RadicalSummary
   onClose: () => void
 }) {
+  const { radicalsCurrentChar: currentChar, setRadicalsCurrentChar: setCurrentChar } = useUIStore()
   const [chars, setChars] = useState<CharCard[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedChar, setSelectedChar] = useState<string | null>(null)
 
   useEffect(() => {
     setLoading(true)
-    setSelectedChar(null)
     api.get(`/radicals/${encodeURIComponent(radical.radical)}/chars`)
       .then(({ data }) => setChars(data.chars ?? []))
       .finally(() => setLoading(false))
@@ -89,8 +96,11 @@ function RadicalPopup({
 
   return (
     <div className="flex flex-col h-full">
-      {selectedChar ? (
-        <CharDetail char={selectedChar} onBack={() => setSelectedChar(null)} />
+      {currentChar ? (
+        <CharDetail
+          char={currentChar}
+          onBack={() => setCurrentChar(null)}
+        />
       ) : (
         <>
           {/* Header */}
@@ -155,7 +165,7 @@ function RadicalPopup({
                         {group.map((c) => (
                           <div
                             key={c.char}
-                            onClick={() => setSelectedChar(c.char)}
+                            onClick={() => setCurrentChar(c.char)}
                             className={cn(
                               'flex flex-col items-center gap-1 py-3 px-2 rounded-xl border transition-all cursor-pointer',
                               'bg-[var(--color-bg-surface)] border-[var(--color-border)]',
@@ -221,8 +231,8 @@ function RadicalCard({ radical, onClick }: { radical: RadicalSummary; onClick: (
 function Modal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-      style={{ background: 'rgba(0,0,0,0.5)' }}
+      className="fixed inset-x-0 bottom-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      style={{ top: '56px', background: 'rgba(0,0,0,0.5)' }}
       onClick={onClose}
     >
       <div
@@ -244,7 +254,7 @@ function Modal({ children, onClose }: { children: React.ReactNode; onClose: () =
 export function RadicalsPage() {
   const { t } = useTranslation()
   const { radicals, loading } = useRadicalList()
-  const [selected, setSelected] = useState<RadicalSummary | null>(null)
+  const { radicalsSelected: selected, setRadicalsSelected: setSelected } = useUIStore()
 
   const sorted = [...radicals].sort((a, b) => {
     if (a.stroke_count == null) return 1
