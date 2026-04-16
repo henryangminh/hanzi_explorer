@@ -12,7 +12,7 @@ from app.models.character import Character, PinyinReading, Definition, Dictionar
 from app.models.note import UserNote
 from app.schemas.dictionary import (
     CedictEntry, CvdictEntry, DictLiteResponse, DictionaryResponse, ExternalSource,
-    HanzipyData, NoteUpsert, UserNoteResponse,
+    HanzipyData, NoteUpsert, UserNoteResponse, XdhyEntry, XdhyDefItem,
 )
 from app.services.wiktionary_parser import parse_wiktionary, parse_vi_wikitext
 
@@ -120,6 +120,48 @@ def lookup_cvdict(session: Session, char: str) -> list[CvdictEntry]:
             hsk_level=None,
             source_name=source.name,
             is_separable=char_row.is_separable,
+        ))
+    return results
+
+
+# ── 现代汉语词典 (XDHY) ───────────────────────────────────
+
+def lookup_xdhy(session: Session, char: str) -> list[XdhyEntry]:
+    char_row = _get_character(session, char)
+    if not char_row:
+        return []
+
+    source = _get_source(session, '现代汉语词典')
+    if not source:
+        return []
+
+    defs = _get_definitions(session, char_row.id, source.id, 'zh')
+
+    results = []
+    for defn in defs:
+        try:
+            data = json.loads(defn.meaning_text)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        pinyin = data.get('pinyin', '')
+        def_items = [
+            XdhyDefItem(
+                pos=d.get('pos'),
+                definition=d.get('def', ''),
+                examples=d.get('ex', []),
+                is_sub=d.get('is_sub', False),
+            )
+            for d in data.get('defs', [])
+        ]
+        if not def_items:
+            continue
+        results.append(XdhyEntry(
+            id=defn.id,
+            simplified=char_row.simplified,
+            traditional=char_row.traditional,
+            pinyin=pinyin,
+            defs=def_items,
+            source_name=source.name,
         ))
     return results
 
@@ -355,6 +397,7 @@ def get_lite_entry(session: Session, char: str) -> DictLiteResponse:
         char=char,
         cedict=cedict_entries,
         cvdict=lookup_cvdict(session, char),
+        xdhy=lookup_xdhy(session, char),
         sino_vn=sino_vn,
         hsk_tags=lookup_hsk_tags(session, char),
     )
@@ -390,6 +433,7 @@ async def get_dictionary_entry(session: Session, char: str, user_id: int) -> Dic
         char=char,
         cedict=cedict_entries,
         cvdict=lookup_cvdict(session, char),
+        xdhy=lookup_xdhy(session, char),
         external=await fetch_external_sources(session, char, traditional=traditional),
         user_note=get_user_note(session, user_id, char),
         hsk_tags=lookup_hsk_tags(session, char),

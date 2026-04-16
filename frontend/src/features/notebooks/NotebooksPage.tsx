@@ -5,6 +5,7 @@ import api from '@/lib/axios'
 import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
 import { useAuthStore } from '@/store/auth.store'
 import { useNotebookStore } from '@/store/notebook.store'
 import { CharDetailPanel } from '@/features/shared/CharDetailPanel'
@@ -191,15 +192,11 @@ function NotebookEntriesModal({
         {/* Sort — only in list view */}
         {!selectedChar && (
           <div className="px-6 py-2 shrink-0">
-            <select
+            <Select
               value={sort}
-              onChange={(e) => setSort(e.target.value as NotebookSortOrder)}
-              className="text-xs px-2 py-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-surface)] text-[var(--color-text-muted)] outline-none"
-            >
-              {SORT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
-              ))}
-            </select>
+              options={SORT_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
+              onChange={setSort}
+            />
           </div>
         )}
 
@@ -483,14 +480,14 @@ function CreateNotebookForm({
       {isAdmin && (
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-[var(--color-text)]">{t('notebooks.typeLabel')}</label>
-          <select
+          <Select
             value={type}
-            onChange={(e) => setType(e.target.value as 'private' | 'global')}
-            className="px-3 py-2 rounded-lg text-sm border border-[var(--color-border)] bg-[var(--color-bg-surface)] text-[var(--color-text)] outline-none"
-          >
-            <option value="private">{t('notebooks.typePrivate')}</option>
-            <option value="global">{t('notebooks.typeGlobal')}</option>
-          </select>
+            options={[
+              { value: 'private', label: t('notebooks.typePrivate') },
+              { value: 'global', label: t('notebooks.typeGlobal') },
+            ]}
+            onChange={(v) => setType(v as 'private' | 'global')}
+          />
         </div>
       )}
       <div className="flex gap-2 justify-end">
@@ -607,15 +604,12 @@ export function NotebooksPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-[var(--color-text)]">{t('notebooks.title')}</h1>
         <div className="flex items-center gap-2">
-          <select
+          <Select
+            align="right"
             value={sort}
-            onChange={(e) => setSort(e.target.value as NotebookSortOrder)}
-            className="text-xs px-2 py-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-surface)] text-[var(--color-text-muted)] outline-none"
-          >
-            {SORT_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
-            ))}
-          </select>
+            options={SORT_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
+            onChange={setSort}
+          />
           <Button
             size="sm"
             variant="outline"

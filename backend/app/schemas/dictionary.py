@@ -43,11 +43,28 @@ class CvdictEntry(BaseModel):
     is_separable: bool = False
 
 
+class XdhyDefItem(BaseModel):
+    pos: Optional[str]
+    definition: str
+    examples: List[str]
+    is_sub: bool = False
+
+
+class XdhyEntry(BaseModel):
+    id: int
+    simplified: str
+    traditional: Optional[str]
+    pinyin: str
+    defs: List[XdhyDefItem]
+    source_name: str
+
+
 class DictLiteResponse(BaseModel):
-    """CEDICT + CVDICT only — no external sources, no user note."""
+    """CEDICT + CVDICT + XDHY only — no external sources, no user note."""
     char: str
     cedict: List[CedictEntry]
     cvdict: List[CvdictEntry] = []
+    xdhy: List[XdhyEntry] = []
     sino_vn: List[str] = []     # Hán Việt readings, e.g. ["phán đoán"]
     hsk_tags: List[str] = []
 
@@ -60,6 +77,7 @@ class DictionaryResponse(BaseModel):
     char: str
     cedict: List[CedictEntry]   # list — multiple readings supported
     cvdict: List[CvdictEntry] = []
+    xdhy: List[XdhyEntry] = []
     external: List[ExternalSource]
     user_note: Optional[UserNoteResponse]
     hsk_tags: List[str] = []    # HSK notebook names from drkameleon DB

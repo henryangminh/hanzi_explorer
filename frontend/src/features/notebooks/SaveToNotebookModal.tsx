@@ -5,6 +5,7 @@ import api from '@/lib/axios'
 import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
 import { useNotebookStore } from '@/store/notebook.store'
 import type { NotebookResponse, NotebookSortOrder } from '@/types'
 
@@ -117,15 +118,11 @@ export function SaveToNotebookModal({ char, onClose, excludeNotebookId }: Props)
 
         {/* Sort */}
         <div className="px-5 pb-2 shrink-0">
-          <select
+          <Select
             value={sort}
-            onChange={(e) => setSort(e.target.value as NotebookSortOrder)}
-            className="text-xs px-2 py-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-surface)] text-[var(--color-text-muted)] outline-none"
-          >
-            {SORT_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
-            ))}
-          </select>
+            options={SORT_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
+            onChange={setSort}
+          />
         </div>
 
         {/* List */}

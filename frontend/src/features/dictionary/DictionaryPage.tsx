@@ -99,6 +99,11 @@ function EntryCard({
               HSK {firstCedict.hsk_level}
             </span>
           )}
+          {lite.xdhy?.some((x) => x.pinyin.includes('//')) && (
+            <span className="text-xs px-2 py-0.5 rounded border border-[var(--color-accent)] text-[var(--color-accent)] shrink-0">
+              {t('dictionary.separable')}
+            </span>
+          )}
           <button
             onClick={() => setSaveModalOpen(true)}
             className="p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-bg-subtle)] transition-colors"

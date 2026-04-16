@@ -19,15 +19,29 @@ import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { CardTitle } from '@/components/ui/Card'
+import { DictionarySectionTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { DictionaryList } from './DictionaryList'
 import api from '@/lib/axios'
-import type { DictionaryResponse, DictLiteResponse, UserNoteResponse } from '@/types'
+import type { DictionaryResponse, DictLiteResponse, UserNoteResponse, XdhyEntry } from '@/types'
 
 // DictLiteResponse also has char/cedict/cvdict/sino_vn. We accept both.
 type InitialEntry = DictLiteResponse | DictionaryResponse
+
+// Group consecutive definitions that share the same part-of-speech
+type PosGroup = { pos: string | null; defs: XdhyEntry['defs'] }
+function groupDefsByPos(defs: XdhyEntry['defs']): PosGroup[] {
+  return defs.reduce<PosGroup[]>((groups, d) => {
+    const last = groups[groups.length - 1]
+    if (last && last.pos === d.pos) {
+      last.defs.push(d)
+    } else {
+      groups.push({ pos: d.pos, defs: [d] })
+    }
+    return groups
+  }, [])
+}
 
 function isFullEntry(e: InitialEntry): e is DictionaryResponse {
   return 'external' in e
@@ -142,6 +156,7 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
         char: liteSource.char,
         cedict: liteSource.cedict,
         cvdict: liteSource.cvdict,
+        xdhy: liteSource.xdhy ?? [],
         sino_vn: liteSource.sino_vn,
         external: [],
         user_note: null,
@@ -208,13 +223,15 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
       {/* CC-CEDICT */}
       {entry.cedict.length > 0 ? (
         <div>
-          <CardTitle className="mb-2">{t('dictionary.cedict')}</CardTitle>
-          <DictionaryList
-            entries={entry.cedict}
-            renderMeaning={(ce) => (
-              <p className="text-sm text-[var(--color-text-muted)]">{ce.meaning_en}</p>
-            )}
-          />
+          <DictionarySectionTitle className="mb-2">{t('dictionary.cedict')}</DictionarySectionTitle>
+          <div className="pl-4">
+            <DictionaryList
+              entries={entry.cedict}
+              renderMeaning={(ce) => (
+                <p className="text-sm text-[var(--color-text-muted)]">{ce.meaning_en}</p>
+              )}
+            />
+          </div>
         </div>
       ) : (
         <p className="text-sm text-[var(--color-text-muted)] italic">{t('dictionary.noResult')}</p>
@@ -223,26 +240,86 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
       {/* CVDICT */}
       {entry.cvdict?.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
-            CVDICT — Hán Việt
-          </p>
-          <DictionaryList
-            entries={entry.cvdict}
-            renderMeaning={(cv) => (
-              <>
-                {cv.meaning_vi.split('/').filter(Boolean).map((meaning, i) => {
-                  const parts = cv.meaning_vi.split('/').filter(Boolean)
-                  return (
-                    <p key={i} className="text-sm text-[var(--color-text-muted)]">
-                      {parts.length > 1 ? (
-                        <><span className="text-xs text-[var(--color-primary)] mr-1">{i + 1}.</span>{meaning.trim()}</>
-                      ) : meaning.trim()}
-                    </p>
-                  )
-                })}
-              </>
-            )}
-          />
+          <DictionarySectionTitle className="mb-2">{t('dictionary.cvdict')}</DictionarySectionTitle>
+          <div className="pl-4">
+            <DictionaryList
+              entries={entry.cvdict}
+              renderMeaning={(cv) => (
+                <>
+                  {cv.meaning_vi.split('/').filter(Boolean).map((meaning, i) => {
+                    const parts = cv.meaning_vi.split('/').filter(Boolean)
+                    return (
+                      <p key={i} className="text-sm text-[var(--color-text-muted)]">
+                        {parts.length > 1 ? (
+                          <><span className="text-xs text-[var(--color-primary)] mr-1">{i + 1}.</span>{meaning.trim()}</>
+                        ) : meaning.trim()}
+                      </p>
+                    )
+                  })}
+                </>
+              )}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 现代汉语词典 */}
+      {entry.xdhy?.length > 0 && (
+        <div>
+          <DictionarySectionTitle className="mb-2">{t('dictionary.xdhy')}</DictionarySectionTitle>
+          <div className="pl-4 flex flex-col gap-3">
+            {entry.xdhy.map((xEntry: XdhyEntry) => {
+              const groups = groupDefsByPos(xEntry.defs)
+              return (
+                <div
+                  key={xEntry.id}
+                  className={cn(
+                    'flex flex-col gap-1',
+                    entry.xdhy.length > 1 && 'pl-3 border-l-2 border-[var(--color-border-md)]'
+                  )}
+                >
+                  <span className="font-medium text-[var(--color-text)]">{xEntry.pinyin}</span>
+                  <div className="flex flex-col gap-2">
+                    {groups.map((group, gi) => (
+                      <div key={gi}>
+                        {group.pos && (
+                          <span className="inline-block text-sm font-medium text-[var(--color-primary)] border border-[var(--color-primary)] rounded px-1.5 py-0.5 mb-1">
+                            {group.pos}
+                          </span>
+                        )}
+                        <div className="flex flex-col gap-1">
+                          {(() => {
+                            let numCount = 0
+                            return group.defs.map((d, idx) => {
+                              const subMatch = d.is_sub ? d.definition.match(/^([a-z])）(.*)/) : null
+                              const subLetter = subMatch?.[1]
+                              const defText = subMatch ? subMatch[2].trim() : d.definition
+                              if (!d.is_sub) numCount++
+                              return (
+                                <div key={idx} className={d.is_sub ? 'ml-4' : ''}>
+                                  <div className="flex gap-1.5 text-sm text-[var(--color-text)]">
+                                    <span className="shrink-0 text-[var(--color-text-muted)]">
+                                      {d.is_sub ? `${subLetter}）` : `${numCount}.`}
+                                    </span>
+                                    <span>{defText}</span>
+                                  </div>
+                                  {d.examples.map((ex, j) => (
+                                    <div key={j} className={cn('text-sm italic', d.is_sub ? 'ml-8' : 'ml-4')} style={{ color: 'var(--color-accent)' }}>
+                                      → {ex}
+                                    </div>
+                                  ))}
+                                </div>
+                              )
+                            })
+                          })()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
@@ -263,14 +340,12 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
         if (!d.found) return null
         return (
           <div key={src.source}>
-            <div className="flex items-center justify-between mb-2">
-              <CardTitle>{src.label}</CardTitle>
-            </div>
-            <div className="flex flex-col gap-2">
+            <DictionarySectionTitle className="mb-2">{src.label}</DictionarySectionTitle>
+            <div className="pl-4 flex flex-col gap-2">
               {d.sections?.map((sec, i) => (
                 <div key={i}>
                   {sec.part_of_speech && (
-                    <span className="text-xs font-medium text-[var(--color-primary)] uppercase tracking-wide">
+                    <span className="inline-block text-sm font-medium text-[var(--color-primary)] border border-[var(--color-primary)] rounded px-1.5 py-0.5 mb-1">
                       {sec.part_of_speech}
                     </span>
                   )}
@@ -303,8 +378,8 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
       {/* Notes — only shown when showNotes=true (Tra từ feature) */}
       {showNotes && (
         <div>
-          <CardTitle className="mb-2">{t('dictionary.notes')}</CardTitle>
-          <div className="flex flex-col gap-2">
+          <DictionarySectionTitle className="mb-2">{t('dictionary.notes')}</DictionarySectionTitle>
+          <div className="pl-4 flex flex-col gap-2">
             <Input
               id={`vi-${char}`}
               label={t('dictionary.meaningVi')}

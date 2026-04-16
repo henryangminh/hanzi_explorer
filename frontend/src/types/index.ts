@@ -58,10 +58,27 @@ export interface CvdictEntry {
   is_separable: boolean
 }
 
+export interface XdhyDefItem {
+  pos: string | null
+  definition: string
+  examples: string[]
+  is_sub: boolean
+}
+
+export interface XdhyEntry {
+  id: number
+  simplified: string
+  traditional: string | null
+  pinyin: string
+  defs: XdhyDefItem[]
+  source_name: string
+}
+
 export interface DictLiteResponse {
   char: string
   cedict: CedictEntry[]
   cvdict: CvdictEntry[]
+  xdhy: XdhyEntry[]
   sino_vn: string[]
   hsk_tags: string[]
 }
@@ -74,6 +91,7 @@ export interface DictionaryResponse {
   char: string
   cedict: CedictEntry[]
   cvdict: CvdictEntry[]
+  xdhy: XdhyEntry[]
   external: ExternalSource[]
   user_note: UserNoteResponse | null
   hsk_tags: string[]

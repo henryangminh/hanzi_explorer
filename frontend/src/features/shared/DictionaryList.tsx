@@ -36,11 +36,6 @@ export function DictionaryList<T extends CoreDictEntry>({
           )}
         >
           <div className="flex items-center gap-2 flex-wrap">
-            {entries.length > 1 && (
-              <span className="text-xs font-medium text-[var(--color-primary)]">
-                #{idx + 1}
-              </span>
-            )}
             <span className="font-medium text-[var(--color-text)]">
               {formatPinyin(entry.pinyin, entry.is_separable)}
             </span>

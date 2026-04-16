@@ -30,3 +30,12 @@ export function CardTitle({ className, children, ...props }: HTMLAttributes<HTML
     </h3>
   )
 }
+
+/** Shared section header for all dictionary source sections (CC-CEDICT, CVDICT, XDHY, Wiktionary). */
+export function DictionarySectionTitle({ className, children, ...props }: HTMLAttributes<HTMLHeadingElement>) {
+  return (
+    <h3 className={cn('text-base font-bold text-[var(--color-primary)]', className)} {...props}>
+      {children}
+    </h3>
+  )
+}
