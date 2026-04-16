@@ -8,6 +8,7 @@ import { SettingsPage } from '@/features/settings/SettingsPage'
 import { ChangePasswordPage } from '@/features/settings/ChangePasswordPage'
 import { ProfilePage } from '@/features/auth/ProfilePage'
 import { NotebooksPage } from '@/features/notebooks/NotebooksPage'
+import { MyNotesPage } from '@/features/my-notes/MyNotesPage'
 import { AdminRoute } from './AdminRoute'
 import { UserRoute } from './UserRoute'
 import { AdminLayout } from '@/components/layout/AdminLayout'
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
           { path: 'radicals', element: <RadicalsPage /> },
           { path: 'dictionary', element: <DictionaryPage /> },
           { path: 'notebooks', element: <NotebooksPage /> },
+          { path: 'my-notes', element: <MyNotesPage /> },
         ],
       },
       { path: 'settings', element: <SettingsPage /> },

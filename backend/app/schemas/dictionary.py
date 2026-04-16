@@ -25,9 +25,21 @@ class ExternalSource(BaseModel):
 class UserNoteResponse(BaseModel):
     id: int
     char: str
-    meaning_vi: Optional[str]
-    note: Optional[str]
-    tags: List[str]
+    title: str
+    detail: Optional[str]
+    updated_at: Optional[str] = None
+    pinyin: str = ''
+    sino_vn: List[str] = []
+
+
+class NoteCreate(BaseModel):
+    title: str
+    detail: Optional[str] = None
+
+
+class NoteUpdate(BaseModel):
+    title: str
+    detail: Optional[str] = None
 
 
 class CvdictEntry(BaseModel):
@@ -79,13 +91,7 @@ class DictionaryResponse(BaseModel):
     cvdict: List[CvdictEntry] = []
     xdhy: List[XdhyEntry] = []
     external: List[ExternalSource]
-    user_note: Optional[UserNoteResponse]
+    user_notes: List[UserNoteResponse] = []
     hsk_tags: List[str] = []    # HSK notebook names from drkameleon DB
     sino_vn: List[str] = []     # Hán Việt readings, e.g. ["phán đoán"]
     hanzipy: Optional[HanzipyData] = None
-
-
-class NoteUpsert(BaseModel):
-    meaning_vi: Optional[str] = None
-    note: Optional[str] = None
-    tags: Optional[List[str]] = None

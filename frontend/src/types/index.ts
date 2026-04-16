@@ -40,9 +40,11 @@ export interface ExternalSource {
 export interface UserNoteResponse {
   id: number
   char: string
-  meaning_vi: string | null
-  note: string | null
-  tags: string[]
+  title: string
+  detail: string | null
+  updated_at: string | null
+  pinyin: string
+  sino_vn: string[]
 }
 
 export interface CvdictEntry {
@@ -93,7 +95,7 @@ export interface DictionaryResponse {
   cvdict: CvdictEntry[]
   xdhy: XdhyEntry[]
   external: ExternalSource[]
-  user_note: UserNoteResponse | null
+  user_notes: UserNoteResponse[]
   hsk_tags: string[]
   sino_vn: string[]
   hanzipy: HanzipyData | null

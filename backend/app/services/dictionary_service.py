@@ -12,7 +12,7 @@ from app.models.character import Character, PinyinReading, Definition, Dictionar
 from app.models.note import UserNote
 from app.schemas.dictionary import (
     CedictEntry, CvdictEntry, DictLiteResponse, DictionaryResponse, ExternalSource,
-    HanzipyData, NoteUpsert, UserNoteResponse, XdhyEntry, XdhyDefItem,
+    HanzipyData, NoteCreate, NoteUpdate, UserNoteResponse, XdhyEntry, XdhyDefItem,
 )
 from app.services.wiktionary_parser import parse_wiktionary, parse_vi_wikitext
 
@@ -313,43 +313,100 @@ async def fetch_external_sources(session: Session, char: str, traditional: str |
 
 # ── User notes ────────────────────────────────────────────
 
-def get_user_note(session: Session, user_id: int, char: str) -> Optional[UserNoteResponse]:
-    note = session.exec(
+def _get_char_display_info(session: Session, char: str) -> tuple[str, list[str]]:
+    """Return (first_pinyin_diacritic, sino_vn_list) for a char."""
+    from app.services.sino_vn_service import _get_db_readings, _combine
+    char_row = _get_character(session, char)
+    if not char_row:
+        return ('', [])
+    pr = session.exec(
+        select(PinyinReading)
+        .where(PinyinReading.character_id == char_row.id)
+        .order_by(PinyinReading.id)
+    ).first()
+    if not pr:
+        return ('', [])
+    pinyin_str = pr.pinyin or ''
+    sino_vn: list[str] = []
+    if pr.pinyin_numeric:
+        chars_list = list(char)
+        syllables = pr.pinyin_numeric.strip().split()
+        if len(chars_list) == len(syllables):
+            parts = [_get_db_readings(session, c, s) for c, s in zip(chars_list, syllables)]
+            sino_vn = _combine(parts)
+    return (pinyin_str, sino_vn)
+
+
+def _note_to_response(note: UserNote, pinyin: str = '', sino_vn: list[str] | None = None) -> UserNoteResponse:
+    return UserNoteResponse(
+        id=note.id,
+        char=note.char,
+        title=note.title,
+        detail=note.detail,
+        updated_at=note.updated_at.isoformat() if note.updated_at else None,
+        pinyin=pinyin,
+        sino_vn=sino_vn or [],
+    )
+
+
+def get_all_user_notes(session: Session, user_id: int) -> list[UserNoteResponse]:
+    notes = session.exec(
+        select(UserNote)
+        .where(UserNote.user_id == user_id)
+        .order_by(UserNote.updated_at.desc())
+    ).all()
+    # Batch-cache display info per unique char to avoid redundant lookups
+    char_info: dict[str, tuple[str, list[str]]] = {}
+    for note in notes:
+        if note.char not in char_info:
+            char_info[note.char] = _get_char_display_info(session, note.char)
+    return [_note_to_response(n, pinyin=char_info[n.char][0], sino_vn=char_info[n.char][1]) for n in notes]
+
+
+def get_user_notes(session: Session, user_id: int, char: str) -> list[UserNoteResponse]:
+    notes = session.exec(
         select(UserNote)
         .where(UserNote.user_id == user_id)
         .where(UserNote.char == char)
-    ).first()
-    return _note_to_response(note) if note else None
+        .order_by(UserNote.created_at)
+    ).all()
+    if not notes:
+        return []
+    pinyin, sino_vn = _get_char_display_info(session, char)
+    return [_note_to_response(n, pinyin=pinyin, sino_vn=sino_vn) for n in notes]
 
 
-def upsert_user_note(session: Session, user_id: int, char: str, data: NoteUpsert) -> UserNoteResponse:
-    note = session.exec(
-        select(UserNote)
-        .where(UserNote.user_id == user_id)
-        .where(UserNote.char == char)
-    ).first()
-    tags_str = ','.join(data.tags) if data.tags else None
-    if note:
-        if data.meaning_vi is not None: note.meaning_vi = data.meaning_vi
-        if data.note is not None: note.note = data.note
-        if data.tags is not None: note.tags = tags_str
-        note.updated_at = datetime.now(timezone.utc)
-    else:
-        note = UserNote(
-            user_id=user_id, char=char,
-            meaning_vi=data.meaning_vi, note=data.note, tags=tags_str,
-        )
+def create_user_note(session: Session, user_id: int, char: str, data: NoteCreate) -> UserNoteResponse:
+    note = UserNote(user_id=user_id, char=char, title=data.title, detail=data.detail)
     session.add(note)
     session.commit()
     session.refresh(note)
-    return _note_to_response(note)
+    pinyin, sino_vn = _get_char_display_info(session, char)
+    return _note_to_response(note, pinyin=pinyin, sino_vn=sino_vn)
 
 
-def _note_to_response(note: UserNote) -> UserNoteResponse:
-    return UserNoteResponse(
-        id=note.id, char=note.char, meaning_vi=note.meaning_vi,
-        note=note.note, tags=note.tags.split(',') if note.tags else [],
-    )
+def update_user_note(session: Session, user_id: int, note_id: int, data: NoteUpdate) -> UserNoteResponse:
+    from fastapi import HTTPException
+    note = session.get(UserNote, note_id)
+    if not note or note.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Note not found")
+    note.title = data.title
+    note.detail = data.detail
+    note.updated_at = datetime.now(timezone.utc)
+    session.add(note)
+    session.commit()
+    session.refresh(note)
+    pinyin, sino_vn = _get_char_display_info(session, note.char)
+    return _note_to_response(note, pinyin=pinyin, sino_vn=sino_vn)
+
+
+def delete_user_note(session: Session, user_id: int, note_id: int) -> None:
+    from fastapi import HTTPException
+    note = session.get(UserNote, note_id)
+    if not note or note.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Note not found")
+    session.delete(note)
+    session.commit()
 
 
 # ── HSK tags (from drkameleon notebook data) ─────────────
@@ -435,7 +492,7 @@ async def get_dictionary_entry(session: Session, char: str, user_id: int) -> Dic
         cvdict=lookup_cvdict(session, char),
         xdhy=lookup_xdhy(session, char),
         external=await fetch_external_sources(session, char, traditional=traditional),
-        user_note=get_user_note(session, user_id, char),
+        user_notes=get_user_notes(session, user_id, char),
         hsk_tags=lookup_hsk_tags(session, char),
         sino_vn=sino_vn,
         hanzipy=HanzipyData(components=hanzipy_components) if hanzipy_components else None,

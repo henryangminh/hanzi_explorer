@@ -1,14 +1,33 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 from fastapi.responses import StreamingResponse
 from app.core.deps import CurrentUser, DbSession
-from app.schemas.dictionary import DictLiteResponse, DictionaryResponse, NoteUpsert, UserNoteResponse
+from app.schemas.dictionary import DictLiteResponse, DictionaryResponse, NoteCreate, NoteUpdate, UserNoteResponse
 from app.services import dictionary_service
 
 router = APIRouter(prefix="/dictionary", tags=["dictionary"])
 
-@router.put("/{char}/note", response_model=UserNoteResponse)
-def upsert_note(char: str, body: NoteUpsert, current_user: CurrentUser, session: DbSession):
-    return dictionary_service.upsert_user_note(session, current_user.id, char, body)
+@router.get("/notes", response_model=list[UserNoteResponse])
+def list_all_notes(current_user: CurrentUser, session: DbSession):
+    """Get all notes of the current user across all characters."""
+    return dictionary_service.get_all_user_notes(session, current_user.id)
+
+
+@router.get("/{char}/notes", response_model=list[UserNoteResponse])
+def list_notes(char: str, current_user: CurrentUser, session: DbSession):
+    return dictionary_service.get_user_notes(session, current_user.id, char)
+
+@router.post("/{char}/notes", response_model=UserNoteResponse, status_code=201)
+def create_note(char: str, body: NoteCreate, current_user: CurrentUser, session: DbSession):
+    return dictionary_service.create_user_note(session, current_user.id, char, body)
+
+@router.put("/{char}/notes/{note_id}", response_model=UserNoteResponse)
+def update_note(char: str, note_id: int, body: NoteUpdate, current_user: CurrentUser, session: DbSession):
+    return dictionary_service.update_user_note(session, current_user.id, note_id, body)
+
+@router.delete("/{char}/notes/{note_id}", status_code=204)
+def delete_note(char: str, note_id: int, current_user: CurrentUser, session: DbSession):
+    dictionary_service.delete_user_note(session, current_user.id, note_id)
+    return Response(status_code=204)
 
 
 @router.get("/lookup", response_model=DictLiteResponse)

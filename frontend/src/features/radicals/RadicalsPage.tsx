@@ -5,7 +5,7 @@ import { useRadicalList } from './useRadicals'
 import { cn } from '@/lib/cn'
 import type { RadicalSummary } from '@/types'
 import api from '@/lib/axios'
-import { SaveToNotebookModal } from '@/features/notebooks/SaveToNotebookModal'
+import { SaveToNotebookModal } from '@/features/shared/SaveToNotebookModal'
 import { CharDetailPanel } from '@/features/shared/CharDetailPanel'
 
 interface CharCard { char: string; pinyin: string; meaning_en: string; stroke_count?: number | null }
@@ -44,7 +44,7 @@ function CharDetail({ char, onBack }: { char: string; onBack: () => void }) {
         <button
           onClick={() => setSaveModalOpen(true)}
           className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-bg-subtle)] transition-colors shrink-0"
-          title="Thêm vào sổ tay"
+          title={t('notebooks.saveToNotebook')}
         >
           <BookmarkPlus size={16} />
         </button>
@@ -54,7 +54,7 @@ function CharDetail({ char, onBack }: { char: string; onBack: () => void }) {
       <div className="flex-1 overflow-y-auto px-4 py-3">
         <CharDetailPanel
           char={char}
-          showNotes={false}
+          showNotes={true}
           onDataLoaded={(entry) => setHeaderInfo({
             pinyin: entry.cedict[0]?.pinyin ?? '',
             sinoVn: entry.sino_vn ?? [],

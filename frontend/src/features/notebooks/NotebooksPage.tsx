@@ -9,7 +9,7 @@ import { Select } from '@/components/ui/Select'
 import { useAuthStore } from '@/store/auth.store'
 import { useNotebookStore } from '@/store/notebook.store'
 import { CharDetailPanel } from '@/features/shared/CharDetailPanel'
-import { SaveToNotebookModal } from '@/features/notebooks/SaveToNotebookModal'
+import { SaveToNotebookModal } from '@/features/shared/SaveToNotebookModal'
 import type { NotebookEntryPreview, NotebookResponse, NotebookSortOrder } from '@/types'
 
 const SORT_OPTIONS: { value: NotebookSortOrder; labelKey: string }[] = [
@@ -122,7 +122,7 @@ function NotebookEntriesModal({
     try {
       await api.delete(`/notebooks/${notebook.id}/entries/${encodeURIComponent(entry.char)}`)
       setEntries((prev) => prev.filter((e) => e.id !== entry.id))
-      if (selectedChar === entry.char) { setSelectedChar(null); setCharDetail(null) }
+      if (selectedChar === entry.char) { setSelectedChar(null) }
     } finally {
       setRemovingChar(null)
     }
@@ -159,6 +159,11 @@ function NotebookEntriesModal({
             <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
               {entries.length} {t('notebooks.entries')}
             </p>
+            {notebook.description && (
+              <p className="text-xs text-[var(--color-text-muted)] mt-0.5 italic">
+                {notebook.description}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-1 ml-3 shrink-0">
             {canEdit && onEdit && (
@@ -232,7 +237,7 @@ function NotebookEntriesModal({
               </div>
 
               {/* CharDetailPanel self-manages: shows DB data first, then lazy-loads Wiktionary */}
-              <CharDetailPanel char={selectedChar} showNotes={false} />
+              <CharDetailPanel char={selectedChar} showNotes={true} />
             </div>
           ) : (
             /* ── Grid view ── */
@@ -638,7 +643,7 @@ export function NotebooksPage() {
           {globalNotebooks.length > 0 && (
             <section className="flex flex-col gap-3">
               <button
-                title="Mở rộng / Thu gọn"
+                title={`${t('common.expand')} / ${t('common.collapse')}`}
                 onClick={() => setGlobalExpanded((v) => !v)}
                 className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider hover:text-[var(--color-text)] transition-colors w-fit"
               >
@@ -664,7 +669,7 @@ export function NotebooksPage() {
           {/* Private notebooks */}
           <section className="flex flex-col gap-3">
             <button
-              title="Mở rộng / Thu gọn"
+              title={`${t('common.expand')} / ${t('common.collapse')}`}
               onClick={() => setPrivateExpanded((v) => !v)}
               className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider hover:text-[var(--color-text)] transition-colors w-fit"
             >

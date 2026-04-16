@@ -9,9 +9,8 @@ class UserNote(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", index=True)
     char: str = Field(index=True, max_length=10)
-    meaning_vi: Optional[str] = None
-    note: Optional[str] = None
-    tags: Optional[str] = None
+    title: str = Field(max_length=200)
+    detail: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

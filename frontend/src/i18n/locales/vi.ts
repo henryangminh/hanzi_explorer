@@ -5,6 +5,7 @@ export default {
       radicals: 'Bộ thủ',
       dictionary: 'Tra từ',
       notebooks: 'Sổ Tay',
+      myNotes: 'Ghi chú',
       settings: 'Cài đặt',
       profile: 'Hồ sơ',
       logout: 'Đăng xuất',
@@ -24,6 +25,8 @@ export default {
     settings: {
       title: 'Cài đặt',
       language: 'Ngôn ngữ',
+      langVi: 'Tiếng Việt',
+      langEn: 'Tiếng Anh',
       theme: 'Giao diện',
       light: 'Sáng',
       dark: 'Tối',
@@ -45,6 +48,14 @@ export default {
       strokeCount: 'Số nét',
       clickHint: 'Bấm vào chữ bất kỳ để xem chi tiết',
     },
+    // myNotes
+    myNotes: {
+      title: 'Ghi chú của tôi',
+      empty: 'Bạn chưa có ghi chú nào',
+      emptyHint: 'Thêm ghi chú khi tra từ ở trang Tra từ',
+      goToDictionary: 'Tra từ',
+      charLabel: 'Chữ',
+    },
     // dictionary
     dictionary: {
       title: 'Tra từ',
@@ -55,9 +66,16 @@ export default {
       separable: 'Động từ li hợp',
       notes: 'Ghi chú của tôi',
       noResult: 'Không tìm thấy',
-      meaningVi: 'Nghĩa tiếng Việt',
-      notePlaceholder: 'Ghi chú cá nhân...',
-      tags: 'Tags',
+      addNote: 'Thêm ghi chú',
+      editNote: 'Sửa ghi chú',
+      deleteNote: 'Xoá ghi chú',
+      noteTitle: 'Tiêu đề',
+      noteDetail: 'Chi tiết',
+      noteTitlePlaceholder: 'Nhập tiêu đề...',
+      noteDetailPlaceholder: 'Nhập chi tiết (tuỳ chọn)...',
+      charCount: '{{current}}/{{max}} ký tự',
+      moreReadings: '+{{count}} cách đọc',
+      loadingMore: 'Đang load thêm dữ liệu...',
       save: 'Lưu',
       saving: 'Đang lưu...',
       fromCache: 'từ cache',
@@ -81,6 +99,9 @@ export default {
       error: 'Có lỗi xảy ra',
       cancel: 'Huỷ',
       back: 'Quay lại',
+      expand: 'Mở rộng',
+      collapse: 'Thu gọn',
+      close: 'Đóng',
     },
     // notebooks
     notebooks: {

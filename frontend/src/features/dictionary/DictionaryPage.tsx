@@ -1,21 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router-dom'
 import { Search, ChevronDown, ChevronUp, BookmarkPlus } from 'lucide-react'
-import type { DictLiteResponse, DictionaryResponse, UserNoteResponse } from '@/types'
+import type { DictLiteResponse } from '@/types'
 import { CharDetailPanel } from '@/features/shared/CharDetailPanel'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
-import { SaveToNotebookModal } from '@/features/notebooks/SaveToNotebookModal'
+import { SaveToNotebookModal } from '@/features/shared/SaveToNotebookModal'
 import { useAuthStore } from '@/store/auth.store'
+import { useDictionaryStore } from '@/store/dictionary.store'
 import { SearchHistoryPanel, SearchHistoryPopup } from '@/features/search-history/SearchHistoryPanel'
 
 // ── Single entry card ─────────────────────────────────────
 
-/**
- * EntryCard nhận DictLiteResponse từ search stream.
- * Khi expand, CharDetailPanel tự fetch Wiktionary (lazy, cache phía server).
- * Card đầu tiên (autoExpand=true) mở sẵn và CharDetailPanel bắt đầu fetch Wiktionary ngay.
- */
 function EntryCard({
   lite,
   autoExpand = false,
@@ -23,7 +20,7 @@ function EntryCard({
 }: {
   lite: DictLiteResponse
   autoExpand?: boolean
-  onNoteSaved: (note: UserNoteResponse) => void
+  onNoteSaved: () => void
 }) {
   const { t } = useTranslation()
   const [collapsed, setCollapsed] = useState(!autoExpand)
@@ -41,16 +38,14 @@ function EntryCard({
         <SaveToNotebookModal char={lite.char} onClose={() => setSaveModalOpen(false)} />
       )}
 
-      {/* Header — text is selectable; blank-area click toggles expand */}
+      {/* Header */}
       <div
         className="relative flex items-center gap-3 px-4 py-3 bg-[var(--color-bg-surface)] hover:bg-[var(--color-bg-subtle)] transition-colors cursor-pointer"
         onClick={() => {
-          // Don't toggle if user is selecting text
           if (window.getSelection()?.toString()) return
           setCollapsed((v) => !v)
         }}
       >
-        {/* Text content — selectable, propagation flows up to parent toggle */}
         <div className="flex-1 min-w-0 flex flex-wrap items-baseline gap-x-2 gap-y-1 select-text">
           <span className={cn(
             'font-cjk leading-none cursor-text',
@@ -77,7 +72,7 @@ function EntryCard({
                 )}
                 {lite.cedict.length > 1 && (
                   <span className="ml-1.5 text-xs text-[var(--color-text-muted)]">
-                    +{lite.cedict.length - 1} cách đọc
+                    {t('dictionary.moreReadings', { count: lite.cedict.length - 1 })}
                   </span>
                 )}
               </span>
@@ -92,7 +87,6 @@ function EntryCard({
           )}
         </div>
 
-        {/* Right actions */}
         <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
           {firstCedict?.hsk_level && (
             <span className="text-xs bg-[var(--color-bg-subtle)] px-2 py-0.5 rounded-full text-[var(--color-text-muted)]">
@@ -121,8 +115,6 @@ function EntryCard({
         </div>
       </div>
 
-
-      {/* Body */}
       {!collapsed && (
         <div className="px-4 pb-4 pt-2 bg-[var(--color-bg-surface)] border-t border-[var(--color-border)]">
           <CharDetailPanel
@@ -134,7 +126,6 @@ function EntryCard({
         </div>
       )}
     </div>
-
   )
 }
 
@@ -144,19 +135,24 @@ export function DictionaryPage() {
   const { t } = useTranslation()
   const user = useAuthStore((s) => s.user)
   const isAdmin = user?.is_admin ?? false
+  const [searchParams] = useSearchParams()
 
-  const [query, setQuery] = useState('')
-  const [results, setResults] = useState<DictLiteResponse[]>([])
+  const { query, results, setQuery, setResults, appendResult } = useDictionaryStore()
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
   const [historyPopupOpen, setHistoryPopupOpen] = useState(false)
+
+  // Track whether we've already handled the URL param on this mount
+  const handledParamRef = useRef(false)
 
   const runSearch = async (q: string) => {
     const trimmed = q.trim()
     if (!trimmed) return
     setLoading(true)
     setError('')
+    setQuery(trimmed)
     setResults([])
     try {
       const token = localStorage.getItem('access_token')
@@ -183,16 +179,13 @@ export function DictionaryPage() {
         buffer = lines.pop() ?? ''
         for (const line of lines) {
           if (line.trim()) {
-            const entry = JSON.parse(line) as DictLiteResponse
-            setResults((prev) => [...prev, entry])
+            appendResult(JSON.parse(line) as DictLiteResponse)
           }
         }
       }
       if (buffer.trim()) {
-        const entry = JSON.parse(buffer) as DictLiteResponse
-        setResults((prev) => [...prev, entry])
+        appendResult(JSON.parse(buffer) as DictLiteResponse)
       }
-      // Refresh history panel after a successful search (backend records it)
       if (!isAdmin) setHistoryRefreshKey((k) => k + 1)
     } catch {
       setError(t('dictionary.noResult'))
@@ -201,7 +194,19 @@ export function DictionaryPage() {
     }
   }
 
-  const handleSearch = async (e?: React.FormEvent) => {
+  // On mount: check URL ?q= param. If different from stored query → search.
+  // If no param but store has results → just restore (no re-search needed).
+  useEffect(() => {
+    if (handledParamRef.current) return
+    handledParamRef.current = true
+    const paramQ = searchParams.get('q')?.trim() ?? ''
+    if (paramQ && paramQ !== query) {
+      runSearch(paramQ)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleSearch = async (e?: React.SyntheticEvent) => {
     e?.preventDefault()
     await runSearch(query)
   }
@@ -235,7 +240,6 @@ export function DictionaryPage() {
             />
           </div>
           <Button type="submit" isLoading={loading}>{t('dictionary.title')}</Button>
-          {/* Mobile-only: history button */}
           {!isAdmin && (
             <Button
               type="button"
@@ -257,7 +261,7 @@ export function DictionaryPage() {
                 key={lite.char}
                 lite={lite}
                 autoExpand={idx === 0}
-                onNoteSaved={(_note) => {}}
+                onNoteSaved={() => {}}
               />
             ))}
             {loading && (
@@ -281,7 +285,6 @@ export function DictionaryPage() {
         </aside>
       )}
 
-      {/* ── Mobile history popup ── */}
       {historyPopupOpen && !isAdmin && (
         <SearchHistoryPopup
           onSearch={handleHistorySearch}
