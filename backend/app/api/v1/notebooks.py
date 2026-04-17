@@ -7,6 +7,7 @@ from app.core.deps import CurrentUser, DbSession
 from app.models.notebook import Notebook
 from app.schemas.notebook import (
     AddEntryRequest,
+    FlashcardCardResponse,
     NotebookCreate,
     NotebookDetail,
     NotebookEntryPreview,
@@ -63,6 +64,121 @@ def create_notebook(
             detail="Chỉ admin mới có thể tạo sổ tay chung",
         )
     return notebook_service.create_notebook(session, user.id, data)
+
+
+@router.get("/flashcards", response_model=list[FlashcardCardResponse])
+def get_flashcards(
+    notebook_ids: str,
+    session: DbSession,
+    user: CurrentUser,
+    count: int = 10,
+):
+    """Return `count` random flashcard entries from the given comma-separated notebook IDs."""
+    from sqlalchemy import text
+    from app.core.cedict_utils import clean_meaning
+    from app.core.pinyin import numeric_to_diacritic
+
+    # Parse and validate IDs
+    ids: list[int] = []
+    for part in notebook_ids.split(","):
+        part = part.strip()
+        if part.isdigit():
+            ids.append(int(part))
+
+    if not ids:
+        return []
+
+    count = max(1, min(count, 100))
+
+    # Verify user can view each notebook
+    for nb_id in ids:
+        nb = _get_notebook_or_404(session, nb_id)
+        _assert_can_view(nb, user)
+
+    ids_str = ",".join(str(i) for i in ids)
+
+    # Pre-fetch source IDs
+    src_row = session.execute(text(
+        "SELECT name, id FROM dictionary_sources WHERE name IN ('CC-CEDICT', 'CVDICT')"
+    )).fetchall()
+    src_ids = {row[0]: row[1] for row in src_row}
+    cedict_id = src_ids.get("CC-CEDICT", -1)
+    cvdict_id = src_ids.get("CVDICT", -1)
+
+    rows = session.execute(
+        text(f"""
+            WITH sampled_chars AS (
+                SELECT DISTINCT ne.char_id
+                FROM notebook_entries ne
+                WHERE ne.notebook_id IN ({ids_str})
+                ORDER BY RANDOM()
+                LIMIT :count
+            ),
+            en_min AS (
+                SELECT character_id, MIN(id) AS min_id
+                FROM definitions
+                WHERE source_id = :cedict_id AND language = 'en'
+                  AND character_id IN (SELECT char_id FROM sampled_chars)
+                GROUP BY character_id
+            ),
+            vi_min AS (
+                SELECT character_id, MIN(id) AS min_id
+                FROM definitions
+                WHERE source_id = :cvdict_id AND language = 'vi'
+                  AND character_id IN (SELECT char_id FROM sampled_chars)
+                GROUP BY character_id
+            ),
+            py AS (
+                SELECT pr.character_id,
+                       GROUP_CONCAT(pr.pinyin_numeric, '|||') AS pinyins_raw
+                FROM (
+                    SELECT character_id, pinyin_numeric
+                    FROM pinyin_readings
+                    WHERE character_id IN (SELECT char_id FROM sampled_chars)
+                    GROUP BY character_id, pinyin_numeric
+                    ORDER BY character_id, MIN(id)
+                ) pr
+                GROUP BY pr.character_id
+            )
+            SELECT c.simplified,
+                   py.pinyins_raw,
+                   en_d.meaning_text AS cedict_raw,
+                   vi_d.meaning_text AS cvdict_raw
+            FROM sampled_chars sc
+            JOIN characters c ON c.id = sc.char_id
+            LEFT JOIN en_min   ON en_min.character_id  = sc.char_id
+            LEFT JOIN definitions en_d ON en_d.id      = en_min.min_id
+            LEFT JOIN vi_min   ON vi_min.character_id  = sc.char_id
+            LEFT JOIN definitions vi_d ON vi_d.id      = vi_min.min_id
+            LEFT JOIN py       ON py.character_id       = sc.char_id
+        """),
+        {"count": count, "cedict_id": cedict_id, "cvdict_id": cvdict_id},
+    ).fetchall()
+
+    def _cedict_brief(raw: str | None) -> str | None:
+        if not raw:
+            return None
+        return clean_meaning(raw).split(";")[0].strip()
+
+    def _cvdict_brief(raw: str | None) -> str | None:
+        if not raw:
+            return None
+        return raw.split("/")[0].strip()
+
+    def _pinyins(raw: str | None) -> list[str]:
+        if not raw:
+            return []
+        return [numeric_to_diacritic(p.strip()) for p in raw.split("|||") if p.strip()]
+
+    return [
+        FlashcardCardResponse(
+            char=row[0],
+            pinyins=_pinyins(row[1]),
+            cedict_brief=_cedict_brief(row[2]),
+            cvdict_brief=_cvdict_brief(row[3]),
+        )
+        for row in rows
+    ]
 
 
 @router.get("/{notebook_id}/entries/preview")

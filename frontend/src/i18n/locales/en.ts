@@ -1,6 +1,7 @@
 export default {
   translation: {
     nav: {
+      dashboard: 'Dashboard',
       radicals: 'Radicals',
       dictionary: 'Dictionary',
       notebooks: 'Notebooks',
@@ -133,6 +134,29 @@ export default {
       editTitle: 'Edit Notebook',
       save: 'Save',
       saving: 'Saving...',
+    },
+    dashboard: {
+      greeting: 'Hello, {{name}}!',
+      wordsOfDay: 'Words of the Day',
+      addWidget: 'Add widget',
+      widgetSettings: 'Widget settings',
+      widgetName: 'Widget name',
+      interval: 'Refresh interval',
+      minutes: 'Minutes',
+      hours: 'Hours',
+      days: 'Days',
+      count: 'Count',
+      source: 'Vocabulary source',
+      save: 'Save',
+      delete: 'Delete widget',
+      refresh: 'Refresh',
+      noCards: 'No vocabulary available',
+      noSource: 'No source selected',
+      noNotebooks: 'No notebooks available',
+      minIntervalWarning: 'Minimum interval is 30 minutes',
+      minIntervalHint: 'Minimum 30 if using minutes',
+      errorName: 'Please enter a widget name',
+      errorCount: 'Count must be greater than 0',
     },
     searchHistory: {
       title: 'Search History',

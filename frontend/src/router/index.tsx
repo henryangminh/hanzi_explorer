@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { ProtectedRoute } from './ProtectedRoute'
 import { LoginPage } from '@/features/auth/LoginPage'
+import { HomePage } from '@/features/dashboard/HomePage'
 import { RadicalsPage } from '@/features/radicals/RadicalsPage'
 import { DictionaryPage } from '@/features/dictionary/DictionaryPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
@@ -31,7 +32,8 @@ export const router = createBrowserRouter([
       {
         element: <UserRoute />,
         children: [
-          { index: true, element: <Navigate to="/radicals" replace /> },
+          { index: true, element: <Navigate to="/dashboard" replace /> },
+          { path: 'dashboard', element: <HomePage /> },
           { path: 'radicals', element: <RadicalsPage /> },
           { path: 'dictionary', element: <DictionaryPage /> },
           { path: 'notebooks', element: <NotebooksPage /> },

@@ -59,3 +59,10 @@ class NotebookEntryPreview(BaseModel):
 
 class AddEntryRequest(BaseModel):
     char: str
+
+
+class FlashcardCardResponse(BaseModel):
+    char: str
+    pinyins: list[str] = []
+    cedict_brief: Optional[str] = None
+    cvdict_brief: Optional[str] = None

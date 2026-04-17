@@ -191,6 +191,15 @@ export type NotebookSortOrder =
   | 'name_asc'
   | 'name_desc'
 
+// ── Flashcard ─────────────────────────────────────────────
+
+export interface FlashcardEntry {
+  char: string
+  pinyins: string[]
+  cedict_brief: string | null
+  cvdict_brief: string | null
+}
+
 // ── Search History ────────────────────────────────────────
 
 export interface SearchHistoryItem {

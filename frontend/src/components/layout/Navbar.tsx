@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { BookOpen, Search, NotebookText, StickyNote, Settings, LogOut, User, Sun, Moon, Shield, Menu, X } from 'lucide-react'
+import { BookOpen, Search, NotebookText, StickyNote, Settings, LogOut, User, Sun, Moon, Shield, Menu, X, LayoutDashboard } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { cn } from '@/lib/cn'
 
 const NAV_ITEMS = [
+  { to: '/dashboard', labelKey: 'nav.dashboard', icon: LayoutDashboard },
   { to: '/radicals', labelKey: 'nav.radicals', icon: BookOpen },
   { to: '/dictionary', labelKey: 'nav.dictionary', icon: Search },
   { to: '/notebooks', labelKey: 'nav.notebooks', icon: NotebookText },
@@ -106,7 +107,7 @@ export function Navbar() {
 
         {/* Logo */}
         <Link
-          to={user?.is_admin ? '/admin/dashboard' : '/radicals'}
+          to={user?.is_admin ? '/admin/dashboard' : '/dashboard'}
           className="flex items-center gap-2 shrink-0"
           onClick={closeMobileMenu}
         >

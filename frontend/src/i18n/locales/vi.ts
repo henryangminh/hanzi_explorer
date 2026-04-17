@@ -2,6 +2,7 @@ export default {
   translation: {
     // nav
     nav: {
+      dashboard: 'Trang chủ',
       radicals: 'Bộ thủ',
       dictionary: 'Tra từ',
       notebooks: 'Sổ Tay',
@@ -141,6 +142,29 @@ export default {
       editTitle: 'Sửa Sổ Tay',
       save: 'Lưu',
       saving: 'Đang lưu...',
+    },
+    dashboard: {
+      greeting: 'Chào {{name}}!',
+      wordsOfDay: 'Từ vựng của ngày',
+      addWidget: 'Thêm widget',
+      widgetSettings: 'Cài đặt widget',
+      widgetName: 'Tên widget',
+      interval: 'Khoảng thời gian',
+      minutes: 'Phút',
+      hours: 'Giờ',
+      days: 'Ngày',
+      count: 'Số lượng',
+      source: 'Nguồn từ vựng',
+      save: 'Lưu',
+      delete: 'Xoá widget',
+      refresh: 'Làm mới',
+      noCards: 'Không có từ vựng nào',
+      noSource: 'Chưa chọn nguồn từ vựng',
+      noNotebooks: 'Không có sổ tay nào',
+      minIntervalWarning: 'Thời gian tối thiểu là 30 phút',
+      minIntervalHint: 'Nếu chọn đơn vị phút, tối thiểu là 30',
+      errorName: 'Vui lòng nhập tên widget',
+      errorCount: 'Số lượng phải lớn hơn 0',
     },
     searchHistory: {
       title: 'Lịch sử tra từ',
