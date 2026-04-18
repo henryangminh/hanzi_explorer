@@ -66,3 +66,9 @@ class FlashcardCardResponse(BaseModel):
     pinyins: list[str] = []
     cedict_brief: Optional[str] = None
     cvdict_brief: Optional[str] = None
+    status: Optional[str] = None
+
+
+class FlashcardStatusUpdate(BaseModel):
+    char: str
+    status: Optional[Literal['learned', 'not_learned']] = None

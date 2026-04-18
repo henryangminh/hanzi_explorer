@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { FlashcardEntry } from '@/types'
 
 export type IntervalUnit = 'minutes' | 'hours' | 'days'
+export type RepeatMode = 'random' | 'unlearned_only' | 'no_repeat'
 
 export interface FlashcardWidgetConfig {
   id: string
@@ -14,6 +15,7 @@ export interface FlashcardWidgetConfig {
   isDefault: boolean
   lastRefreshed: string | null
   cards: FlashcardEntry[]
+  repeatMode?: RepeatMode
 }
 
 interface FlashcardState {
@@ -22,6 +24,7 @@ interface FlashcardState {
   updateWidget: (id: string, updates: Partial<Omit<FlashcardWidgetConfig, 'id'>>) => void
   removeWidget: (id: string) => void
   setWidgetCards: (id: string, cards: FlashcardEntry[]) => void
+  updateCardStatus: (widgetId: string, char: string, status: 'learned' | 'not_learned' | null) => void
 }
 
 function generateId(): string {
@@ -67,6 +70,14 @@ export const useFlashcardStore = create<FlashcardState>()(
         widgets: state.widgets.map((w) =>
           w.id === id
             ? { ...w, cards, lastRefreshed: new Date().toISOString() }
+            : w
+        ),
+      })),
+
+      updateCardStatus: (widgetId, char, status) => set((state) => ({
+        widgets: state.widgets.map((w) =>
+          w.id === widgetId
+            ? { ...w, cards: w.cards.map((c) => c.char === char ? { ...c, status } : c) }
             : w
         ),
       })),

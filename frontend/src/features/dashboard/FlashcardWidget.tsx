@@ -4,9 +4,132 @@ import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/cn'
 import api from '@/lib/axios'
 import type { FlashcardEntry, NotebookResponse } from '@/types'
-import { useFlashcardStore, getIntervalMs, type FlashcardWidgetConfig } from '@/store/flashcard.store'
+import { useFlashcardStore, getIntervalMs, type FlashcardWidgetConfig, type RepeatMode } from '@/store/flashcard.store'
 import { Flashcard } from '@/components/ui/Flashcard'
 import { FlashcardWidgetSettings } from './FlashcardWidgetSettings'
+
+// ── Helpers ───────────────────────────────────────────────
+
+function getLocalDateStr(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function getStoredDateStr(iso: string | null): string | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// ── Mini calendar ─────────────────────────────────────────
+
+interface CalendarProps {
+  year: number
+  month: number
+  wotdDates: Set<string>
+  viewDate: string | null   // null = today (current cards)
+  today: string
+  onSelect: (date: string) => void
+  onPrevMonth: () => void
+  onNextMonth: () => void
+}
+
+function MiniCalendar({ year, month, wotdDates, viewDate, today, onSelect, onPrevMonth, onNextMonth }: CalendarProps) {
+  const { i18n } = useTranslation()
+  const isVi = i18n.language === 'vi'
+
+  const monthLabel = new Date(year, month).toLocaleDateString(
+    isVi ? 'vi-VN' : 'en-US',
+    { month: 'long', year: 'numeric' },
+  )
+
+  const dayHeaders = isVi
+    ? ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
+    : ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
+
+  // Monday-first grid
+  const firstDow = (new Date(year, month, 1).getDay() + 6) % 7
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const cells: (string | null)[] = [
+    ...Array(firstDow).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => {
+      const d = i + 1
+      return `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    }),
+  ]
+  while (cells.length % 7 !== 0) cells.push(null)
+
+  // selected = viewDate if set, otherwise today
+  const selected = viewDate ?? today
+
+  return (
+    <div className="mt-2 select-none">
+      {/* Month nav */}
+      <div className="flex items-center justify-between mb-1">
+        <button
+          type="button"
+          onClick={onPrevMonth}
+          className="p-0.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors"
+        >
+          <ChevronLeft size={13} />
+        </button>
+        <span className="text-[11px] font-medium text-[var(--color-text)] capitalize">{monthLabel}</span>
+        <button
+          type="button"
+          onClick={onNextMonth}
+          className="p-0.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors"
+        >
+          <ChevronRight size={13} />
+        </button>
+      </div>
+
+      {/* Day headers */}
+      <div className="grid grid-cols-7 mb-0.5">
+        {dayHeaders.map((d) => (
+          <span key={d} className="text-center text-[9px] font-medium text-[var(--color-text-muted)] py-0.5">
+            {d}
+          </span>
+        ))}
+      </div>
+
+      {/* Day cells */}
+      <div className="grid grid-cols-7 gap-y-0.5">
+        {cells.map((dateStr, i) => {
+          if (!dateStr) return <div key={`pad-${i}`} />
+
+          const isToday = dateStr === today
+          const isSelected = dateStr === selected
+          const hasWOTD = wotdDates.has(dateStr)
+          const isFuture = dateStr > today
+          const isClickable = (hasWOTD || isToday) && !isFuture
+
+          return (
+            <button
+              key={dateStr}
+              type="button"
+              onClick={() => isClickable && onSelect(dateStr)}
+              disabled={!isClickable}
+              className={cn(
+                'relative flex flex-col items-center justify-center h-6 rounded transition-colors text-[10px] w-full',
+                isSelected && 'bg-[var(--color-primary)] text-[var(--color-primary-fg)] font-semibold',
+                !isSelected && isToday && 'ring-1 ring-[var(--color-primary)] text-[var(--color-primary)] font-semibold',
+                !isSelected && !isToday && isClickable && 'text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)]',
+                !isClickable && 'text-[var(--color-border-md)] cursor-default',
+              )}
+            >
+              {parseInt(dateStr.slice(-2), 10)}
+              {hasWOTD && !isSelected && (
+                <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[var(--color-primary)]" />
+              )}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Main component ────────────────────────────────────────
 
 interface Props {
   widget: FlashcardWidgetConfig
@@ -15,62 +138,217 @@ interface Props {
 
 export function FlashcardWidget({ widget, allNotebooks }: Props) {
   const { t } = useTranslation()
-  const { updateWidget, removeWidget, setWidgetCards } = useFlashcardStore()
+  const { updateWidget, removeWidget, setWidgetCards, updateCardStatus } = useFlashcardStore()
 
+  // Carousel state
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [exitClass, setExitClass] = useState('')
+  const [enterKey, setEnterKey] = useState(0)
+  const [entering, setEntering] = useState(false)
+  const animating = useRef(false)
   const touchStartX = useRef<number | null>(null)
 
-  const cards = widget.cards
-  const total = cards.length
+  // WOTD history state (only relevant when widget.isDefault)
+  const [wotdDates, setWotdDates] = useState<Set<string>>(new Set())
+  const [viewDate, setViewDate] = useState<string | null>(null)   // null = current cards
+  const [historyCards, setHistoryCards] = useState<FlashcardEntry[] | null>(null)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [calMonth, setCalMonth] = useState(() => {
+    const d = new Date()
+    return { year: d.getFullYear(), month: d.getMonth() }
+  })
+  const [calExpanded, setCalExpanded] = useState(false)
+
+  // Which cards to display
+  const activeCards: FlashcardEntry[] =
+    viewDate !== null && historyCards !== null ? historyCards : widget.cards
+  const total = activeCards.length
+  const safeIndex = total > 0 ? currentIndex % total : 0
+
+  const showLoading = loading || historyLoading
 
   // ── Fetch helpers ─────────────────────────────────────────
 
+  const fetchWOTDDates = useCallback(async () => {
+    try {
+      const { data } = await api.get<string[]>('/wotd/dates')
+      setWotdDates(new Set(data))
+    } catch { /* silent */ }
+  }, [])
+
+  // Fetch new cards and save to DB for WOTD widget
+  const initWOTD = useCallback(async () => {
+    const today = getLocalDateStr()
+    const { widgets } = useFlashcardStore.getState()
+    const w = widgets.find((x) => x.id === widget.id)
+    if (!w) return
+
+    const storedDate = getStoredDateStr(w.lastRefreshed)
+
+    if (storedDate === today && w.cards.length > 0) {
+      // Already have today's cards — still ensure DB record exists (idempotent)
+      try {
+        await api.post('/wotd', { date: today, chars: w.cards.map((c) => c.char) })
+      } catch { /* silent */ }
+      return
+    }
+
+    if (w.notebookIds.length === 0) return
+
+    setLoading(true)
+    try {
+      const { data } = await api.get<FlashcardEntry[]>('/notebooks/flashcards', {
+        params: { notebook_ids: w.notebookIds.join(','), count: w.count },
+      })
+      setWidgetCards(widget.id, data)
+      setCurrentIndex(0)
+
+      await api.post('/wotd', { date: today, chars: data.map((c) => c.char) })
+      fetchWOTDDates()
+    } catch { /* silent */ } finally {
+      setLoading(false)
+    }
+  }, [widget.id, setWidgetCards, fetchWOTDDates])
+
+  // Fetch cards for custom widget (cache-based, no DB)
   const fetchCards = useCallback(async (notebookIds: number[], count: number) => {
+    const { widgets: curr } = useFlashcardStore.getState()
+    const w = curr.find((x) => x.id === widget.id)
+    const mode: RepeatMode = w?.repeatMode ?? 'random'
+
+    if (mode === 'unlearned_only') {
+      const oldCards = w?.cards ?? []
+      if (oldCards.length > 0) {
+        setWidgetCards(widget.id, oldCards.filter((c) => c.status === 'not_learned'))
+        setCurrentIndex(0)
+        return
+      }
+      // No existing cards — fall through to a normal fetch
+    }
+
     if (notebookIds.length === 0) return
     setLoading(true)
     try {
       const { data } = await api.get<FlashcardEntry[]>('/notebooks/flashcards', {
         params: { notebook_ids: notebookIds.join(','), count },
       })
-      setWidgetCards(widget.id, data)
+
+      let finalCards = data
+      if (mode === 'random') {
+        const maxRepeat = Math.floor(count * 0.1)
+        const oldCards = w?.cards ?? []
+        if (maxRepeat > 0 && oldCards.length > 0) {
+          const shuffledOld = [...oldCards].sort(() => Math.random() - 0.5)
+          const repeated = shuffledOld.slice(0, maxRepeat)
+          finalCards = [...repeated, ...data.slice(maxRepeat)].sort(() => Math.random() - 0.5)
+        }
+      }
+      // mode === 'no_repeat': use fresh data as-is
+
+      setWidgetCards(widget.id, finalCards)
       setCurrentIndex(0)
-    } catch {
-      // silently ignore – old cards remain
-    } finally {
+    } catch { /* silent */ } finally {
       setLoading(false)
     }
   }, [widget.id, setWidgetCards])
 
-  // On mount: refresh if interval has passed
-  useEffect(() => {
-    const needsRefresh =
-      !widget.lastRefreshed ||
-      Date.now() - new Date(widget.lastRefreshed).getTime() >=
-        getIntervalMs(widget.intervalValue, widget.intervalUnit)
+  // ── On-mount refresh logic ────────────────────────────────
 
-    if (needsRefresh && widget.notebookIds.length > 0) {
-      fetchCards(widget.notebookIds, widget.count)
+  useEffect(() => {
+    if (widget.isDefault) {
+      initWOTD()
+      fetchWOTDDates()
+
+      // Check for day change every minute (midnight crossover)
+      const todayRef = { value: getLocalDateStr() }
+      const timer = setInterval(() => {
+        const now = getLocalDateStr()
+        if (now !== todayRef.value) {
+          todayRef.value = now
+          initWOTD()
+          fetchWOTDDates()
+        }
+      }, 60_000)
+      return () => clearInterval(timer)
     }
+
+    // Custom widget: check cache expiry on mount and periodically
+    const checkAndRefresh = () => {
+      const { widgets } = useFlashcardStore.getState()
+      const w = widgets.find((x) => x.id === widget.id)
+      if (!w || w.notebookIds.length === 0) return
+      const elapsed = w.lastRefreshed
+        ? Date.now() - new Date(w.lastRefreshed).getTime()
+        : Infinity
+      if (elapsed >= getIntervalMs(w.intervalValue, w.intervalUnit)) {
+        fetchCards(w.notebookIds, w.count)
+      }
+    }
+
+    checkAndRefresh()
+    const timer = setInterval(checkAndRefresh, 60_000)
+    return () => clearInterval(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── Calendar date selection ───────────────────────────────
+
+  const selectCalendarDate = useCallback(async (date: string) => {
+    const today = getLocalDateStr()
+
+    if (date === today) {
+      // Back to current cards
+      setViewDate(null)
+      setHistoryCards(null)
+      setCurrentIndex(0)
+      setEnterKey((k) => k + 1)
+      setEntering(true)
+      return
+    }
+
+    setViewDate(date)
+    setHistoryCards(null)
+    setHistoryLoading(true)
+    setCurrentIndex(0)
+    try {
+      const { data } = await api.get<FlashcardEntry[]>(`/wotd/${date}`)
+      setHistoryCards(data)
+      setEnterKey((k) => k + 1)
+      setEntering(true)
+    } catch {
+      setHistoryCards([])
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [])
+
+  const backToToday = useCallback(() => {
+    setViewDate(null)
+    setHistoryCards(null)
+    setCurrentIndex(0)
+    setEnterKey((k) => k + 1)
+    setEntering(true)
   }, [])
 
   // ── Navigation ────────────────────────────────────────────
 
-  const safeIndex = total > 0 ? currentIndex % total : 0
-
-  function prev() {
-    if (total === 0) return
-    setCurrentIndex((i) => (i - 1 + total) % total)
+  function navigate(dir: 'next' | 'prev') {
+    if (animating.current || total === 0) return
+    animating.current = true
+    setExitClass(dir === 'next' ? 'fc-exit-next' : 'fc-exit-prev')
+    setTimeout(() => {
+      setCurrentIndex((i) => dir === 'next' ? (i + 1) % total : (i - 1 + total) % total)
+      setEnterKey((k) => k + 1)
+      setExitClass('')
+      setEntering(true)
+      animating.current = false
+    }, 230)
   }
 
-  function next() {
-    if (total === 0) return
-    setCurrentIndex((i) => (i + 1) % total)
-  }
-
-  // ── Touch / swipe ─────────────────────────────────────────
+  function prev() { navigate('prev') }
+  function next() { navigate('next') }
 
   function handleTouchStart(e: React.TouchEvent) {
     touchStartX.current = e.touches[0].clientX
@@ -79,14 +357,11 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
   function handleTouchEnd(e: React.TouchEvent) {
     if (touchStartX.current === null) return
     const delta = e.changedTouches[0].clientX - touchStartX.current
-    if (Math.abs(delta) > 40) {
-      if (delta < 0) next()
-      else prev()
-    }
+    if (Math.abs(delta) > 40) navigate(delta < 0 ? 'next' : 'prev')
     touchStartX.current = null
   }
 
-  // ── Settings callbacks ─────────────────────────────────────
+  // ── Settings handlers ─────────────────────────────────────
 
   function handleSaveSettings(updates: {
     name: string
@@ -94,11 +369,15 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
     intervalUnit: typeof widget.intervalUnit
     count: number
     notebookIds: number[]
+    repeatMode: RepeatMode
   }) {
-    updateWidget(widget.id, { ...updates, lastRefreshed: null })
+    if (widget.isDefault) {
+      updateWidget(widget.id, { ...updates })
+    } else {
+      updateWidget(widget.id, { ...updates, lastRefreshed: null })
+      fetchCards(updates.notebookIds, updates.count)
+    }
     setSettingsOpen(false)
-    // Fetch with the new values immediately (not stale closure)
-    fetchCards(updates.notebookIds, updates.count)
   }
 
   function handleDelete() {
@@ -106,28 +385,61 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
     setSettingsOpen(false)
   }
 
+  async function handleCardStatusChange(char: string, status: 'learned' | 'not_learned' | null) {
+    updateCardStatus(widget.id, char, status)
+    try {
+      await api.put('/notebooks/flashcards/status', { char, status })
+    } catch { /* optimistic update stays */ }
+  }
+
+  // ── Calendar month nav helpers ────────────────────────────
+
+  function prevMonth() {
+    setCalMonth((m) => {
+      const d = new Date(m.year, m.month - 1)
+      return { year: d.getFullYear(), month: d.getMonth() }
+    })
+  }
+  function nextMonth() {
+    setCalMonth((m) => {
+      const d = new Date(m.year, m.month + 1)
+      return { year: d.getFullYear(), month: d.getMonth() }
+    })
+  }
+
+  // ── Date label formatter ──────────────────────────────────
+
+  function formatDateShort(dateStr: string) {
+    const [y, m, d] = dateStr.split('-').map(Number)
+    return `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`
+  }
+
   // ── Render ────────────────────────────────────────────────
+
+  const today = getLocalDateStr()
 
   return (
     <>
       <div className="bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-xl p-4 flex flex-col gap-3">
 
-        {/* Header row */}
+        {/* Header */}
         <div className="flex items-center justify-between min-w-0">
           <h3 className="text-sm font-semibold text-[var(--color-text)] truncate">{widget.name}</h3>
           <div className="flex items-center gap-0.5 flex-shrink-0 ml-2">
-            <button
-              type="button"
-              onClick={() => fetchCards(widget.notebookIds, widget.count)}
-              disabled={loading}
-              title={t('dashboard.refresh')}
-              className={cn(
-                'p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors',
-                loading && 'opacity-50 cursor-not-allowed'
-              )}
-            >
-              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-            </button>
+            {!widget.isDefault && (
+              <button
+                type="button"
+                onClick={() => fetchCards(widget.notebookIds, widget.count)}
+                disabled={loading}
+                title={t('dashboard.refresh')}
+                className={cn(
+                  'p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors',
+                  loading && 'opacity-50 cursor-not-allowed',
+                )}
+              >
+                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setSettingsOpen(true)}
@@ -139,50 +451,110 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
           </div>
         </div>
 
-        {/* Carousel area */}
-        {loading ? (
+        {/* Carousel */}
+        {showLoading ? (
           <div className="flex items-center justify-center h-[240px]">
             <Loader2 size={24} className="animate-spin text-[var(--color-text-muted)]" />
           </div>
         ) : total === 0 ? (
           <div className="flex items-center justify-center h-[240px] text-sm text-[var(--color-text-muted)] italic text-center px-4">
-            {widget.notebookIds.length === 0
-              ? t('dashboard.noSource')
-              : t('dashboard.noCards')}
+            {widget.isDefault && viewDate !== null
+              ? t('dashboard.noWOTD')
+              : widget.notebookIds.length === 0
+                ? t('dashboard.noSource')
+                : t('dashboard.noCards')}
           </div>
         ) : (
-          <div
-            className="flex items-center gap-2"
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
-          >
-            <button
-              type="button"
-              onClick={prev}
-              className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors flex-shrink-0"
-            >
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={prev}
+              className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors flex-shrink-0">
               <ChevronLeft size={20} />
             </button>
 
-            <div className="flex-1 min-w-0">
-              <Flashcard card={cards[safeIndex]} />
+            <div className="flex-1 min-w-0 [touch-action:pan-y]"
+              onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+              <div className="relative" style={{ perspective: '1000px' }}>
+                {total > 2 && (
+                  <div aria-hidden className="absolute inset-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)]"
+                    style={{ transform: 'translateY(10px)', zIndex: 0 }} />
+                )}
+                {total > 1 && (
+                  <div aria-hidden className="absolute inset-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)]"
+                    style={{ transform: 'translateY(5px)', zIndex: 1 }} />
+                )}
+                <div
+                  key={enterKey}
+                  className={cn(entering && 'fc-enter', exitClass)}
+                  onAnimationEnd={() => setEntering(false)}
+                  style={{ position: 'relative', zIndex: 2 }}
+                >
+                  <Flashcard
+                    card={activeCards[safeIndex]}
+                    onStatusChange={(s) => handleCardStatusChange(activeCards[safeIndex].char, s)}
+                  />
+                </div>
+              </div>
             </div>
 
-            <button
-              type="button"
-              onClick={next}
-              className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors flex-shrink-0"
-            >
+            <button type="button" onClick={next}
+              className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors flex-shrink-0">
               <ChevronRight size={20} />
             </button>
           </div>
         )}
 
-        {/* Progress counter */}
-        {!loading && total > 0 && (
+        {/* Progress counter (centered) */}
+        {!showLoading && total > 0 && (
           <p className="text-center text-xs text-[var(--color-text-muted)]">
             {safeIndex + 1}/{total}
           </p>
+        )}
+
+        {/* WOTD Calendar toggle + expandable panel */}
+        {widget.isDefault && !showLoading && (
+          <div className="border-t border-[var(--color-border)] pt-2 flex flex-col gap-0">
+            {/* Toggle row: shows today's date or viewing date */}
+            <button
+              type="button"
+              onClick={() => setCalExpanded((v) => !v)}
+              className="flex items-center justify-between w-full text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors px-0.5"
+            >
+              <span>
+                {viewDate !== null
+                  ? t('dashboard.viewingDate', { date: formatDateShort(viewDate) })
+                  : formatDateShort(today)}
+              </span>
+              <ChevronRight
+                size={13}
+                className={cn('transition-transform duration-200', calExpanded && 'rotate-90')}
+              />
+            </button>
+
+            {/* "Back to today" shown when viewing history */}
+            {viewDate !== null && (
+              <button
+                type="button"
+                onClick={backToToday}
+                className="text-left text-[10px] text-[var(--color-primary)] hover:underline px-0.5 mt-0.5"
+              >
+                ← {t('dashboard.backToToday')}
+              </button>
+            )}
+
+            {/* Full calendar (expandable) */}
+            {calExpanded && (
+              <MiniCalendar
+                year={calMonth.year}
+                month={calMonth.month}
+                wotdDates={wotdDates}
+                viewDate={viewDate}
+                today={today}
+                onSelect={(date) => { selectCalendarDate(date); setCalExpanded(false) }}
+                onPrevMonth={prevMonth}
+                onNextMonth={nextMonth}
+              />
+            )}
+          </div>
         )}
       </div>
 

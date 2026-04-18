@@ -19,6 +19,7 @@ const NEW_WIDGET_TEMPLATE: FlashcardWidgetConfig = {
   isDefault: false,
   lastRefreshed: null,
   cards: [],
+  repeatMode: 'random',
 }
 
 export function HomePage() {
@@ -74,6 +75,7 @@ export function HomePage() {
     intervalUnit: FlashcardWidgetConfig['intervalUnit']
     count: number
     notebookIds: number[]
+    repeatMode: FlashcardWidgetConfig['repeatMode']
   }) {
     addWidget({ ...updates, isDefault: false })
     setAddingWidget(false)

@@ -22,7 +22,7 @@ export function LoginPage() {
       if (user.is_admin) {
         navigate('/admin/dashboard', { replace: true })
       } else {
-        navigate('/radicals', { replace: true })
+        navigate('/dashboard', { replace: true })
       }
     } catch {
       setError(t('auth.loginError'))

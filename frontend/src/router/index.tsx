@@ -10,6 +10,7 @@ import { ChangePasswordPage } from '@/features/settings/ChangePasswordPage'
 import { ProfilePage } from '@/features/auth/ProfilePage'
 import { NotebooksPage } from '@/features/notebooks/NotebooksPage'
 import { MyNotesPage } from '@/features/my-notes/MyNotesPage'
+import { FlashcardsPage } from '@/features/flashcards/FlashcardsPage'
 import { AdminRoute } from './AdminRoute'
 import { UserRoute } from './UserRoute'
 import { AdminLayout } from '@/components/layout/AdminLayout'
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="/dashboard" replace /> },
           { path: 'dashboard', element: <HomePage /> },
+          { path: 'flashcards', element: <FlashcardsPage /> },
           { path: 'radicals', element: <RadicalsPage /> },
           { path: 'dictionary', element: <DictionaryPage /> },
           { path: 'notebooks', element: <NotebooksPage /> },

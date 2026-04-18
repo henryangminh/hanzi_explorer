@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { BookOpen, Search, NotebookText, StickyNote, Settings, LogOut, User, Sun, Moon, Shield, Menu, X, LayoutDashboard } from 'lucide-react'
+import { Search, NotebookText, StickyNote, Settings, LogOut, User, Sun, Moon, Shield, Menu, X, LayoutDashboard, GraduationCap } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { cn } from '@/lib/cn'
 
 const NAV_ITEMS = [
   { to: '/dashboard', labelKey: 'nav.dashboard', icon: LayoutDashboard },
-  { to: '/radicals', labelKey: 'nav.radicals', icon: BookOpen },
+  { to: '/flashcards', labelKey: 'nav.flashcards', icon: GraduationCap },
   { to: '/dictionary', labelKey: 'nav.dictionary', icon: Search },
   { to: '/notebooks', labelKey: 'nav.notebooks', icon: NotebookText },
   { to: '/my-notes', labelKey: 'nav.myNotes', icon: StickyNote },

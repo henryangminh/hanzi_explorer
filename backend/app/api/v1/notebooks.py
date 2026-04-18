@@ -8,6 +8,7 @@ from app.models.notebook import Notebook
 from app.schemas.notebook import (
     AddEntryRequest,
     FlashcardCardResponse,
+    FlashcardStatusUpdate,
     NotebookCreate,
     NotebookDetail,
     NotebookEntryPreview,
@@ -143,7 +144,8 @@ def get_flashcards(
             SELECT c.simplified,
                    py.pinyins_raw,
                    en_d.meaning_text AS cedict_raw,
-                   vi_d.meaning_text AS cvdict_raw
+                   vi_d.meaning_text AS cvdict_raw,
+                   un.flashcard_status
             FROM sampled_chars sc
             JOIN characters c ON c.id = sc.char_id
             LEFT JOIN en_min   ON en_min.character_id  = sc.char_id
@@ -151,8 +153,9 @@ def get_flashcards(
             LEFT JOIN vi_min   ON vi_min.character_id  = sc.char_id
             LEFT JOIN definitions vi_d ON vi_d.id      = vi_min.min_id
             LEFT JOIN py       ON py.character_id       = sc.char_id
+            LEFT JOIN user_flashcards un ON un.user_id = :user_id AND un.char = c.simplified
         """),
-        {"count": count, "cedict_id": cedict_id, "cvdict_id": cvdict_id},
+        {"count": count, "cedict_id": cedict_id, "cvdict_id": cvdict_id, "user_id": user.id},
     ).fetchall()
 
     def _cedict_brief(raw: str | None) -> str | None:
@@ -176,9 +179,42 @@ def get_flashcards(
             pinyins=_pinyins(row[1]),
             cedict_brief=_cedict_brief(row[2]),
             cvdict_brief=_cvdict_brief(row[3]),
+            status=row[4],  # from user_flashcards.status
         )
         for row in rows
     ]
+
+
+@router.put("/flashcards/status", status_code=204)
+def update_flashcard_status(
+    data: FlashcardStatusUpdate,
+    session: DbSession,
+    user: CurrentUser,
+):
+    """Upsert the user's learned/not_learned status for a single flashcard character."""
+    from datetime import datetime, timezone
+    from sqlmodel import select
+    from app.models.note import UserFlashcard
+
+    fc = session.exec(
+        select(UserFlashcard)
+        .where(UserFlashcard.user_id == user.id)
+        .where(UserFlashcard.char == data.char)
+    ).first()
+
+    if fc:
+        fc.status = data.status
+        fc.updated_at = datetime.now(timezone.utc)
+        session.add(fc)
+        session.commit()
+    elif data.status is not None:
+        fc = UserFlashcard(
+            user_id=user.id,
+            char=data.char,
+            status=data.status,
+        )
+        session.add(fc)
+        session.commit()
 
 
 @router.get("/{notebook_id}/entries/preview")

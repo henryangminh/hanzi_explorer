@@ -353,6 +353,7 @@ def get_all_user_notes(session: Session, user_id: int) -> list[UserNoteResponse]
     notes = session.exec(
         select(UserNote)
         .where(UserNote.user_id == user_id)
+        .where(UserNote.title != '')
         .order_by(UserNote.updated_at.desc())
     ).all()
     # Batch-cache display info per unique char to avoid redundant lookups

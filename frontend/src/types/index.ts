@@ -198,6 +198,7 @@ export interface FlashcardEntry {
   pinyins: string[]
   cedict_brief: string | null
   cvdict_brief: string | null
+  status: 'learned' | 'not_learned' | null
 }
 
 // ── Search History ────────────────────────────────────────

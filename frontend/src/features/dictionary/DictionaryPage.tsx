@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSearchParams } from 'react-router-dom'
-import { Search, ChevronDown, ChevronUp, BookmarkPlus, X } from 'lucide-react'
+import { useSearchParams, Link } from 'react-router-dom'
+import { Search, ChevronDown, ChevronUp, BookmarkPlus, X, BookOpen } from 'lucide-react'
 import { useState } from 'react'
 import type { DictLiteResponse } from '@/types'
 import { CharDetailPanel } from '@/features/shared/CharDetailPanel'
@@ -239,9 +239,30 @@ export function DictionaryPage() {
     <div className="flex gap-6 items-start">
       {/* ── Left: search area ── */}
       <div className="flex flex-col gap-4 flex-1 min-w-0 max-w-2xl">
-        <h1 className="text-xl font-semibold text-[var(--color-text)]">
-          {t('dictionary.title')}
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-semibold text-[var(--color-text)]">
+            {t('dictionary.title')}
+          </h1>
+          {!isAdmin && (
+            <div className="flex items-center gap-2 lg:hidden">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setHistoryPopupOpen(true)}
+              >
+                Lịch sử
+              </Button>
+              <Link
+                to="/radicals"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-[#7c5c3e] hover:bg-[#6a4f35] text-white transition-colors"
+              >
+                <BookOpen size={14} />
+                Bộ thủ
+              </Link>
+            </div>
+          )}
+        </div>
 
         <form onSubmit={handleSearch} className="flex gap-2">
           <div className="relative flex-1">
@@ -261,16 +282,6 @@ export function DictionaryPage() {
           <Button type="submit" isLoading={activeTab?.loading && activeTab.results.length === 0}>
             {t('dictionary.title')}
           </Button>
-          {!isAdmin && (
-            <Button
-              type="button"
-              variant="outline"
-              className="lg:hidden shrink-0"
-              onClick={() => setHistoryPopupOpen(true)}
-            >
-              Lịch sử
-            </Button>
-          )}
         </form>
 
         {/* ── Tabs ── */}
@@ -353,8 +364,19 @@ export function DictionaryPage() {
 
       {/* ── Right: history sidebar (desktop only, non-admin) ── */}
       {!isAdmin && (
-        <aside className="hidden lg:flex flex-col w-80 shrink-0 sticky top-20 max-h-[calc(100vh-6rem)] border border-[var(--color-border)] rounded-xl bg-[var(--color-bg-surface)] p-4">
-          <SearchHistoryPanel onSearch={handleHistorySearch} refreshKey={historyRefreshKey} />
+        <aside className="hidden lg:flex flex-col w-80 shrink-0 sticky top-20 max-h-[calc(100vh-6rem)] border border-[var(--color-border)] rounded-xl bg-[var(--color-bg-surface)] p-4 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <SearchHistoryPanel onSearch={handleHistorySearch} refreshKey={historyRefreshKey} />
+          </div>
+          <div className="mt-3 pt-3 border-t border-[var(--color-border)] shrink-0">
+            <Link
+              to="/radicals"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-[#7c5c3e] hover:bg-[#6a4f35] text-white transition-colors"
+            >
+              <BookOpen size={14} />
+              Bộ thủ
+            </Link>
+          </div>
         </aside>
       )}
 

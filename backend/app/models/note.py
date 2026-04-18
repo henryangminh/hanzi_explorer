@@ -11,6 +11,18 @@ class UserNote(SQLModel, table=True):
     char: str = Field(index=True, max_length=10)
     title: str = Field(max_length=200)
     detail: Optional[str] = None
+    flashcard_status: Optional[str] = Field(default=None)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class UserFlashcard(SQLModel, table=True):
+    __tablename__ = "user_flashcards"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    char: str = Field(index=True, max_length=10)
+    status: Optional[str] = Field(default=None)  # 'learned' or 'not_learned'
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
