@@ -1,4 +1,7 @@
+import { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Loader2 } from 'lucide-react'
+import api from '@/lib/axios'
 import { useFlashcardStore } from '@/store/flashcard.store'
 import { Flashcard } from '@/components/ui/Flashcard'
 import type { FlashcardEntry } from '@/types'
@@ -7,34 +10,44 @@ export function FlashcardsPage() {
   const { t } = useTranslation()
   const { widgets, updateCardStatus } = useFlashcardStore()
 
-  // Deduplicate cards by char across all widgets, tracking which widgets contain each char
-  const cardMap = new Map<string, { card: FlashcardEntry; widgetIds: string[] }>()
-  for (const widget of widgets) {
-    for (const card of widget.cards) {
-      const existing = cardMap.get(card.char)
-      if (existing) {
-        existing.widgetIds.push(widget.id)
-        // Prioritize: learned > not_learned > null
-        if (existing.card.status !== 'learned' && card.status === 'learned') {
-          existing.card = { ...card }
-        } else if (existing.card.status === null && card.status === 'not_learned') {
-          existing.card = { ...card }
-        }
-      } else {
-        cardMap.set(card.char, { card: { ...card }, widgetIds: [widget.id] })
+  const [cards, setCards] = useState<FlashcardEntry[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const fetchMarked = useCallback(async () => {
+    setLoading(true)
+    try {
+      const { data } = await api.get<FlashcardEntry[]>('/notebooks/flashcards/marked')
+      setCards(data)
+    } catch { /* silent */ } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchMarked() }, [fetchMarked])
+
+  async function handleStatusChange(char: string, status: 'learned' | 'not_learned' | null) {
+    // Update backend
+    try {
+      await api.put('/notebooks/flashcards/status', { char, status })
+    } catch { /* silent */ }
+
+    // Update local list optimistically
+    if (status === null) {
+      setCards((prev) => prev.filter((c) => c.char !== char))
+    } else {
+      setCards((prev) => prev.map((c) => c.char === char ? { ...c, status } : c))
+    }
+
+    // Sync any widgets that also contain this card
+    for (const widget of widgets) {
+      if (widget.cards.some((c) => c.char === char)) {
+        updateCardStatus(widget.id, char, status)
       }
     }
   }
 
-  const allCards = Array.from(cardMap.values())
-  const learned = allCards.filter(({ card }) => card.status === 'learned')
-  const unlearned = allCards.filter(({ card }) => card.status === 'not_learned')
-
-  function handleStatusChange(char: string, widgetIds: string[], status: 'learned' | 'not_learned' | null) {
-    for (const widgetId of widgetIds) {
-      updateCardStatus(widgetId, char, status)
-    }
-  }
+  const learned = cards.filter((c) => c.status === 'learned')
+  const unlearned = cards.filter((c) => c.status === 'not_learned')
 
   return (
     <div className="py-6 px-4">
@@ -44,7 +57,11 @@ export function FlashcardsPage() {
         </h1>
       </div>
 
-      {allCards.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 size={24} className="animate-spin text-[var(--color-text-muted)]" />
+        </div>
+      ) : cards.length === 0 ? (
         <div className="text-center py-20 text-[var(--color-text-muted)]">
           <p className="text-sm">{t('flashcards.empty')}</p>
         </div>
@@ -56,12 +73,12 @@ export function FlashcardsPage() {
                 {t('flashcards.learned')} ({learned.length})
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-                {learned.map(({ card, widgetIds }) => (
+                {learned.map((card) => (
                   <Flashcard
                     key={card.char}
                     card={card}
                     compact
-                    onStatusChange={(status) => handleStatusChange(card.char, widgetIds, status)}
+                    onStatusChange={(status) => handleStatusChange(card.char, status)}
                   />
                 ))}
               </div>
@@ -74,12 +91,12 @@ export function FlashcardsPage() {
                 {t('flashcards.unlearned')} ({unlearned.length})
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-                {unlearned.map(({ card, widgetIds }) => (
+                {unlearned.map((card) => (
                   <Flashcard
                     key={card.char}
                     card={card}
                     compact
-                    onStatusChange={(status) => handleStatusChange(card.char, widgetIds, status)}
+                    onStatusChange={(status) => handleStatusChange(card.char, status)}
                   />
                 ))}
               </div>

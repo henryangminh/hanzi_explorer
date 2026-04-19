@@ -7,6 +7,11 @@ from app.models.note import RadicalCompound, RadicalGroup
 from app.schemas.radical import CompoundItem, RadicalDetail, RadicalSummary
 
 
+def get_character_stroke_count(session: Session, char: str) -> int | None:
+    row = session.exec(select(Character).where(Character.simplified == char)).first()
+    return row.stroke_count if row else None
+
+
 def list_radicals(session: Session) -> List[RadicalSummary]:
     groups = session.exec(select(RadicalGroup)).all()
     result = []

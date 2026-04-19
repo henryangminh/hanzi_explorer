@@ -1,14 +1,13 @@
 from typing import List, Optional
+
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
-from sqlmodel import select
+
 from app.core.deps import CurrentUser, DbSession
-from app.models.character import Character
 from app.schemas.radical import RadicalDetail, RadicalSummary
 from app.services import radical_service
-from app.services.hanzi_service import get_characters_with_component
 from app.services.dictionary_service import lookup_cedict
-from app.core.pinyin import numeric_to_diacritic
+from app.services.hanzi_service import get_characters_with_component
 
 router = APIRouter(prefix="/radicals", tags=["radicals"])
 
@@ -53,8 +52,7 @@ def get_radical_chars(radical: str, current_user: CurrentUser, session: DbSessio
         if char in seen:
             continue
         seen.add(char)
-        char_row = session.exec(select(Character).where(Character.simplified == char)).first()
-        stroke = char_row.stroke_count if char_row else None
+        stroke = radical_service.get_character_stroke_count(session, char)
         entries = lookup_cedict(session, char)
         if entries:
             first = entries[0]

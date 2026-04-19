@@ -218,36 +218,43 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
     const w = curr.find((x) => x.id === widget.id)
     const mode: RepeatMode = w?.repeatMode ?? 'random'
 
-    if (mode === 'unlearned_only') {
-      const oldCards = w?.cards ?? []
-      if (oldCards.length > 0) {
-        setWidgetCards(widget.id, oldCards.filter((c) => c.status === 'not_learned'))
-        setCurrentIndex(0)
-        return
-      }
-      // No existing cards — fall through to a normal fetch
+    // Cards that have been marked (green/red) are preserved forever — never removed on refresh
+    const markedCards = (w?.cards ?? []).filter((c) => c.status !== null)
+    const markedChars = new Set(markedCards.map((c) => c.char))
+
+    if (notebookIds.length === 0) {
+      // No source: only show marked cards (filtered by mode)
+      const visible = mode === 'unlearned_only'
+        ? markedCards.filter((c) => c.status === 'not_learned')
+        : markedCards
+      setWidgetCards(widget.id, visible)
+      setCurrentIndex(0)
+      return
     }
 
-    if (notebookIds.length === 0) return
     setLoading(true)
     try {
       const { data } = await api.get<FlashcardEntry[]>('/notebooks/flashcards', {
         params: { notebook_ids: notebookIds.join(','), count },
       })
 
-      let finalCards = data
-      if (mode === 'random') {
-        const maxRepeat = Math.floor(count * 0.1)
-        const oldCards = w?.cards ?? []
-        if (maxRepeat > 0 && oldCards.length > 0) {
-          const shuffledOld = [...oldCards].sort(() => Math.random() - 0.5)
-          const repeated = shuffledOld.slice(0, maxRepeat)
-          finalCards = [...repeated, ...data.slice(maxRepeat)].sort(() => Math.random() - 0.5)
-        }
-      }
-      // mode === 'no_repeat': use fresh data as-is
+      // Fresh cards = API result minus already-marked ones (avoid duplicates)
+      const freshCards = data.filter((c) => !markedChars.has(c.char))
 
-      setWidgetCards(widget.id, finalCards)
+      let base: FlashcardEntry[]
+      if (mode === 'unlearned_only') {
+        // Keep not_learned marked cards + fresh cards (exclude learned)
+        const notLearnedMarked = markedCards.filter((c) => c.status === 'not_learned')
+        const fill = Math.max(0, count - notLearnedMarked.length)
+        base = [...notLearnedMarked, ...freshCards.slice(0, fill)]
+      } else {
+        // random / no_repeat: keep ALL marked cards + fill with fresh
+        const fill = Math.max(0, count - markedCards.length)
+        base = [...markedCards, ...freshCards.slice(0, fill)]
+        if (mode === 'random') base = base.sort(() => Math.random() - 0.5)
+      }
+
+      setWidgetCards(widget.id, base)
       setCurrentIndex(0)
     } catch { /* silent */ } finally {
       setLoading(false)
@@ -374,7 +381,8 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
     if (widget.isDefault) {
       updateWidget(widget.id, { ...updates })
     } else {
-      updateWidget(widget.id, { ...updates, lastRefreshed: null })
+      // Reset cards so marked cards from old notebooks don't bleed into new config
+      updateWidget(widget.id, { ...updates, lastRefreshed: null, cards: [] })
       fetchCards(updates.notebookIds, updates.count)
     }
     setSettingsOpen(false)
