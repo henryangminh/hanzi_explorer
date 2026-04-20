@@ -28,7 +28,7 @@ export function FlashcardWidgetSettings({ widget, allNotebooks, onSave, onDelete
   const [intervalUnit, setIntervalUnit] = useState<IntervalUnit>(widget.intervalUnit)
   const [count, setCount] = useState(widget.count)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set(widget.notebookIds))
-  const [repeatMode, setRepeatMode] = useState<RepeatMode>(widget.repeatMode ?? 'random')
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>(widget.repeatMode ?? 'no_repeat')
   const [error, setError] = useState<string | null>(null)
 
   // Default widget: only HSK notebooks; custom: all notebooks
@@ -213,9 +213,10 @@ export function FlashcardWidgetSettings({ widget, allNotebooks, onSave, onDelete
               </label>
               <div className="flex flex-col gap-1">
                 {([
-                  { value: 'random',         labelKey: 'dashboard.repeatRandom',    hintKey: 'dashboard.repeatRandomHint'    },
-                  { value: 'unlearned_only', labelKey: 'dashboard.repeatUnlearned', hintKey: 'dashboard.repeatUnlearnedHint' },
-                  { value: 'no_repeat',      labelKey: 'dashboard.repeatNone',      hintKey: 'dashboard.repeatNoneHint'      },
+                  { value: 'random',            labelKey: 'dashboard.repeatRandom',          hintKey: 'dashboard.repeatRandomHint'          },
+                  { value: 'repeat_unlearned',  labelKey: 'dashboard.repeatRepeatUnlearned', hintKey: 'dashboard.repeatRepeatUnlearnedHint' },
+                  { value: 'unlearned_only',    labelKey: 'dashboard.repeatUnlearned',       hintKey: 'dashboard.repeatUnlearnedHint'       },
+                  { value: 'no_repeat',         labelKey: 'dashboard.repeatNone',            hintKey: 'dashboard.repeatNoneHint'            },
                 ] as const).map(({ value, labelKey, hintKey }) => (
                   <label
                     key={value}

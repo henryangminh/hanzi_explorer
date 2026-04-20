@@ -19,7 +19,7 @@ const NEW_WIDGET_TEMPLATE: FlashcardWidgetConfig = {
   isDefault: false,
   lastRefreshed: null,
   cards: [],
-  repeatMode: 'random',
+  repeatMode: 'no_repeat',
 }
 
 export function HomePage() {

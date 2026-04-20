@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { FlashcardEntry } from '@/types'
 
 export type IntervalUnit = 'minutes' | 'hours' | 'days'
-export type RepeatMode = 'random' | 'unlearned_only' | 'no_repeat'
+export type RepeatMode = 'random' | 'repeat_unlearned' | 'unlearned_only' | 'no_repeat'
 
 export interface FlashcardWidgetConfig {
   id: string

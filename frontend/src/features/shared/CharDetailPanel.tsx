@@ -527,22 +527,24 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, pinyinF
                                   </span>
                                   <div className="flex flex-col gap-1 pl-6">
                                     {(() => {
+                                      const hasParent = posGroup.defs.some((d) => !d.is_sub)
                                       let numCount = 0
                                       return posGroup.defs.map((d, dIdx) => {
-                                        const subMatch = d.is_sub ? d.definition.match(/^([a-z])\s*[）\)]\s*(.*)/) : null
+                                        const effectivelySub = d.is_sub && hasParent
+                                        const subMatch = effectivelySub ? d.definition.match(/^([a-z])\s*[）\)]\s*(.*)/) : null
                                         const subLetter = subMatch?.[1]
                                         const defText = subMatch ? subMatch[2].trim() : d.definition.replace(/^[a-z]\s*[）\)]\s*/, '').trim()
-                                        if (!d.is_sub) numCount++
+                                        if (!effectivelySub) numCount++
                                         return (
-                                          <div key={dIdx} className={d.is_sub ? 'ml-4' : ''}>
+                                          <div key={dIdx} className={effectivelySub ? 'ml-4' : ''}>
                                             <div className="flex gap-1.5 text-sm text-[var(--color-text)]">
                                               <span className="shrink-0 text-[var(--color-text-muted)]">
-                                                {d.is_sub ? (subLetter ? `${subLetter}）` : '•') : `${numCount}.`}
+                                                {effectivelySub ? (subLetter ? `${subLetter}）` : '•') : `${numCount}.`}
                                               </span>
-                                              <span>{defText}</span>
+                                              <span className="text-lg font-cjk">{defText}</span>
                                             </div>
                                             {d.examples.map((ex, j) => (
-                                              <div key={j} className={cn('text-sm italic', d.is_sub ? 'ml-8' : 'ml-4')} style={{ color: 'var(--color-accent)' }}>
+                                              <div key={j} className={cn('text-lg italic font-cjk', effectivelySub ? 'ml-8' : 'ml-4')} style={{ color: 'var(--color-accent)' }}>
                                                 → {ex}
                                               </div>
                                             ))}
@@ -584,8 +586,8 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, pinyinF
                   >
                     <span className="text-sm text-[var(--color-text-muted)] shrink-0 w-5 text-right">{i + 1}.</span>
                     {w.pinyin
-                      ? <ColorizedHanzi char={w.word} pinyin={w.pinyin} className="font-cjk text-sm" />
-                      : <span className="font-cjk text-sm text-[var(--color-text)]">{w.word}</span>}
+                      ? <ColorizedHanzi char={w.word} pinyin={w.pinyin} className="font-cjk text-lg" />
+                      : <span className="font-cjk text-lg text-[var(--color-text)]">{w.word}</span>}
                     {w.pinyin && <ColorizedPinyin pinyin={w.pinyin} className="text-sm" />}
                     {w.hanviet && <span className="text-sm text-[var(--color-primary)]">{w.hanviet}</span>}
                   </button>
@@ -614,8 +616,8 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, pinyinF
                   >
                     <span className="text-sm text-[var(--color-text-muted)] shrink-0 w-5 text-right">{i + 1}.</span>
                     {w.pinyin
-                      ? <ColorizedHanzi char={w.word} pinyin={w.pinyin} className="font-cjk text-sm" />
-                      : <span className="font-cjk text-sm text-[var(--color-text)]">{w.word}</span>}
+                      ? <ColorizedHanzi char={w.word} pinyin={w.pinyin} className="font-cjk text-lg" />
+                      : <span className="font-cjk text-lg text-[var(--color-text)]">{w.word}</span>}
                     {w.pinyin && <ColorizedPinyin pinyin={w.pinyin} className="text-sm" />}
                     {w.hanviet && <span className="text-sm text-[var(--color-primary)]">{w.hanviet}</span>}
                   </button>
