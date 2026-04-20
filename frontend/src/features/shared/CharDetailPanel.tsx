@@ -97,9 +97,9 @@ function renderWithSeeRefs(
 type PosGroup = { pos: string | null; defs: XdhyEntry['defs'] }
 function groupDefsByPos(defs: XdhyEntry['defs']): PosGroup[] {
   return defs.reduce<PosGroup[]>((groups, d) => {
-    const last = groups[groups.length - 1]
-    if (last && last.pos === d.pos) {
-      last.defs.push(d)
+    const existing = groups.find(g => g.pos === d.pos)
+    if (existing) {
+      existing.defs.push(d)
     } else {
       groups.push({ pos: d.pos, defs: [d] })
     }
@@ -141,12 +141,13 @@ interface Props {
   char: string
   initialEntry?: InitialEntry
   showNotes?: boolean
+  pinyinFilter?: string
   onDataLoaded?: (entry: DictionaryResponse) => void
   onNoteSaved?: () => void
   onWordClick?: (word: string) => void
 }
 
-export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataLoaded, onNoteSaved, onWordClick }: Props) {
+export function CharDetailPanel({ char, initialEntry, showNotes = false, pinyinFilter, onDataLoaded, onNoteSaved, onWordClick }: Props) {
   const { t } = useTranslation()
 
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
@@ -310,7 +311,7 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
 
   // Resolve the current display source: full → lite (phase-1 fetch or prop) → null
   const liteSource = lite // set either from prop (initialEntry lite) or phase-1 fetch
-  const entry = full ?? (liteSource
+  let entry = full ?? (liteSource
     ? {
       char: liteSource.char,
       cedict: liteSource.cedict,
@@ -325,6 +326,20 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
       antonyms: liteSource.antonyms ?? [],
     } satisfies DictionaryResponse
     : null)
+
+  if (entry && pinyinFilter) {
+    const normalizePinyin = (p: string) => p.replace(/[·\.\/]+/g, '').toLowerCase()
+    const filterFn = (item: any) => !item.pinyin || normalizePinyin(item.pinyin) === pinyinFilter.toLowerCase()
+    entry = {
+      ...entry,
+      cedict: entry.cedict.filter(filterFn),
+      cvdict: entry.cvdict?.filter(filterFn) || [],
+      xdhy: entry.xdhy?.filter(filterFn) || [],
+      synonyms: entry.synonyms?.filter(filterFn) || [],
+      antonyms: entry.antonyms?.filter(filterFn) || [],
+      user_notes: entry.user_notes?.filter(n => !n.pinyin || normalizePinyin(n.pinyin) === pinyinFilter.toLowerCase()) || [],
+    }
+  }
 
   // If no data at all yet (lite not fetched, full not fetched), show a spinner
   if (!entry) {
@@ -429,21 +444,26 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
             <div className="pl-4">
               <DictionaryList
                 entries={entry.cvdict}
-                renderMeaning={(cv) => (
-                  <>
-                    {cv.meaning_vi.split('/').filter(Boolean).map((meaning, i) => {
-                      const parts = cv.meaning_vi.split('/').filter(Boolean)
-                      const trimmed = meaning.trim()
-                      return (
-                        <p key={i} className="text-sm text-[var(--color-text-muted)]">
-                          {parts.length > 1 ? (
-                            <><span className="text-xs text-[var(--color-primary)] mr-1">{i + 1}.</span>{renderWithSeeRefs(trimmed, onWordClick)}</>
-                          ) : renderWithSeeRefs(trimmed, onWordClick)}
-                        </p>
-                      )
-                    })}
-                  </>
-                )}
+                renderMeaning={(cv, hasSiblings) => {
+                  const parts = cv.meaning_vi.split('/').filter(Boolean)
+                  return (
+                    <>
+                      {parts.map((meaning, i) => {
+                        const trimmed = meaning.trim()
+                        return (
+                          <div key={i} className={cn("text-sm text-[var(--color-text-muted)]", parts.length > 1 && "flex gap-1.5")}>
+                            {parts.length > 1 && (
+                              <span className="shrink-0 text-[var(--color-text-muted)]">
+                                {hasSiblings ? `${String.fromCharCode(97 + i)})` : `${i + 1})`}
+                              </span>
+                            )}
+                            <span>{renderWithSeeRefs(trimmed, onWordClick)}</span>
+                          </div>
+                        )
+                      })}
+                    </>
+                  )
+                }}
               />
             </div>
           )}
@@ -457,378 +477,421 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
             {t('dictionary.xdhy')}
           </SectionHeader>
           {!collapsed['xdhy'] && <div className="pl-4 flex flex-col gap-3">
-            {entry.xdhy.map((xEntry: XdhyEntry) => {
-              const groups = groupDefsByPos(xEntry.defs)
-              return (
-                <div
-                  key={xEntry.id}
-                  className={cn(
-                    'flex flex-col gap-1',
-                    entry.xdhy.length > 1 && 'pl-3 border-l-2 border-[var(--color-border-md)]'
-                  )}
-                >
-                  <div className="flex items-baseline gap-2">
-                    <ColorizedHanzi char={xEntry.simplified || entry.char} pinyin={xEntry.pinyin} className="font-cjk font-medium text-lg text-[var(--color-text)]" />
-                    <ColorizedPinyin pinyin={xEntry.pinyin} n={charCount} className="font-medium text-[var(--color-text-muted)]" />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    {groups.map((group, gi) => (
-                      <div key={gi}>
-                        {group.pos && (
-                          <span className="inline-block text-sm font-medium text-[var(--color-primary)] border border-[var(--color-primary)] rounded px-1.5 py-0.5 mb-1">
-                            {group.pos}
-                          </span>
-                        )}
-                        <div className="flex flex-col gap-1">
-                          {(() => {
-                            let numCount = 0
-                            return group.defs.map((d, idx) => {
-                              const subMatch = d.is_sub ? d.definition.match(/^([a-z])）(.*)/) : null
-                              const subLetter = subMatch?.[1]
-                              const defText = subMatch ? subMatch[2].trim() : d.definition
-                              if (!d.is_sub) numCount++
-                              return (
-                                <div key={idx} className={d.is_sub ? 'ml-4' : ''}>
-                                  <div className="flex gap-1.5 text-sm text-[var(--color-text)]">
-                                    <span className="shrink-0 text-[var(--color-text-muted)]">
-                                      {d.is_sub ? `${subLetter}）` : `${numCount}.`}
-                                    </span>
-                                    <span>{defText}</span>
-                                  </div>
-                                  {d.examples.map((ex, j) => (
-                                    <div key={j} className={cn('text-sm italic', d.is_sub ? 'ml-8' : 'ml-4')} style={{ color: 'var(--color-accent)' }}>
-                                      → {ex}
-                                    </div>
-                                  ))}
-                                </div>
-                              )
-                            })
-                          })()}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
-          </div>}
-        </div>
-      )}
+            {(() => {
+              const groupedXdhy: { pinyin: string, simplified: string, items: typeof entry.xdhy }[] = []
+              const normalizePinyin = (p: string) => p.replace(/[·\.\/]+/g, '').toLowerCase()
 
-      {/* Từ đồng nghĩa */}
-      {entry.synonyms?.length > 0 && (
-        <div>
-          <SectionHeader collapsed={!!collapsed['synonyms']} onToggle={() => toggle('synonyms')} className="mb-2">
-            {t('dictionary.synonyms')}
-          </SectionHeader>
-          {!collapsed['synonyms'] && (
-            <div className="pl-4 flex flex-col gap-1">
-              {entry.synonyms.map((w: WordInfo, i: number) => (
-                <button
-                  key={w.word}
-                  type="button"
-                  onClick={() => onWordClick?.(w.word)}
-                  className="flex items-baseline gap-3 text-left cursor-pointer hover:opacity-70 transition-opacity w-fit"
-                >
-                  <span className="text-sm text-[var(--color-text-muted)] shrink-0 w-5 text-right">{i + 1}.</span>
-                  {w.pinyin
-                    ? <ColorizedHanzi char={w.word} pinyin={w.pinyin} className="font-cjk text-sm" />
-                    : <span className="font-cjk text-sm text-[var(--color-text)]">{w.word}</span>}
-                  {w.pinyin && <ColorizedPinyin pinyin={w.pinyin} className="text-sm" />}
-                  {w.hanviet && <span className="text-sm text-[var(--color-primary)]">{w.hanviet}</span>}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Từ trái nghĩa */}
-      {entry.antonyms?.length > 0 && (
-        <div>
-          <SectionHeader collapsed={!!collapsed['antonyms']} onToggle={() => toggle('antonyms')} className="mb-2">
-            {t('dictionary.antonyms')}
-          </SectionHeader>
-          {!collapsed['antonyms'] && (
-            <div className="pl-4 flex flex-col gap-1">
-              {entry.antonyms.map((w: WordInfo, i: number) => (
-                <button
-                  key={w.word}
-                  type="button"
-                  onClick={() => onWordClick?.(w.word)}
-                  className="flex items-baseline gap-3 text-left cursor-pointer hover:opacity-70 transition-opacity w-fit"
-                >
-                  <span className="text-sm text-[var(--color-text-muted)] shrink-0 w-5 text-right">{i + 1}.</span>
-                  {w.pinyin
-                    ? <ColorizedHanzi char={w.word} pinyin={w.pinyin} className="font-cjk text-sm" />
-                    : <span className="font-cjk text-sm text-[var(--color-text)]">{w.word}</span>}
-                  {w.pinyin && <ColorizedPinyin pinyin={w.pinyin} className="text-sm" />}
-                  {w.hanviet && <span className="text-sm text-[var(--color-primary)]">{w.hanviet}</span>}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Wiktionary — loading placeholder */}
-      {loadingFull && (
-        <div className="flex items-center gap-2 py-1 text-sm text-[var(--color-text-muted)]">
-          <Loader2 size={13} className="animate-spin shrink-0" />
-          <span>{t('dictionary.loadingMore')}</span>
-        </div>
-      )}
-
-      {/* Wiktionary — actual data (only shown when full entry arrives) */}
-      {!loadingFull && full?.external?.map((src) => {
-        const d = src.data as {
-          found?: boolean
-          sections?: { part_of_speech: string; definitions: string[] }[]
-        }
-        if (!d.found) return null
-        return (
-          <div key={src.source}>
-            <SectionHeader collapsed={!!collapsed[src.source]} onToggle={() => toggle(src.source)} className="mb-2">
-              {src.label}
-            </SectionHeader>
-            {!collapsed[src.source] && (
-              <div className="pl-4 flex flex-col gap-2">
-                {d.sections?.map((sec, i) => (
-                  <div key={i}>
-                    {sec.part_of_speech && (
-                      <span className="inline-block text-sm font-medium text-[var(--color-primary)] border border-[var(--color-primary)] rounded px-1.5 py-0.5 mb-1">
-                        {sec.part_of_speech}
-                      </span>
-                    )}
-                    <div className="mt-1 flex flex-col gap-1">
+              entry.xdhy.forEach((x: any) => {
+                const existingGroup = groupedXdhy.find(g => normalizePinyin(g.pinyin) === normalizePinyin(x.pinyin))
+                if (existingGroup) {
+                  existingGroup.items.push(x)
+                } else {
+                  groupedXdhy.push({
+                    pinyin: x.pinyin,
+                    simplified: x.simplified || entry.char,
+                    items: [x]
+                  })
+                }
+              })
+              return groupedXdhy.map((group, idx) => {
+                return (
+                  <div key={idx} className="mb-4">
+                    <div className="flex flex-col gap-3 mt-1">
                       {(() => {
-                        let count = 0
-                        return sec.definitions.map((def, j) => {
-                          const isExample = def.startsWith('→')
-                          if (!isExample) count++
-                          return isExample ? (
-                            <div key={j} className="ml-4 text-sm italic" style={{ color: 'var(--color-accent)' }}>
-                              {def}
-                            </div>
-                          ) : (
-                            <div key={j} className="flex gap-1.5 text-sm text-[var(--color-text)]">
-                              <span className="shrink-0 text-[var(--color-text-muted)]">{count}.</span>
-                              <span>{def}</span>
+                        const innerGroups: { exactPinyin: string, defs: typeof entry.xdhy[0]['defs'] }[] = []
+                        group.items.forEach(x => {
+                          const existing = innerGroups.find(g => g.exactPinyin === x.pinyin)
+                          if (existing) {
+                            existing.defs = existing.defs.concat(x.defs)
+                          } else {
+                            innerGroups.push({ exactPinyin: x.pinyin, defs: [...x.defs] })
+                          }
+                        })
+
+                        return innerGroups.map((inner, innerIdx) => {
+                          const posGroups = groupDefsByPos(inner.defs)
+                          return (
+                            <div key={innerIdx} className={cn("flex flex-col gap-2 flex-1 min-w-0", innerIdx > 0 && "pt-3 border-t border-[var(--color-border-md)]")}>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <ColorizedPinyin
+                                  pinyin={inner.exactPinyin}
+                                  n={inner.exactPinyin.split(/[\s-]+/).length}
+                                  className="text-[var(--color-text-muted)] font-medium"
+                                />
+                              </div>
+
+                              {posGroups.map((posGroup, gi) => (
+                                <div key={gi} className={cn("flex flex-col gap-1 mt-1", innerGroups.length > 1 && "pl-4")}>
+                                  <span className="inline-block text-sm font-medium text-[var(--color-primary)] border border-[var(--color-primary)] rounded px-1.5 py-0.5 mb-1 self-start">
+                                    {posGroup.pos || '＊'}
+                                  </span>
+                                  <div className="flex flex-col gap-1 pl-6">
+                                    {(() => {
+                                      let numCount = 0
+                                      return posGroup.defs.map((d, dIdx) => {
+                                        const subMatch = d.is_sub ? d.definition.match(/^([a-z])\s*[）\)]\s*(.*)/) : null
+                                        const subLetter = subMatch?.[1]
+                                        const defText = subMatch ? subMatch[2].trim() : d.definition.replace(/^[a-z]\s*[）\)]\s*/, '').trim()
+                                        if (!d.is_sub) numCount++
+                                        return (
+                                          <div key={dIdx} className={d.is_sub ? 'ml-4' : ''}>
+                                            <div className="flex gap-1.5 text-sm text-[var(--color-text)]">
+                                              <span className="shrink-0 text-[var(--color-text-muted)]">
+                                                {d.is_sub ? (subLetter ? `${subLetter}）` : '•') : `${numCount}.`}
+                                              </span>
+                                              <span>{defText}</span>
+                                            </div>
+                                            {d.examples.map((ex, j) => (
+                                              <div key={j} className={cn('text-sm italic', d.is_sub ? 'ml-8' : 'ml-4')} style={{ color: 'var(--color-accent)' }}>
+                                                → {ex}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )
+                                      })
+                                    })()}
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           )
                         })
                       })()}
                     </div>
                   </div>
+                )
+              })
+            })()}
+          </div>}
+        </div>
+      )}
+
+      {/* Từ đồng nghĩa */}
+      {
+        entry.synonyms?.length > 0 && (
+          <div>
+            <SectionHeader collapsed={!!collapsed['synonyms']} onToggle={() => toggle('synonyms')} className="mb-2">
+              {t('dictionary.synonyms')}
+            </SectionHeader>
+            {!collapsed['synonyms'] && (
+              <div className="pl-4 flex flex-col gap-1">
+                {entry.synonyms.map((w: WordInfo, i: number) => (
+                  <button
+                    key={w.word}
+                    type="button"
+                    onClick={() => onWordClick?.(w.word)}
+                    className="flex items-baseline gap-3 text-left cursor-pointer hover:opacity-70 transition-opacity w-fit"
+                  >
+                    <span className="text-sm text-[var(--color-text-muted)] shrink-0 w-5 text-right">{i + 1}.</span>
+                    {w.pinyin
+                      ? <ColorizedHanzi char={w.word} pinyin={w.pinyin} className="font-cjk text-sm" />
+                      : <span className="font-cjk text-sm text-[var(--color-text)]">{w.word}</span>}
+                    {w.pinyin && <ColorizedPinyin pinyin={w.pinyin} className="text-sm" />}
+                    {w.hanviet && <span className="text-sm text-[var(--color-primary)]">{w.hanviet}</span>}
+                  </button>
                 ))}
               </div>
             )}
           </div>
         )
-      })}
+      }
 
-      {/* No data at all — only shown after full load completes with nothing */}
-      {!loadingFull && !hasAnyData && (
-        <p className="text-sm text-[var(--color-text-muted)] italic">{t('dictionary.noResult')}</p>
-      )}
+      {/* Từ trái nghĩa */}
+      {
+        entry.antonyms?.length > 0 && (
+          <div>
+            <SectionHeader collapsed={!!collapsed['antonyms']} onToggle={() => toggle('antonyms')} className="mb-2">
+              {t('dictionary.antonyms')}
+            </SectionHeader>
+            {!collapsed['antonyms'] && (
+              <div className="pl-4 flex flex-col gap-1">
+                {entry.antonyms.map((w: WordInfo, i: number) => (
+                  <button
+                    key={w.word}
+                    type="button"
+                    onClick={() => onWordClick?.(w.word)}
+                    className="flex items-baseline gap-3 text-left cursor-pointer hover:opacity-70 transition-opacity w-fit"
+                  >
+                    <span className="text-sm text-[var(--color-text-muted)] shrink-0 w-5 text-right">{i + 1}.</span>
+                    {w.pinyin
+                      ? <ColorizedHanzi char={w.word} pinyin={w.pinyin} className="font-cjk text-sm" />
+                      : <span className="font-cjk text-sm text-[var(--color-text)]">{w.word}</span>}
+                    {w.pinyin && <ColorizedPinyin pinyin={w.pinyin} className="text-sm" />}
+                    {w.hanviet && <span className="text-sm text-[var(--color-primary)]">{w.hanviet}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      }
 
-      {/* Notes — only shown when showNotes=true (Tra từ feature) */}
-      {showNotes && (
-        <div>
-          <SectionHeader collapsed={!!collapsed['notes']} onToggle={() => toggle('notes')} className="mb-2">
-            {t('dictionary.notes')}
-          </SectionHeader>
-          {!collapsed['notes'] && (
-            <div className="flex flex-col gap-2">
-              {/* Notes grid: 3 cols on desktop, 1 col on mobile. Cards always truncated. */}
-              {notes.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  {notes.map((note) => (
-                    <Fragment key={note.id}>
-                      <div
-                        className={cn(
-                          'flex flex-col gap-1 p-3 rounded-lg border cursor-pointer transition-colors min-w-0',
-                          selectedNoteId === note.id
-                            ? 'border-[var(--color-primary)] bg-[var(--color-bg-subtle)]'
-                            : 'border-[var(--color-border)] bg-[var(--color-bg-subtle)] hover:border-[var(--color-primary)]'
-                        )}
-                        onClick={() => {
-                          setSelectedNoteId(selectedNoteId === note.id ? null : note.id)
-                          setEditingNoteId(null)
-                          setAddingNote(false)
-                        }}
-                      >
-                        <p className="text-sm font-semibold text-[var(--color-text)] line-clamp-1 break-words min-w-0">
-                          {note.title}
-                        </p>
-                        {note.detail && (
-                          <p className="text-sm text-[var(--color-text-muted)] line-clamp-2 break-words min-w-0">
-                            {note.detail}
-                          </p>
-                        )}
+      {/* Wiktionary — loading placeholder */}
+      {
+        loadingFull && (
+          <div className="flex items-center gap-2 py-1 text-sm text-[var(--color-text-muted)]">
+            <Loader2 size={13} className="animate-spin shrink-0" />
+            <span>{t('dictionary.loadingMore')}</span>
+          </div>
+        )
+      }
+
+      {/* Wiktionary — actual data (only shown when full entry arrives) */}
+      {
+        !loadingFull && full?.external?.map((src) => {
+          const d = src.data as {
+            found?: boolean
+            sections?: { part_of_speech: string; definitions: string[] }[]
+          }
+          if (!d.found) return null
+          return (
+            <div key={src.source}>
+              <SectionHeader collapsed={!!collapsed[src.source]} onToggle={() => toggle(src.source)} className="mb-2">
+                {src.label}
+              </SectionHeader>
+              {!collapsed[src.source] && (
+                <div className="pl-4 flex flex-col gap-2">
+                  {d.sections?.map((sec, i) => (
+                    <div key={i}>
+                      {sec.part_of_speech && (
+                        <span className="inline-block text-sm font-medium text-[var(--color-primary)] border border-[var(--color-primary)] rounded px-1.5 py-0.5 mb-1">
+                          {sec.part_of_speech}
+                        </span>
+                      )}
+                      <div className="mt-1 flex flex-col gap-1">
+                        {(() => {
+                          let count = 0
+                          return sec.definitions.map((def, j) => {
+                            const isExample = def.startsWith('→')
+                            if (!isExample) count++
+                            return isExample ? (
+                              <div key={j} className="ml-4 text-sm italic" style={{ color: 'var(--color-accent)' }}>
+                                {def}
+                              </div>
+                            ) : (
+                              <div key={j} className="flex gap-1.5 text-sm text-[var(--color-text)]">
+                                <span className="shrink-0 text-[var(--color-text-muted)]">{count}.</span>
+                                <span>{def}</span>
+                              </div>
+                            )
+                          })
+                        })()}
                       </div>
-
-                      {/* Detail panel */}
-                      {selectedNoteId === note.id && editingNoteId === null && (
-                        <div ref={detailPanelRef} className="col-span-1 sm:col-span-3 sm:order-last w-full flex flex-col gap-2 p-3 rounded-lg border border-[var(--color-primary)] bg-[var(--color-bg-subtle)] min-w-0">
-                          <p className="text-sm font-semibold text-[var(--color-text)] break-words min-w-0">
-                            {note.title}
-                          </p>
-                          {note.detail && (
-                            <p className="text-sm text-[var(--color-text-muted)] break-words whitespace-pre-wrap min-w-0">
-                              {note.detail}
-                            </p>
-                          )}
-                          <div className="flex gap-2 mt-1">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="flex items-center gap-1"
-                              onClick={() => handleStartEdit(note)}
-                            >
-                              <Pencil size={12} />
-                              {t('dictionary.editNote')}
-                            </Button>
-                            <button
-                              onClick={() => handleDeleteNote(note.id)}
-                              disabled={deletingNoteId === note.id}
-                              className="p-1.5 rounded text-[var(--color-text-muted)] hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-40"
-                              title={t('dictionary.deleteNote')}
-                            >
-                              {deletingNoteId === note.id
-                                ? <Loader2 size={13} className="animate-spin" />
-                                : <Trash2 size={13} />
-                              }
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Edit form */}
-                      {editingNoteId === note.id && (
-                        <div className="col-span-1 sm:col-span-3 sm:order-last w-full flex flex-col gap-2 p-3 rounded-lg border border-[var(--color-primary)] bg-[var(--color-bg-subtle)] min-w-0">
-                          <div className="flex flex-col gap-1.5">
-                            <Input
-                              id={`edit-title-${editingNoteId}`}
-                              label={t('dictionary.noteTitle')}
-                              value={editTitle}
-                              onChange={(e) => setEditTitle(e.target.value.slice(0, 50))}
-                              placeholder={t('dictionary.noteTitlePlaceholder')}
-                              autoFocus
-                              maxLength={50}
-                            />
-                            <span className="text-xs text-[var(--color-text-muted)] text-right">
-                              {t('dictionary.charCount', { current: editTitle.length, max: 50 })}
-                            </span>
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-sm font-medium text-[var(--color-text)]">
-                              {t('dictionary.noteDetail')}
-                            </label>
-                            <textarea
-                              value={editDetail}
-                              onChange={(e) => setEditDetail(e.target.value.slice(0, 250))}
-                              placeholder={t('dictionary.noteDetailPlaceholder')}
-                              rows={3}
-                              maxLength={250}
-                              className={cn(
-                                'w-full px-3 py-2 rounded-lg text-sm resize-none',
-                                'bg-[var(--color-bg-surface)] text-[var(--color-text)]',
-                                'border border-[var(--color-border)] focus:border-[var(--color-primary)]',
-                                'outline-none transition-colors placeholder:text-[var(--color-text-muted)]'
-                              )}
-                            />
-                            <span className="text-xs text-[var(--color-text-muted)] text-right">
-                              {t('dictionary.charCount', { current: editDetail.length, max: 250 })}
-                            </span>
-                          </div>
-                          <div className="flex gap-2 justify-end">
-                            <Button size="sm" variant="ghost" onClick={handleCancelEdit}>
-                              {t('common.cancel')}
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => handleSaveEdit(editingNoteId)}
-                              isLoading={savingEdit}
-                              disabled={!editTitle.trim()}
-                            >
-                              {savingEdit ? t('dictionary.saving') : t('dictionary.save')}
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </Fragment>
+                    </div>
                   ))}
                 </div>
               )}
-
-              {/* Add note form */}
-              {addingNote ? (
-                <div className="flex flex-col gap-2 p-3 rounded-lg border border-[var(--color-primary)] bg-[var(--color-bg-subtle)]">
-                  <div className="flex flex-col gap-1.5">
-                    <Input
-                      id={`new-title-${char}`}
-                      label={t('dictionary.noteTitle')}
-                      value={newTitle}
-                      onChange={(e) => setNewTitle(e.target.value.slice(0, 50))}
-                      placeholder={t('dictionary.noteTitlePlaceholder')}
-                      autoFocus
-                      maxLength={50}
-                    />
-                    <span className="text-xs text-[var(--color-text-muted)] text-right">
-                      {t('dictionary.charCount', { current: newTitle.length, max: 50 })}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-[var(--color-text)]">
-                      {t('dictionary.noteDetail')}
-                    </label>
-                    <textarea
-                      value={newDetail}
-                      onChange={(e) => setNewDetail(e.target.value.slice(0, 250))}
-                      placeholder={t('dictionary.noteDetailPlaceholder')}
-                      rows={3}
-                      maxLength={250}
-                      className={cn(
-                        'w-full px-3 py-2 rounded-lg text-sm resize-none',
-                        'bg-[var(--color-bg-surface)] text-[var(--color-text)]',
-                        'border border-[var(--color-border)] focus:border-[var(--color-primary)]',
-                        'outline-none transition-colors placeholder:text-[var(--color-text-muted)]'
-                      )}
-                    />
-                    <span className="text-xs text-[var(--color-text-muted)] text-right">
-                      {t('dictionary.charCount', { current: newDetail.length, max: 250 })}
-                    </span>
-                  </div>
-                  <div className="flex gap-2 justify-end">
-                    <Button size="sm" variant="ghost" onClick={() => { setAddingNote(false); setNewTitle(''); setNewDetail('') }}>
-                      {t('common.cancel')}
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleAddNote}
-                      isLoading={savingNew}
-                      disabled={!newTitle.trim()}
-                    >
-                      {savingNew ? t('dictionary.saving') : t('dictionary.save')}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="self-start flex items-center gap-1.5"
-                  onClick={() => { setAddingNote(true); setSelectedNoteId(null); setEditingNoteId(null) }}
-                >
-                  <Plus size={13} />
-                  {t('dictionary.addNote')}
-                </Button>
-              )}
             </div>
-          )}
-        </div>
-      )}
-    </div>
+          )
+        })
+      }
+
+      {/* No data at all — only shown after full load completes with nothing */}
+      {
+        !loadingFull && !hasAnyData && (
+          <p className="text-sm text-[var(--color-text-muted)] italic">{t('dictionary.noResult')}</p>
+        )
+      }
+
+      {/* Notes — only shown when showNotes=true (Tra từ feature) */}
+      {
+        showNotes && (
+          <div>
+            <SectionHeader collapsed={!!collapsed['notes']} onToggle={() => toggle('notes')} className="mb-2">
+              {t('dictionary.notes')}
+            </SectionHeader>
+            {!collapsed['notes'] && (
+              <div className="flex flex-col gap-2">
+                {/* Notes grid: 3 cols on desktop, 1 col on mobile. Cards always truncated. */}
+                {notes.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {notes.map((note) => (
+                      <Fragment key={note.id}>
+                        <div
+                          className={cn(
+                            'flex flex-col gap-1 p-3 rounded-lg border cursor-pointer transition-colors min-w-0',
+                            selectedNoteId === note.id
+                              ? 'border-[var(--color-primary)] bg-[var(--color-bg-subtle)]'
+                              : 'border-[var(--color-border)] bg-[var(--color-bg-subtle)] hover:border-[var(--color-primary)]'
+                          )}
+                          onClick={() => {
+                            setSelectedNoteId(selectedNoteId === note.id ? null : note.id)
+                            setEditingNoteId(null)
+                            setAddingNote(false)
+                          }}
+                        >
+                          <p className="text-sm font-semibold text-[var(--color-text)] line-clamp-1 break-words min-w-0">
+                            {note.title}
+                          </p>
+                          {note.detail && (
+                            <p className="text-sm text-[var(--color-text-muted)] line-clamp-2 break-words min-w-0">
+                              {note.detail}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Detail panel */}
+                        {selectedNoteId === note.id && editingNoteId === null && (
+                          <div ref={detailPanelRef} className="col-span-1 sm:col-span-3 sm:order-last w-full flex flex-col gap-2 p-3 rounded-lg border border-[var(--color-primary)] bg-[var(--color-bg-subtle)] min-w-0">
+                            <p className="text-sm font-semibold text-[var(--color-text)] break-words min-w-0">
+                              {note.title}
+                            </p>
+                            {note.detail && (
+                              <p className="text-sm text-[var(--color-text-muted)] break-words whitespace-pre-wrap min-w-0">
+                                {note.detail}
+                              </p>
+                            )}
+                            <div className="flex gap-2 mt-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex items-center gap-1"
+                                onClick={() => handleStartEdit(note)}
+                              >
+                                <Pencil size={12} />
+                                {t('dictionary.editNote')}
+                              </Button>
+                              <button
+                                onClick={() => handleDeleteNote(note.id)}
+                                disabled={deletingNoteId === note.id}
+                                className="p-1.5 rounded text-[var(--color-text-muted)] hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-40"
+                                title={t('dictionary.deleteNote')}
+                              >
+                                {deletingNoteId === note.id
+                                  ? <Loader2 size={13} className="animate-spin" />
+                                  : <Trash2 size={13} />
+                                }
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Edit form */}
+                        {editingNoteId === note.id && (
+                          <div className="col-span-1 sm:col-span-3 sm:order-last w-full flex flex-col gap-2 p-3 rounded-lg border border-[var(--color-primary)] bg-[var(--color-bg-subtle)] min-w-0">
+                            <div className="flex flex-col gap-1.5">
+                              <Input
+                                id={`edit-title-${editingNoteId}`}
+                                label={t('dictionary.noteTitle')}
+                                value={editTitle}
+                                onChange={(e) => setEditTitle(e.target.value.slice(0, 50))}
+                                placeholder={t('dictionary.noteTitlePlaceholder')}
+                                autoFocus
+                                maxLength={50}
+                              />
+                              <span className="text-xs text-[var(--color-text-muted)] text-right">
+                                {t('dictionary.charCount', { current: editTitle.length, max: 50 })}
+                              </span>
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-sm font-medium text-[var(--color-text)]">
+                                {t('dictionary.noteDetail')}
+                              </label>
+                              <textarea
+                                value={editDetail}
+                                onChange={(e) => setEditDetail(e.target.value.slice(0, 250))}
+                                placeholder={t('dictionary.noteDetailPlaceholder')}
+                                rows={3}
+                                maxLength={250}
+                                className={cn(
+                                  'w-full px-3 py-2 rounded-lg text-sm resize-none',
+                                  'bg-[var(--color-bg-surface)] text-[var(--color-text)]',
+                                  'border border-[var(--color-border)] focus:border-[var(--color-primary)]',
+                                  'outline-none transition-colors placeholder:text-[var(--color-text-muted)]'
+                                )}
+                              />
+                              <span className="text-xs text-[var(--color-text-muted)] text-right">
+                                {t('dictionary.charCount', { current: editDetail.length, max: 250 })}
+                              </span>
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                              <Button size="sm" variant="ghost" onClick={handleCancelEdit}>
+                                {t('common.cancel')}
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleSaveEdit(editingNoteId)}
+                                isLoading={savingEdit}
+                                disabled={!editTitle.trim()}
+                              >
+                                {savingEdit ? t('dictionary.saving') : t('dictionary.save')}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </Fragment>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add note form */}
+                {addingNote ? (
+                  <div className="flex flex-col gap-2 p-3 rounded-lg border border-[var(--color-primary)] bg-[var(--color-bg-subtle)]">
+                    <div className="flex flex-col gap-1.5">
+                      <Input
+                        id={`new-title-${char}`}
+                        label={t('dictionary.noteTitle')}
+                        value={newTitle}
+                        onChange={(e) => setNewTitle(e.target.value.slice(0, 50))}
+                        placeholder={t('dictionary.noteTitlePlaceholder')}
+                        autoFocus
+                        maxLength={50}
+                      />
+                      <span className="text-xs text-[var(--color-text-muted)] text-right">
+                        {t('dictionary.charCount', { current: newTitle.length, max: 50 })}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium text-[var(--color-text)]">
+                        {t('dictionary.noteDetail')}
+                      </label>
+                      <textarea
+                        value={newDetail}
+                        onChange={(e) => setNewDetail(e.target.value.slice(0, 250))}
+                        placeholder={t('dictionary.noteDetailPlaceholder')}
+                        rows={3}
+                        maxLength={250}
+                        className={cn(
+                          'w-full px-3 py-2 rounded-lg text-sm resize-none',
+                          'bg-[var(--color-bg-surface)] text-[var(--color-text)]',
+                          'border border-[var(--color-border)] focus:border-[var(--color-primary)]',
+                          'outline-none transition-colors placeholder:text-[var(--color-text-muted)]'
+                        )}
+                      />
+                      <span className="text-xs text-[var(--color-text-muted)] text-right">
+                        {t('dictionary.charCount', { current: newDetail.length, max: 250 })}
+                      </span>
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                      <Button size="sm" variant="ghost" onClick={() => { setAddingNote(false); setNewTitle(''); setNewDetail('') }}>
+                        {t('common.cancel')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleAddNote}
+                        isLoading={savingNew}
+                        disabled={!newTitle.trim()}
+                      >
+                        {savingNew ? t('dictionary.saving') : t('dictionary.save')}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="self-start flex items-center gap-1.5"
+                    onClick={() => { setAddingNote(true); setSelectedNoteId(null); setEditingNoteId(null) }}
+                  >
+                    <Plus size={13} />
+                    {t('dictionary.addNote')}
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      }
+    </div >
   )
 }

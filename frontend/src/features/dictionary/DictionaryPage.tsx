@@ -17,11 +17,13 @@ import { SearchHistoryPanel, SearchHistoryPopup } from '@/features/search-histor
 
 function EntryCard({
   lite,
+  pinyinFilter,
   autoExpand = false,
   onNoteSaved,
   onWordClick,
 }: {
   lite: DictLiteResponse
+  pinyinFilter?: string
   autoExpand?: boolean
   onNoteSaved: () => void
   onWordClick?: (word: string) => void
@@ -140,6 +142,7 @@ function EntryCard({
           <CharDetailPanel
             char={lite.char}
             initialEntry={lite}
+            pinyinFilter={pinyinFilter}
             showNotes
             onNoteSaved={onNoteSaved}
             onWordClick={onWordClick}
@@ -355,15 +358,56 @@ export function DictionaryPage() {
               <p className="text-sm text-red-500">{activeTab.error}</p>
             )}
 
-            {activeTab.results.map((lite, idx) => (
-              <EntryCard
-                key={`${activeTab.id}-${lite.char}`}
-                lite={lite}
-                autoExpand={idx === 0}
-                onNoteSaved={() => { }}
-                onWordClick={runSearch}
-              />
-            ))}
+            {activeTab.results.flatMap((lite, idx) => {
+              const pinyins = new Set<string>()
+              const normalizePinyin = (p: string) => p.replace(/[·\.\/]+/g, '').toLowerCase()
+
+              lite.cedict.forEach(x => { if (x.pinyin) pinyins.add(normalizePinyin(x.pinyin)) })
+              if (lite.cvdict) {
+                lite.cvdict.forEach(x => { if (x.pinyin) pinyins.add(normalizePinyin(x.pinyin)) })
+              }
+              if (lite.xdhy) {
+                lite.xdhy.forEach(x => { if (x.pinyin) pinyins.add(normalizePinyin(x.pinyin)) })
+              }
+
+              if (pinyins.size === 0) {
+                return [
+                  <EntryCard
+                    key={`${activeTab.id}-${lite.char}`}
+                    lite={lite}
+                    autoExpand={idx === 0}
+                    onNoteSaved={() => { }}
+                    onWordClick={runSearch}
+                  />
+                ]
+              }
+
+              return Array.from(pinyins).map((py, pyIdx) => {
+                const pyLower = py.toLowerCase()
+                const filterFn = (x: any) => !x.pinyin || normalizePinyin(x.pinyin) === pyLower
+
+                const filteredLite: DictLiteResponse = {
+                  ...lite,
+                  cedict: lite.cedict.filter(filterFn),
+                  cvdict: lite.cvdict?.filter(filterFn) || [],
+                  xdhy: lite.xdhy?.filter(filterFn) || [],
+                }
+
+                // If filtering removed everything (shouldn't happen), skip
+                if (filteredLite.cedict.length === 0 && filteredLite.cvdict?.length === 0 && filteredLite.xdhy?.length === 0) return null
+
+                return (
+                  <EntryCard
+                    key={`${activeTab.id}-${lite.char}-${py}`}
+                    lite={filteredLite}
+                    pinyinFilter={pyLower}
+                    autoExpand={idx === 0 && pyIdx === 0}
+                    onNoteSaved={() => { }}
+                    onWordClick={runSearch}
+                  />
+                )
+              }).filter(Boolean)
+            })}
 
             {activeTab.loading && (
               <div className="flex items-center gap-2.5 px-1 py-2 text-sm text-[var(--color-text-muted)]">

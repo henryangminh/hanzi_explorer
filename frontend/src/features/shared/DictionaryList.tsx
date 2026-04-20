@@ -17,7 +17,7 @@ function formatPinyin(pinyin: string, isSeparable?: boolean): string {
 
 interface DictionaryListProps<T extends CoreDictEntry> {
   entries: T[]
-  renderMeaning: (entry: T) => React.ReactNode
+  renderMeaning: (entry: T, hasSiblings: boolean) => React.ReactNode
 }
 
 export function DictionaryList<T extends CoreDictEntry>({
@@ -26,33 +26,63 @@ export function DictionaryList<T extends CoreDictEntry>({
 }: DictionaryListProps<T>) {
   if (!entries || entries.length === 0) return null
 
+  // Group entries by case-insensitive pinyin
+  const groupedEntries: { pinyin: string; is_separable?: boolean; items: T[] }[] = []
+  const normalizePinyin = (p: string) => p.replace(/[·\.\/]+/g, '').toLowerCase()
+
+  entries.forEach((entry) => {
+    const existingGroup = groupedEntries.find(g => normalizePinyin(g.pinyin) === normalizePinyin(entry.pinyin))
+    if (existingGroup) {
+      existingGroup.items.push(entry)
+    } else {
+      groupedEntries.push({
+        pinyin: entry.pinyin,
+        is_separable: entry.is_separable,
+        items: [entry],
+      })
+    }
+  })
+
   return (
     <div className="flex flex-col gap-3">
-      {entries.map((entry, idx) => (
+      {groupedEntries.map((group, idx) => (
         <div
-          key={entry.id}
+          key={group.pinyin + idx}
           className={cn(
             'flex flex-col gap-1 pl-3',
-            entries.length > 1 && 'border-l-2 border-[var(--color-border-md)]'
+            groupedEntries.length > 1 && 'border-l-2 border-[var(--color-border-md)]'
           )}
         >
           <div className="flex items-center gap-2 flex-wrap">
             <ColorizedPinyin
-              pinyin={formatPinyin(entry.pinyin, entry.is_separable)}
+              pinyin={formatPinyin(group.pinyin, group.is_separable)}
               className="font-medium"
             />
           </div>
 
-          <div className="flex flex-col gap-0.5">
-            {renderMeaning(entry)}
-          </div>
+          <div className="flex flex-col gap-1.5 mt-0.5 pl-6">
+            {group.items.map((entry, i) => (
+              <div key={entry.id} className="flex flex-col gap-1">
+                <div className="flex items-start gap-2">
+                  {group.items.length > 1 && (
+                    <span className="shrink-0 text-sm text-[var(--color-text-muted)] min-w-[1rem] text-right mt-[1px]">
+                      {i + 1})
+                    </span>
+                  )}
+                  <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                    {renderMeaning(entry, group.items.length > 1)}
+                  </div>
+                </div>
 
-          <div className="flex flex-wrap gap-2 mt-0.5">
-            {entry.hsk_level && (
-              <span className="text-xs bg-[var(--color-bg-subtle)] px-2 py-0.5 rounded-full text-[var(--color-primary)] w-fit">
-                HSK {entry.hsk_level}
-              </span>
-            )}
+                {entry.hsk_level && (
+                  <div className={cn("flex flex-wrap gap-2 mt-0.5", group.items.length > 1 && "ml-6")}>
+                    <span className="text-xs bg-[var(--color-bg-subtle)] px-2 py-0.5 rounded-full text-[var(--color-primary)] w-fit">
+                      HSK {entry.hsk_level}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       ))}
