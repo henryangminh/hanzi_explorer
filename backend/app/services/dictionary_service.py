@@ -314,7 +314,7 @@ async def fetch_external_sources(session: Session, char: str, traditional: str |
 # ── User notes ────────────────────────────────────────────
 
 def _get_char_display_info(session: Session, char: str) -> tuple[str, list[str]]:
-    """Return (first_pinyin_diacritic, sino_vn_list) for a char."""
+    """Return (first_pinyin_diacritic, sino_vn_list) for a single char. Used by single-char lookups."""
     from app.services.sino_vn_service import _get_db_readings, _combine
     char_row = _get_character(session, char)
     if not char_row:
@@ -337,6 +337,7 @@ def _get_char_display_info(session: Session, char: str) -> tuple[str, list[str]]
     return (pinyin_str, sino_vn)
 
 
+
 def _note_to_response(note: UserNote, pinyin: str = '', sino_vn: list[str] | None = None) -> UserNoteResponse:
     return UserNoteResponse(
         id=note.id,
@@ -349,6 +350,21 @@ def _note_to_response(note: UserNote, pinyin: str = '', sino_vn: list[str] | Non
     )
 
 
+def _note_to_response_stored(note: UserNote) -> UserNoteResponse:
+    """Read pinyin/sino_vn from stored columns — no extra queries needed."""
+    import json
+    sino_vn = json.loads(note.sino_vn_json) if note.sino_vn_json else []
+    return _note_to_response(note, pinyin=note.pinyin or '', sino_vn=sino_vn)
+
+
+def _store_display_info(session: Session, note: UserNote, char: str) -> None:
+    """Compute and persist pinyin + sino_vn into the note row at write time."""
+    import json
+    pinyin, sino_vn = _get_char_display_info(session, char)
+    note.pinyin = pinyin or None
+    note.sino_vn_json = json.dumps(sino_vn, ensure_ascii=False)
+
+
 def get_all_user_notes(session: Session, user_id: int) -> list[UserNoteResponse]:
     notes = session.exec(
         select(UserNote)
@@ -356,12 +372,7 @@ def get_all_user_notes(session: Session, user_id: int) -> list[UserNoteResponse]
         .where(UserNote.title != '')
         .order_by(UserNote.updated_at.desc())
     ).all()
-    # Batch-cache display info per unique char to avoid redundant lookups
-    char_info: dict[str, tuple[str, list[str]]] = {}
-    for note in notes:
-        if note.char not in char_info:
-            char_info[note.char] = _get_char_display_info(session, note.char)
-    return [_note_to_response(n, pinyin=char_info[n.char][0], sino_vn=char_info[n.char][1]) for n in notes]
+    return [_note_to_response_stored(n) for n in notes]
 
 
 def get_user_notes(session: Session, user_id: int, char: str) -> list[UserNoteResponse]:
@@ -371,19 +382,16 @@ def get_user_notes(session: Session, user_id: int, char: str) -> list[UserNoteRe
         .where(UserNote.char == char)
         .order_by(UserNote.created_at)
     ).all()
-    if not notes:
-        return []
-    pinyin, sino_vn = _get_char_display_info(session, char)
-    return [_note_to_response(n, pinyin=pinyin, sino_vn=sino_vn) for n in notes]
+    return [_note_to_response_stored(n) for n in notes]
 
 
 def create_user_note(session: Session, user_id: int, char: str, data: NoteCreate) -> UserNoteResponse:
     note = UserNote(user_id=user_id, char=char, title=data.title, detail=data.detail)
+    _store_display_info(session, note, char)
     session.add(note)
     session.commit()
     session.refresh(note)
-    pinyin, sino_vn = _get_char_display_info(session, char)
-    return _note_to_response(note, pinyin=pinyin, sino_vn=sino_vn)
+    return _note_to_response_stored(note)
 
 
 def update_user_note(session: Session, user_id: int, note_id: int, data: NoteUpdate) -> UserNoteResponse:
@@ -397,8 +405,7 @@ def update_user_note(session: Session, user_id: int, note_id: int, data: NoteUpd
     session.add(note)
     session.commit()
     session.refresh(note)
-    pinyin, sino_vn = _get_char_display_info(session, note.char)
-    return _note_to_response(note, pinyin=pinyin, sino_vn=sino_vn)
+    return _note_to_response_stored(note)
 
 
 def delete_user_note(session: Session, user_id: int, note_id: int) -> None:

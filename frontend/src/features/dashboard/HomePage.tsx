@@ -5,8 +5,8 @@ import api from '@/lib/axios'
 import { useAuthStore } from '@/store/auth.store'
 import { useFlashcardStore, type FlashcardWidgetConfig } from '@/store/flashcard.store'
 import type { NotebookResponse } from '@/types'
-import { FlashcardWidget } from './FlashcardWidget'
-import { FlashcardWidgetSettings } from './FlashcardWidgetSettings'
+import { FlashcardWidget } from '@/features/widgets/FlashcardWidget'
+import { FlashcardWidgetSettings } from '@/features/widgets/FlashcardWidgetSettings'
 
 // Blank widget template used when creating a new widget via the modal
 const NEW_WIDGET_TEMPLATE: FlashcardWidgetConfig = {

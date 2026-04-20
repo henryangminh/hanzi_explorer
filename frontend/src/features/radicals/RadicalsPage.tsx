@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { X, ArrowLeft, BookmarkPlus } from 'lucide-react'
 import { useRadicalList } from './useRadicals'
 import { cn } from '@/lib/cn'
+import { ColorizedPinyin, ColorizedHanzi } from '@/lib/pinyinColor'
 import type { RadicalSummary } from '@/types'
 import api from '@/lib/axios'
 import { SaveToNotebookModal } from '@/features/shared/SaveToNotebookModal'
@@ -46,10 +47,12 @@ function CharDetail({ char, onBack }: { char: string; onBack: () => void }) {
           <ArrowLeft size={16} />
         </button>
         <div className="flex-1 min-w-0 flex items-baseline gap-x-2.5 flex-wrap">
-          <span className="font-cjk text-4xl text-[var(--color-primary)] leading-none">{char}</span>
+          {headerInfo?.pinyin
+            ? <ColorizedHanzi char={char} pinyin={headerInfo.pinyin} className="font-cjk text-4xl leading-none" />
+            : <span className="font-cjk text-4xl text-[var(--color-primary)] leading-none">{char}</span>}
           {headerInfo && (
             <span className="text-sm text-[var(--color-text-muted)]">
-              {headerInfo.pinyin}
+              <ColorizedPinyin pinyin={headerInfo.pinyin} />
               {headerInfo.sinoVn.length > 0 && (
                 <span className="ml-1.5 text-[var(--color-primary)]">· {headerInfo.sinoVn.join(', ')}</span>
               )}

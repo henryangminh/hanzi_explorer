@@ -7,6 +7,7 @@ import type { DictLiteResponse } from '@/types'
 import { CharDetailPanel } from '@/features/shared/CharDetailPanel'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
+import { ColorizedPinyin, ColorizedHanzi } from '@/lib/pinyinColor'
 import { SaveToNotebookModal } from '@/features/shared/SaveToNotebookModal'
 import { useAuthStore } from '@/store/auth.store'
 import { useDictionaryStore } from '@/store/dictionary.store'
@@ -50,24 +51,26 @@ function EntryCard({
         }}
       >
         <div className="flex-1 min-w-0 flex flex-wrap items-baseline gap-x-2 gap-y-1 select-text">
-          <span className={cn(
-            'font-cjk leading-none cursor-text',
-            isMultiChar ? 'text-3xl text-[var(--color-primary)]' : 'text-2xl text-[var(--color-text)]'
-          )}>
-            {lite.char}
-          </span>
+          {firstCedict ? (
+            <ColorizedHanzi
+              char={lite.char}
+              pinyin={firstCedict.pinyin}
+              className={cn('font-cjk leading-none cursor-text', isMultiChar ? 'text-3xl' : 'text-2xl')}
+            />
+          ) : (
+            <span className={cn('font-cjk leading-none cursor-text', isMultiChar ? 'text-3xl text-[var(--color-primary)]' : 'text-2xl text-[var(--color-text)]')}>
+              {lite.char}
+            </span>
+          )}
           {firstCedict?.traditional && firstCedict.traditional !== lite.char && (
-            <span className={cn(
-              'font-cjk leading-none text-[var(--color-text-muted)] cursor-text',
-              isMultiChar ? 'text-3xl' : 'text-2xl'
-            )}>
-              ({firstCedict.traditional})
+            <span className={cn('font-cjk leading-none text-[var(--color-text-muted)] cursor-text', isMultiChar ? 'text-3xl' : 'text-2xl')}>
+              (<ColorizedHanzi char={firstCedict.traditional} pinyin={firstCedict.pinyin} />)
             </span>
           )}
           {firstCedict ? (
             <div className="w-full text-sm">
-              <span className="font-medium text-[var(--color-text)] cursor-text">
-                {firstCedict.pinyin}
+              <span className="font-medium cursor-text">
+                <ColorizedPinyin pinyin={firstCedict.pinyin} />
                 {lite.sino_vn?.length > 0 && (
                   <span className="ml-1.5 text-[var(--color-text-muted)]">
                     · {lite.sino_vn.join(', ')}

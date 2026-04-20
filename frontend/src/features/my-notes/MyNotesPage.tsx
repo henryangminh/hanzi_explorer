@@ -1,8 +1,9 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, memo, useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Loader2, StickyNote, X, Pencil, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { ColorizedPinyin, ColorizedHanzi } from '@/lib/pinyinColor'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import api from '@/lib/axios'
@@ -90,14 +91,16 @@ function ExpandedNotePanel({
         <div className="px-5 pt-5 pb-3 border-b border-[var(--color-border)]">
           <button
             onClick={() => onGoToDict(note.char)}
-            className="font-cjk text-3xl font-bold text-[var(--color-primary)] hover:opacity-75 transition-opacity leading-none block cursor-pointer"
+            className="font-cjk text-3xl font-bold hover:opacity-75 transition-opacity leading-none block cursor-pointer"
             title={t('myNotes.goToDictionary')}
           >
-            {note.char}
+            {note.pinyin
+              ? <ColorizedHanzi char={note.char} pinyin={note.pinyin} />
+              : <span className="text-[var(--color-primary)]">{note.char}</span>}
           </button>
           <div className="mt-1.5 flex flex-col gap-0.5">
             {note.pinyin && (
-              <span className="text-sm font-medium text-[var(--color-text)]">{note.pinyin}</span>
+              <ColorizedPinyin pinyin={note.pinyin} className="text-sm font-medium" />
             )}
             {note.sino_vn?.length > 0 && (
               <span className="text-sm text-[var(--color-text-muted)]">{note.sino_vn.join(', ')}</span>
@@ -204,16 +207,17 @@ function ExpandedNotePanel({
 
 // ── Small note card ────────────────────────────────────────
 
-function NoteCard({
+const NoteCard = memo(function NoteCard({
   note,
-  onClick,
+  onToggle,
 }: {
   note: UserNoteResponse
-  onClick: () => void
+  onToggle: (note: UserNoteResponse) => void
 }) {
+  const handleClick = useCallback(() => onToggle(note), [note, onToggle])
   return (
     <button
-      onClick={onClick}
+      onClick={handleClick}
       className={cn(
         'group flex flex-col text-left gap-1.5 p-3 rounded-xl border',
         'bg-[var(--color-bg-subtle)] border-[var(--color-border)]',
@@ -223,15 +227,15 @@ function NoteCard({
     >
       {/* Character + pinyin + hán việt: char bên trái, pinyin/HV xếp dọc bên phải */}
       <div className="flex items-center gap-2 min-w-0">
-        <span className="font-cjk text-xl font-bold leading-none text-[var(--color-primary)] shrink-0 group-hover:scale-105 transition-transform origin-left">
-          {note.char}
+        <span className="font-cjk text-xl font-bold leading-none shrink-0 group-hover:scale-105 transition-transform origin-left">
+          {note.pinyin
+            ? <ColorizedHanzi char={note.char} pinyin={note.pinyin} />
+            : <span className="text-[var(--color-primary)]">{note.char}</span>}
         </span>
         {(note.pinyin || note.sino_vn?.length > 0) && (
           <div className="flex flex-col gap-0.5 min-w-0 overflow-hidden">
             {note.pinyin && (
-              <span className="text-[10px] font-medium text-[var(--color-text)] leading-none truncate">
-                {note.pinyin}
-              </span>
+              <ColorizedPinyin pinyin={note.pinyin} className="text-[10px] font-medium leading-none truncate" />
             )}
             {note.sino_vn?.length > 0 && (
               <span className="text-[10px] text-[var(--color-text-muted)] leading-none truncate">
@@ -258,7 +262,7 @@ function NoteCard({
       )}
     </button>
   )
-}
+})
 
 // ── Inline note detail — mobile only ──────────────────────
 
@@ -464,6 +468,10 @@ export function MyNotesPage() {
     setExpandedNote(null)
   }
 
+  const handleToggleNote = useCallback((note: UserNoteResponse) => {
+    setExpandedNote((prev) => (prev?.id === note.id ? null : note))
+  }, [])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center gap-2 py-16 text-sm text-[var(--color-text-muted)]">
@@ -495,7 +503,7 @@ export function MyNotesPage() {
             <Fragment key={note.id}>
               <NoteCard
                 note={note}
-                onClick={() => setExpandedNote(expandedNote?.id === note.id ? null : note)}
+                onToggle={handleToggleNote}
               />
               {/* Inline detail — mobile only, appears right below the tapped card */}
               {expandedNote?.id === note.id && (

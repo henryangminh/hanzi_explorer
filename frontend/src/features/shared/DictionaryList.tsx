@@ -1,4 +1,5 @@
 import { cn } from '@/lib/cn'
+import { ColorizedPinyin } from '@/lib/pinyinColor'
 
 interface CoreDictEntry {
   id: number
@@ -36,9 +37,10 @@ export function DictionaryList<T extends CoreDictEntry>({
           )}
         >
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-[var(--color-text)]">
-              {formatPinyin(entry.pinyin, entry.is_separable)}
-            </span>
+            <ColorizedPinyin
+              pinyin={formatPinyin(entry.pinyin, entry.is_separable)}
+              className="font-medium"
+            />
           </div>
 
           <div className="flex flex-col gap-0.5">

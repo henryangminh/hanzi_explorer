@@ -11,6 +11,8 @@ class UserNote(SQLModel, table=True):
     char: str = Field(index=True, max_length=10)
     title: str = Field(max_length=200)
     detail: Optional[str] = None
+    pinyin: Optional[str] = Field(default=None, max_length=100)
+    sino_vn_json: Optional[str] = Field(default=None)
     flashcard_status: Optional[str] = Field(default=None)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

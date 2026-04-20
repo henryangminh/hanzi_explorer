@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Literal, Optional
+from typing import Literal, Optional, Iterator
 
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select, func
@@ -212,12 +212,13 @@ def remove_entry(session: Session, nb: Notebook, char: str) -> bool:
     return True
 
 
-def get_entries_preview(
+def stream_entries_preview(
     session: Session,
     notebook_id: int,
     sort: SortOrder = "updated_at_desc",
-) -> list[NotebookEntryPreview]:
-    # 1. Entries + characters (with sort)
+    chunk_size: int = 50,
+) -> Iterator[NotebookEntryPreview]:
+    # 1. Base entries + characters query (with sort)
     stmt = (
         select(NotebookEntry, Character)
         .join(Character, NotebookEntry.char_id == Character.id)
@@ -234,11 +235,9 @@ def get_entries_preview(
 
     rows = session.exec(stmt).all()
     if not rows:
-        return []
+        return
 
-    char_ids = [char.id for _, char in rows]
-
-    # 2. Dictionary source IDs
+    # 2. Extract dictionary source IDs
     sources = session.exec(
         select(DictionarySource).where(DictionarySource.name.in_(["CC-CEDICT", "CVDICT"]))
     ).all()
@@ -246,75 +245,77 @@ def get_entries_preview(
     cedict_id = src_by_name.get("CC-CEDICT", -1)
     cvdict_id = src_by_name.get("CVDICT", -1)
 
-    # 3. All pinyin readings for these characters, ordered by id (primary reading first)
-    all_pinyins = session.exec(
-        select(PinyinReading)
-        .where(PinyinReading.character_id.in_(char_ids))
-        .order_by(PinyinReading.character_id, PinyinReading.id)
-    ).all()
+    # Yield in batches to avoid fetching definitions for all 2000 entries at once
+    for i in range(0, len(rows), chunk_size):
+        chunk = rows[i:i + chunk_size]
+        char_ids = [char.id for _, char in chunk]
 
-    # Group by character, deduplicate readings preserving order
-    pinyins_by_char: dict[int, list[str]] = {}
-    for pr in all_pinyins:
-        seen = pinyins_by_char.setdefault(pr.character_id, [])
-        if pr.pinyin_numeric and pr.pinyin_numeric not in seen:
-            seen.append(pr.pinyin_numeric)
+        # 3. All pinyin readings for chunk
+        all_pinyins = session.exec(
+            select(PinyinReading)
+            .where(PinyinReading.character_id.in_(char_ids))
+            .order_by(PinyinReading.character_id, PinyinReading.id)
+        ).all()
 
-    # 4. First CC-CEDICT (en) definition per character
-    en_defs = session.exec(
-        select(Definition)
-        .where(
-            Definition.character_id.in_(char_ids),
-            Definition.source_id == cedict_id,
-            Definition.language == "en",
-        )
-        .order_by(Definition.character_id, Definition.id)
-    ).all()
-    cedict_by_char: dict[int, str] = {}
-    for d in en_defs:
-        cedict_by_char.setdefault(d.character_id, d.meaning_text)
+        pinyins_by_char: dict[int, list[str]] = {}
+        for pr in all_pinyins:
+            seen = pinyins_by_char.setdefault(pr.character_id, [])
+            if pr.pinyin_numeric and pr.pinyin_numeric not in seen:
+                seen.append(pr.pinyin_numeric)
 
-    # 5. First CVDICT (vi) definition per character
-    vi_defs = session.exec(
-        select(Definition)
-        .where(
-            Definition.character_id.in_(char_ids),
-            Definition.source_id == cvdict_id,
-            Definition.language == "vi",
-        )
-        .order_by(Definition.character_id, Definition.id)
-    ).all()
-    cvdict_by_char: dict[int, str] = {}
-    for d in vi_defs:
-        cvdict_by_char.setdefault(d.character_id, d.meaning_text)
+        # 4. First CC-CEDICT definition for chunk
+        en_defs = session.exec(
+            select(Definition)
+            .where(
+                Definition.character_id.in_(char_ids),
+                Definition.source_id == cedict_id,
+                Definition.language == "en",
+            )
+            .order_by(Definition.character_id, Definition.id)
+        ).all()
+        cedict_by_char: dict[int, str] = {}
+        for d in en_defs:
+            cedict_by_char.setdefault(d.character_id, d.meaning_text)
 
-    # 6. Sino-Vietnamese matched to each character's primary pinyin
-    first_pinyin_by_char = {
-        char_id: readings[0]
-        for char_id, readings in pinyins_by_char.items()
-        if readings
-    }
-    sv_rows = session.exec(
-        select(SinoVietnamese).where(SinoVietnamese.character_id.in_(char_ids))
-    ).all()
-    sino_vn_by_char: dict[int, list[str]] = {}
-    for sv in sv_rows:
-        if sv.pinyin == first_pinyin_by_char.get(sv.character_id):
-            values = sino_vn_by_char.setdefault(sv.character_id, [])
-            values.extend(v.strip() for v in sv.hanviet.split("/") if v.strip())
+        # 5. First CVDICT definition for chunk
+        vi_defs = session.exec(
+            select(Definition)
+            .where(
+                Definition.character_id.in_(char_ids),
+                Definition.source_id == cvdict_id,
+                Definition.language == "vi",
+            )
+            .order_by(Definition.character_id, Definition.id)
+        ).all()
+        cvdict_by_char: dict[int, str] = {}
+        for d in vi_defs:
+            cvdict_by_char.setdefault(d.character_id, d.meaning_text)
 
-    # 7. Build response
-    return [
-        NotebookEntryPreview(
-            id=entry.id,
-            char=char.simplified,
-            added_at=str(entry.added_at),
-            traditional=char.traditional if char.traditional and char.traditional != char.simplified else None,
-            cedict_brief=clean_meaning(cedict_by_char[char.id]).split(";")[0].strip() if char.id in cedict_by_char else None,
-            cvdict_brief=cvdict_by_char[char.id].split("/")[0].strip() if char.id in cvdict_by_char else None,
-            pinyins=[numeric_to_diacritic(p) for p in pinyins_by_char.get(char.id, [])],
-            sino_vn=sino_vn_by_char.get(char.id, []),
-            is_separable=char.is_separable,
-        )
-        for entry, char in rows
-    ]
+        # 6. Sino-Vietnamese readings for primary pinyin
+        first_pinyin_by_char = {
+            char_id: readings[0]
+            for char_id, readings in pinyins_by_char.items()
+            if readings
+        }
+        sv_rows = session.exec(
+            select(SinoVietnamese).where(SinoVietnamese.character_id.in_(char_ids))
+        ).all()
+        sino_vn_by_char: dict[int, list[str]] = {}
+        for sv in sv_rows:
+            if sv.pinyin == first_pinyin_by_char.get(sv.character_id):
+                values = sino_vn_by_char.setdefault(sv.character_id, [])
+                values.extend(v.strip() for v in sv.hanviet.split("/") if v.strip())
+
+        # Yield entries in chunk
+        for entry, char in chunk:
+            yield NotebookEntryPreview(
+                id=entry.id,
+                char=char.simplified,
+                added_at=str(entry.added_at),
+                traditional=char.traditional if char.traditional and char.traditional != char.simplified else None,
+                cedict_brief=clean_meaning(cedict_by_char[char.id]).split(";")[0].strip() if char.id in cedict_by_char else None,
+                cvdict_brief=cvdict_by_char[char.id].split("/")[0].strip() if char.id in cvdict_by_char else None,
+                pinyins=[numeric_to_diacritic(p) for p in pinyins_by_char.get(char.id, [])],
+                sino_vn=sino_vn_by_char.get(char.id, []),
+                is_separable=char.is_separable,
+            )

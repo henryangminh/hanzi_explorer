@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, X, ChevronDown, ChevronLeft, BookmarkPlus, Pencil } from 'lucide-react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import api from '@/lib/axios'
 import { cn } from '@/lib/cn'
+import { ColorizedPinyin, ColorizedHanzi } from '@/lib/pinyinColor'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -51,6 +53,23 @@ function NotebookEntriesModal({
   const navigate = useNavigate()
   const { tabs, setActiveTabId } = useDictionaryStore()
   const [saveModalChar, setSaveModalChar] = useState<string | null>(null)
+
+  const parentRef = useRef<HTMLDivElement>(null)
+
+  const entryRows = useMemo(() => {
+    const rows = []
+    for (let i = 0; i < entries.length; i += 2) {
+      rows.push(entries.slice(i, i + 2))
+    }
+    return rows
+  }, [entries])
+
+  const rowVirtualizer = useVirtualizer({
+    count: entryRows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 140,
+    overscan: 5,
+  })
 
   const handleGoToDict = (word: string) => {
     const existingTab = tabs.find((t) => t.query === word && t.results.length > 0)
@@ -221,7 +240,7 @@ function NotebookEntriesModal({
         )}
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 pb-6">
+        <div className="flex-1 overflow-y-auto px-6 pb-6" ref={parentRef}>
           {/* ── Detail view ── */}
           {saveModalChar && (
             <SaveToNotebookModal
@@ -262,70 +281,110 @@ function NotebookEntriesModal({
               <p className="text-sm text-[var(--color-text-muted)] text-center py-8">{t('notebooks.emptyEntries')}</p>
             ) : (
               <>
-                <div className="grid grid-cols-2 gap-2 pt-2">
-                  {entries.map((entry) => (
-                    <div
-                      key={entry.id}
-                      onClick={() => handleSelectChar(entry.char)}
-                      className="text-left flex flex-col gap-1 px-3 py-2.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)] hover:border-[var(--color-primary)] transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        {/* Selectable char + traditional */}
-                        <div
-                          className="flex items-baseline gap-1.5 flex-wrap min-w-0 select-text"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <span className="font-cjk text-2xl text-[var(--color-text)] leading-none cursor-text">{entry.char}</span>
-                          {entry.traditional && (
-                            <span className="font-cjk text-2xl text-[var(--color-text-muted)] leading-none cursor-text">({entry.traditional})</span>
-                          )}
-                        </div>
-                        {canEdit && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleRemoveEntry(entry) }}
-                            disabled={removingChar === entry.char}
-                            className="p-0.5 rounded text-[var(--color-text-muted)] hover:text-red-400 transition-colors disabled:opacity-40 shrink-0 mt-0.5"
-                            title={t('notebooks.removeEntry')}
+                <div
+                  style={{
+                    height: `${rowVirtualizer.getTotalSize()}px`,
+                    width: '100%',
+                    position: 'relative',
+                  }}
+                  className="mt-2"
+                >
+                  {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const rowEntries = entryRows[virtualRow.index]
+                    return (
+                      <div
+                        key={virtualRow.index}
+                        ref={rowVirtualizer.measureElement}
+                        data-index={virtualRow.index}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          transform: `translateY(${virtualRow.start}px)`,
+                        }}
+                        className="grid grid-cols-2 gap-2 pb-2"
+                      >
+                        {rowEntries.map((entry) => (
+                          <div
+                            key={entry.id}
+                            onClick={() => handleSelectChar(entry.char)}
+                            className="text-left flex flex-col gap-1 px-3 py-2.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)] hover:border-[var(--color-primary)] transition-colors cursor-pointer"
                           >
-                            <X size={11} />
-                          </button>
-                        )}
+                            <div className="flex items-start justify-between gap-2">
+                              {/* Selectable char + traditional */}
+                              <div
+                                className="flex items-baseline gap-1.5 flex-wrap min-w-0 select-text"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {entry.pinyins[0]
+                                  ? <ColorizedHanzi char={entry.char} pinyin={entry.pinyins[0]} className="font-cjk text-2xl leading-none cursor-text" />
+                                  : <span className="font-cjk text-2xl text-[var(--color-text)] leading-none cursor-text">{entry.char}</span>}
+                                {entry.traditional && entry.pinyins[0] && (
+                                  <span className="font-cjk text-2xl text-[var(--color-text-muted)] leading-none cursor-text">
+                                    (<ColorizedHanzi char={entry.traditional} pinyin={entry.pinyins[0]} />)
+                                  </span>
+                                )}
+                                {entry.traditional && !entry.pinyins[0] && (
+                                  <span className="font-cjk text-2xl text-[var(--color-text-muted)] leading-none cursor-text">({entry.traditional})</span>
+                                )}
+                              </div>
+                              {canEdit && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleRemoveEntry(entry) }}
+                                  disabled={removingChar === entry.char}
+                                  className="p-0.5 rounded text-[var(--color-text-muted)] hover:text-red-400 transition-colors disabled:opacity-40 shrink-0 mt-0.5"
+                                  title={t('notebooks.removeEntry')}
+                                >
+                                  <X size={11} />
+                                </button>
+                              )}
+                            </div>
+                            {/* Selectable pinyin / sino_vn / meanings — w-fit so only text area is selectable */}
+                            {entry.pinyins.length > 0 && (
+                              <p
+                                className="w-fit text-xs leading-tight cursor-text select-text"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {entry.pinyins.map((p, pi) => {
+                                  const formatted = (() => {
+                                    if (!entry.is_separable) return p
+                                    const idx = p.indexOf(' ')
+                                    return idx === -1 ? p : p.slice(0, idx) + '//' + p.slice(idx + 1)
+                                  })()
+                                  return (
+                                    <span key={pi}>
+                                      {pi > 0 && <span className="text-[var(--color-text-muted)]">, </span>}
+                                      <ColorizedPinyin pinyin={formatted} />
+                                    </span>
+                                  )
+                                })}
+                                {entry.sino_vn?.length > 0 && (
+                                  <span className="text-[var(--color-primary)]"> · {entry.sino_vn.join(', ')}</span>
+                                )}
+                              </p>
+                            )}
+                            {entry.cedict_brief && (
+                              <p
+                                className="w-fit max-w-full text-xs text-[var(--color-text-muted)] line-clamp-1 leading-tight cursor-text select-text"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {entry.cedict_brief}
+                              </p>
+                            )}
+                            {entry.cvdict_brief && (
+                              <p
+                                className="w-fit max-w-full text-xs text-[var(--color-primary)] line-clamp-1 leading-tight cursor-text select-text"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {entry.cvdict_brief}
+                              </p>
+                            )}
+                          </div>
+                        ))}
                       </div>
-                      {/* Selectable pinyin / sino_vn / meanings — w-fit so only text area is selectable */}
-                      {entry.pinyins.length > 0 && (
-                        <p
-                          className="w-fit text-xs text-[var(--color-text-muted)] leading-tight cursor-text select-text"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {entry.pinyins.map((p) => {
-                            if (!entry.is_separable) return p
-                            const idx = p.indexOf(' ')
-                            return idx === -1 ? p : p.slice(0, idx) + '//' + p.slice(idx + 1)
-                          }).join(', ')}
-                          {entry.sino_vn?.length > 0 && (
-                            <span className="text-[var(--color-primary)]"> · {entry.sino_vn.join(', ')}</span>
-                          )}
-                        </p>
-                      )}
-                      {entry.cedict_brief && (
-                        <p
-                          className="w-fit max-w-full text-xs text-[var(--color-text-muted)] line-clamp-1 leading-tight cursor-text select-text"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {entry.cedict_brief}
-                        </p>
-                      )}
-                      {entry.cvdict_brief && (
-                        <p
-                          className="w-fit max-w-full text-xs text-[var(--color-primary)] line-clamp-1 leading-tight cursor-text select-text"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {entry.cvdict_brief}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-
+                    )
+                  })}
                 </div>
                 {loading && (
                   <div className="flex items-center gap-2.5 px-1 py-3 text-sm text-[var(--color-text-muted)]">

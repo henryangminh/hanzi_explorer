@@ -73,10 +73,8 @@ def get_entries_preview(
     nb = _get_notebook_or_404(session, notebook_id)
     _assert_can_view(nb, user)
 
-    entries = notebook_service.get_entries_preview(session, notebook_id, sort)
-
     def generate():
-        for entry in entries:
+        for entry in notebook_service.stream_entries_preview(session, notebook_id, sort):
             yield entry.model_dump_json() + '\n'
 
     return StreamingResponse(generate(), media_type='application/x-ndjson')

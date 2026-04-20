@@ -19,6 +19,7 @@ import { useState, useEffect, useRef, useLayoutEffect, Fragment } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Loader2, Plus, Minus, Pencil, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { ColorizedPinyin, ColorizedHanzi } from '@/lib/pinyinColor'
 import { DictionarySectionTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -451,7 +452,7 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
                     entry.xdhy.length > 1 && 'pl-3 border-l-2 border-[var(--color-border-md)]'
                   )}
                 >
-                  <span className="font-medium text-[var(--color-text)]">{xEntry.pinyin}</span>
+                  <ColorizedPinyin pinyin={xEntry.pinyin} className="font-medium" />
                   <div className="flex flex-col gap-2">
                     {groups.map((group, gi) => (
                       <div key={gi}>
@@ -512,8 +513,10 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
                   className="flex items-baseline gap-3 text-left cursor-pointer hover:opacity-70 transition-opacity w-fit"
                 >
                   <span className="text-sm text-[var(--color-text-muted)] shrink-0 w-5 text-right">{i + 1}.</span>
-                  <span className="font-cjk text-sm text-[var(--color-text)]">{w.word}</span>
-                  {w.pinyin && <span className="text-sm text-[var(--color-text-muted)]">{w.pinyin}</span>}
+                  {w.pinyin
+                    ? <ColorizedHanzi char={w.word} pinyin={w.pinyin} className="font-cjk text-sm" />
+                    : <span className="font-cjk text-sm text-[var(--color-text)]">{w.word}</span>}
+                  {w.pinyin && <ColorizedPinyin pinyin={w.pinyin} className="text-sm" />}
                   {w.hanviet && <span className="text-sm text-[var(--color-primary)]">{w.hanviet}</span>}
                 </button>
               ))}
@@ -538,8 +541,10 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
                   className="flex items-baseline gap-3 text-left cursor-pointer hover:opacity-70 transition-opacity w-fit"
                 >
                   <span className="text-sm text-[var(--color-text-muted)] shrink-0 w-5 text-right">{i + 1}.</span>
-                  <span className="font-cjk text-sm text-[var(--color-text)]">{w.word}</span>
-                  {w.pinyin && <span className="text-sm text-[var(--color-text-muted)]">{w.pinyin}</span>}
+                  {w.pinyin
+                    ? <ColorizedHanzi char={w.word} pinyin={w.pinyin} className="font-cjk text-sm" />
+                    : <span className="font-cjk text-sm text-[var(--color-text)]">{w.word}</span>}
+                  {w.pinyin && <ColorizedPinyin pinyin={w.pinyin} className="text-sm" />}
                   {w.hanviet && <span className="text-sm text-[var(--color-primary)]">{w.hanviet}</span>}
                 </button>
               ))}
