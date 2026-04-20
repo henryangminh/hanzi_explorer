@@ -100,7 +100,7 @@ function ExpandedNotePanel({
           </button>
           <div className="mt-1.5 flex flex-col gap-0.5">
             {note.pinyin && (
-              <ColorizedPinyin pinyin={note.pinyin} className="text-sm font-medium" />
+              <ColorizedPinyin pinyin={note.pinyin} n={[...note.char].length} className="text-sm font-medium" />
             )}
             {note.sino_vn?.length > 0 && (
               <span className="text-sm text-[var(--color-text-muted)]">{note.sino_vn.join(', ')}</span>
@@ -235,7 +235,7 @@ const NoteCard = memo(function NoteCard({
         {(note.pinyin || note.sino_vn?.length > 0) && (
           <div className="flex flex-col gap-0.5 min-w-0 overflow-hidden">
             {note.pinyin && (
-              <ColorizedPinyin pinyin={note.pinyin} className="text-[10px] font-medium leading-none truncate" />
+              <ColorizedPinyin pinyin={note.pinyin} n={[...note.char].length} className="text-[10px] font-medium leading-none truncate" />
             )}
             {note.sino_vn?.length > 0 && (
               <span className="text-[10px] text-[var(--color-text-muted)] leading-none truncate">
@@ -469,8 +469,8 @@ export function MyNotesPage() {
   }
 
   const handleToggleNote = useCallback((note: UserNoteResponse) => {
-    setExpandedNote((prev) => (prev?.id === note.id ? null : note))
-  }, [])
+    setExpandedNote(expandedNote?.id === note.id ? null : note)
+  }, [expandedNote, setExpandedNote])
 
   if (loading) {
     return (

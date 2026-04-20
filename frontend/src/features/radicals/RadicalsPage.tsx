@@ -52,7 +52,7 @@ function CharDetail({ char, onBack }: { char: string; onBack: () => void }) {
             : <span className="font-cjk text-4xl text-[var(--color-primary)] leading-none">{char}</span>}
           {headerInfo && (
             <span className="text-sm text-[var(--color-text-muted)]">
-              <ColorizedPinyin pinyin={headerInfo.pinyin} />
+              <ColorizedPinyin pinyin={headerInfo.pinyin} n={[...char].length} />
               {headerInfo.sinoVn.length > 0 && (
                 <span className="ml-1.5 text-[var(--color-primary)]">· {headerInfo.sinoVn.join(', ')}</span>
               )}

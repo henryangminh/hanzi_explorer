@@ -234,7 +234,7 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
     }
 
     run()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [char])
 
   // When full entry arrives (e.g. passed from parent after search), sync notes
@@ -312,18 +312,18 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
   const liteSource = lite // set either from prop (initialEntry lite) or phase-1 fetch
   const entry = full ?? (liteSource
     ? {
-        char: liteSource.char,
-        cedict: liteSource.cedict,
-        cvdict: liteSource.cvdict,
-        xdhy: liteSource.xdhy ?? [],
-        sino_vn: liteSource.sino_vn,
-        external: [],
-        user_notes: [],
-        hsk_tags: liteSource.hsk_tags ?? [],
-        hanzipy: null,
-        synonyms: liteSource.synonyms ?? [],
-        antonyms: liteSource.antonyms ?? [],
-      } satisfies DictionaryResponse
+      char: liteSource.char,
+      cedict: liteSource.cedict,
+      cvdict: liteSource.cvdict,
+      xdhy: liteSource.xdhy ?? [],
+      sino_vn: liteSource.sino_vn,
+      external: [],
+      user_notes: [],
+      hsk_tags: liteSource.hsk_tags ?? [],
+      hanzipy: null,
+      synonyms: liteSource.synonyms ?? [],
+      antonyms: liteSource.antonyms ?? [],
+    } satisfies DictionaryResponse
     : null)
 
   // If no data at all yet (lite not fetched, full not fetched), show a spinner
@@ -339,17 +339,30 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
 
   const hskTags = entry.hsk_tags ?? []
 
+  const hasAnyData =
+    entry.cedict.length > 0 ||
+    (entry.cvdict?.length ?? 0) > 0 ||
+    (entry.xdhy?.length ?? 0) > 0 ||
+    (full?.external?.some((src) => (src.data as { found?: boolean })?.found) ?? false)
+
+  const traditional = entry.cedict[0]?.traditional ?? entry.cvdict?.[0]?.traditional ?? entry.xdhy?.[0]?.traditional ?? null
+  // Best pinyin for colorizing the top title — prefer space-separated (cedict/cvdict) then xdhy
+  const titlePinyin = entry.cedict[0]?.pinyin ?? entry.cvdict?.[0]?.pinyin ?? entry.xdhy?.[0]?.pinyin ?? null
+  const charCount = [...entry.char].length
+
   return (
     <div className="flex flex-col gap-4">
-      {/* Char display: simplified (traditional) */}
-      {entry.cedict[0] && (
-        <div className="flex items-baseline gap-2 flex-wrap">
+      {/* Char display: simplified (traditional) — colorized by tone when pinyin available */}
+      <div className="flex items-baseline gap-2 flex-wrap">
+        {titlePinyin ? (
+          <ColorizedHanzi char={entry.char} pinyin={titlePinyin} className="font-cjk text-3xl leading-none" />
+        ) : (
           <span className="font-cjk text-3xl text-[var(--color-text)] leading-none">{entry.char}</span>
-          {entry.cedict[0].traditional && entry.cedict[0].traditional !== entry.char && (
-            <span className="font-cjk text-3xl text-[var(--color-text-muted)] leading-none">({entry.cedict[0].traditional})</span>
-          )}
-        </div>
-      )}
+        )}
+        {traditional && traditional !== entry.char && (
+          <span className="font-cjk text-3xl text-[var(--color-text-muted)] leading-none">({traditional})</span>
+        )}
+      </div>
 
       {/* HSK tags */}
       {hskTags.length > 0 && (
@@ -365,24 +378,28 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
         </div>
       )}
 
-      {entry.cedict[0] && (entry.cedict[0].radical || entry.cedict[0].stroke_count) && (
-        <div className="flex flex-wrap gap-3">
-          {entry.cedict[0].radical && (
-            <span className="text-sm text-[var(--color-text-muted)]">
-              {t('dictionary.radical')}: <span className="font-cjk font-medium text-[var(--color-text)]">{entry.cedict[0].radical}</span>
-            </span>
-          )}
-          {entry.cedict[0].stroke_count && (
-            <span className="text-sm text-[var(--color-text-muted)]">
-              {t('dictionary.strokes')}: <span className="font-medium text-[var(--color-text)]">{entry.cedict[0].stroke_count}</span>
-            </span>
-          )}
-        </div>
-      )}
+      {(entry.cedict[0] ?? entry.cvdict?.[0]) && (() => {
+        const m = entry.cedict[0] ?? entry.cvdict[0]
+        if (!m.radical && !m.stroke_count) return null
+        return (
+          <div className="flex flex-wrap gap-3">
+            {m.radical && (
+              <span className="text-sm text-[var(--color-text-muted)]">
+                {t('dictionary.radical')}: <span className="font-cjk font-medium text-[var(--color-text)]">{m.radical}</span>
+              </span>
+            )}
+            {m.stroke_count && (
+              <span className="text-sm text-[var(--color-text-muted)]">
+                {t('dictionary.strokes')}: <span className="font-medium text-[var(--color-text)]">{m.stroke_count}</span>
+              </span>
+            )}
+          </div>
+        )
+      })()}
 
 
       {/* CC-CEDICT */}
-      {entry.cedict.length > 0 ? (
+      {entry.cedict.length > 0 && (
         <div>
           <SectionHeader collapsed={!!collapsed['cedict']} onToggle={() => toggle('cedict')} className="mb-2">
             {t('dictionary.cedict')}
@@ -400,8 +417,6 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
             </div>
           )}
         </div>
-      ) : (
-        <p className="text-sm text-[var(--color-text-muted)] italic">{t('dictionary.noResult')}</p>
       )}
 
       {/* CVDICT */}
@@ -452,7 +467,10 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
                     entry.xdhy.length > 1 && 'pl-3 border-l-2 border-[var(--color-border-md)]'
                   )}
                 >
-                  <ColorizedPinyin pinyin={xEntry.pinyin} className="font-medium" />
+                  <div className="flex items-baseline gap-2">
+                    <ColorizedHanzi char={xEntry.simplified || entry.char} pinyin={xEntry.pinyin} className="font-cjk font-medium text-lg text-[var(--color-text)]" />
+                    <ColorizedPinyin pinyin={xEntry.pinyin} n={charCount} className="font-medium text-[var(--color-text-muted)]" />
+                  </div>
                   <div className="flex flex-col gap-2">
                     {groups.map((group, gi) => (
                       <div key={gi}>
@@ -608,6 +626,11 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, onDataL
           </div>
         )
       })}
+
+      {/* No data at all — only shown after full load completes with nothing */}
+      {!loadingFull && !hasAnyData && (
+        <p className="text-sm text-[var(--color-text-muted)] italic">{t('dictionary.noResult')}</p>
+      )}
 
       {/* Notes — only shown when showNotes=true (Tra từ feature) */}
       {showNotes && (

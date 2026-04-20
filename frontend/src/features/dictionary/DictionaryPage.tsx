@@ -32,6 +32,16 @@ function EntryCard({
 
   const isMultiChar = lite.char.length > 1
   const firstCedict = lite.cedict[0] ?? null
+  const firstCvdict = lite.cvdict?.[0] ?? null
+  const firstXdhy = lite.xdhy?.[0] ?? null
+  // Fallback chain for header display
+  const previewPinyin = firstCedict?.pinyin ?? firstCvdict?.pinyin ?? firstXdhy?.pinyin ?? null
+  const previewTraditional = firstCedict?.traditional ?? firstCvdict?.traditional ?? firstXdhy?.traditional ?? null
+  const previewMeaning = firstCedict?.meaning_en
+    ?? (firstCvdict ? firstCvdict.meaning_vi.split('/').filter(Boolean)[0]?.trim() : null)
+    ?? (firstXdhy ? firstXdhy.defs.find((d) => !d.is_sub)?.definition : null)
+    ?? null
+  const hasAnyPreview = previewPinyin !== null || previewMeaning !== null
 
   return (
     <div className={cn(
@@ -51,10 +61,10 @@ function EntryCard({
         }}
       >
         <div className="flex-1 min-w-0 flex flex-wrap items-baseline gap-x-2 gap-y-1 select-text">
-          {firstCedict ? (
+          {previewPinyin ? (
             <ColorizedHanzi
               char={lite.char}
-              pinyin={firstCedict.pinyin}
+              pinyin={previewPinyin}
               className={cn('font-cjk leading-none cursor-text', isMultiChar ? 'text-3xl' : 'text-2xl')}
             />
           ) : (
@@ -62,29 +72,33 @@ function EntryCard({
               {lite.char}
             </span>
           )}
-          {firstCedict?.traditional && firstCedict.traditional !== lite.char && (
+          {previewTraditional && previewTraditional !== lite.char && previewPinyin && (
             <span className={cn('font-cjk leading-none text-[var(--color-text-muted)] cursor-text', isMultiChar ? 'text-3xl' : 'text-2xl')}>
-              (<ColorizedHanzi char={firstCedict.traditional} pinyin={firstCedict.pinyin} />)
+              (<ColorizedHanzi char={previewTraditional} pinyin={previewPinyin} />)
             </span>
           )}
-          {firstCedict ? (
+          {hasAnyPreview ? (
             <div className="w-full text-sm">
-              <span className="font-medium cursor-text">
-                <ColorizedPinyin pinyin={firstCedict.pinyin} />
-                {lite.sino_vn?.length > 0 && (
-                  <span className="ml-1.5 text-[var(--color-text-muted)]">
-                    · {lite.sino_vn.join(', ')}
-                  </span>
-                )}
-                {lite.cedict.length > 1 && (
-                  <span className="ml-1.5 text-xs text-[var(--color-text-muted)]">
-                    {t('dictionary.moreReadings', { count: lite.cedict.length - 1 })}
-                  </span>
-                )}
-              </span>
-              <p className="text-xs text-[var(--color-text-muted)] truncate mt-0.5 cursor-text">
-                {firstCedict.meaning_en}
-              </p>
+              {previewPinyin && (
+                <span className="font-medium cursor-text">
+                  <ColorizedPinyin pinyin={previewPinyin} n={[...lite.char].length} />
+                  {lite.sino_vn?.length > 0 && (
+                    <span className="ml-1.5 text-[var(--color-text-muted)]">
+                      · {lite.sino_vn.join(', ')}
+                    </span>
+                  )}
+                  {lite.cedict.length > 1 && (
+                    <span className="ml-1.5 text-xs text-[var(--color-text-muted)]">
+                      {t('dictionary.moreReadings', { count: lite.cedict.length - 1 })}
+                    </span>
+                  )}
+                </span>
+              )}
+              {previewMeaning && (
+                <p className="text-xs text-[var(--color-text-muted)] truncate mt-0.5 cursor-text">
+                  {previewMeaning}
+                </p>
+              )}
             </div>
           ) : (
             <span className="text-xs text-[var(--color-text-muted)] italic">
@@ -225,7 +239,7 @@ export function DictionaryPage() {
     if (paramQ) {
       runSearch(paramQ)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleSearch = async (e?: React.SyntheticEvent) => {
@@ -346,7 +360,7 @@ export function DictionaryPage() {
                 key={`${activeTab.id}-${lite.char}`}
                 lite={lite}
                 autoExpand={idx === 0}
-                onNoteSaved={() => {}}
+                onNoteSaved={() => { }}
                 onWordClick={runSearch}
               />
             ))}
