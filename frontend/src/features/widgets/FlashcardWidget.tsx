@@ -212,46 +212,46 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
     }
   }, [widget.id, setWidgetCards, fetchWOTDDates])
 
-  // Fetch cards for custom widget (cache-based, no DB)
+  // Fetch cards for custom widget — always replaces current set with fresh cards from API
   const fetchCards = useCallback(async (notebookIds: number[], count: number) => {
-    const { widgets: curr } = useFlashcardStore.getState()
-    const w = curr.find((x) => x.id === widget.id)
-    const mode: RepeatMode = w?.repeatMode ?? 'random'
-
-    // Cards that have been marked (green/red) are preserved forever — never removed on refresh
-    const markedCards = (w?.cards ?? []).filter((c) => c.status !== null)
-    const markedChars = new Set(markedCards.map((c) => c.char))
-
     if (notebookIds.length === 0) {
-      // No source: only show marked cards (filtered by mode)
-      const visible = mode === 'unlearned_only'
-        ? markedCards.filter((c) => c.status === 'not_learned')
-        : markedCards
-      setWidgetCards(widget.id, visible)
+      setWidgetCards(widget.id, [])
       setCurrentIndex(0)
       return
     }
 
     setLoading(true)
     try {
+      const { widgets: curr } = useFlashcardStore.getState()
+      const w = curr.find((x) => x.id === widget.id)
+      const mode: RepeatMode = w?.repeatMode ?? 'random'
+
+      // Fetch extra cards for filtered modes to compensate for post-filter reduction
+      const fetchCount = mode === 'random' ? count : count * 3
+
       const { data } = await api.get<FlashcardEntry[]>('/notebooks/flashcards', {
-        params: { notebook_ids: notebookIds.join(','), count },
+        params: { notebook_ids: notebookIds.join(','), count: fetchCount },
       })
 
-      // Fresh cards = API result minus already-marked ones (avoid duplicates)
-      const freshCards = data.filter((c) => !markedChars.has(c.char))
+      const maxRepeat = Math.max(1, Math.floor(count * 0.1))
 
       let base: FlashcardEntry[]
       if (mode === 'unlearned_only') {
-        // Keep not_learned marked cards + fresh cards (exclude learned)
-        const notLearnedMarked = markedCards.filter((c) => c.status === 'not_learned')
-        const fill = Math.max(0, count - notLearnedMarked.length)
-        base = [...notLearnedMarked, ...freshCards.slice(0, fill)]
+        // Only cards explicitly marked not_learned (red)
+        base = data.filter((c) => c.status === 'not_learned').slice(0, count)
+      } else if (mode === 'no_repeat') {
+        // Only cards never interacted with (no status)
+        base = data.filter((c) => c.status === null).slice(0, count)
+      } else if (mode === 'repeat_unlearned') {
+        // Mostly fresh cards, up to 10% not_learned mixed in for review
+        const repeated = data.filter((c) => c.status === 'not_learned').slice(0, maxRepeat)
+        const fresh = data.filter((c) => c.status === null).slice(0, count - repeated.length)
+        base = [...repeated, ...fresh].sort(() => Math.random() - 0.5)
       } else {
-        // random / no_repeat: keep ALL marked cards + fill with fresh
-        const fill = Math.max(0, count - markedCards.length)
-        base = [...markedCards, ...freshCards.slice(0, fill)]
-        if (mode === 'random') base = base.sort(() => Math.random() - 0.5)
+        // random: mostly fresh, up to 10% any previously-seen (learned or not_learned)
+        const repeated = data.filter((c) => c.status !== null).slice(0, maxRepeat)
+        const fresh = data.filter((c) => c.status === null).slice(0, count - repeated.length)
+        base = [...repeated, ...fresh].sort(() => Math.random() - 0.5)
       }
 
       setWidgetCards(widget.id, base)
@@ -516,6 +516,11 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
           <p className="text-center text-xs text-[var(--color-text-muted)]">
             {safeIndex + 1}/{total}
           </p>
+        )}
+
+        {/* Spacer for non-WOTD widgets to match WOTD calendar row height */}
+        {!widget.isDefault && !showLoading && (
+          <div aria-hidden className="border-t border-[var(--color-border)] pt-2 h-5" />
         )}
 
         {/* WOTD Calendar toggle + expandable panel */}

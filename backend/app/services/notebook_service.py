@@ -224,10 +224,22 @@ def stream_entries_preview(
         .join(Character, NotebookEntry.char_id == Character.id)
         .where(NotebookEntry.notebook_id == notebook_id)
     )
-    if sort == "name_asc":
-        stmt = stmt.order_by(Character.simplified.asc())
-    elif sort == "name_desc":
-        stmt = stmt.order_by(Character.simplified.desc())
+    if sort in ("name_asc", "name_desc"):
+        min_id_subq = (
+            select(func.min(PinyinReading.id).label("min_id"), PinyinReading.character_id)
+            .group_by(PinyinReading.character_id)
+            .subquery()
+        )
+        first_pinyin_subq = (
+            select(PinyinReading.character_id, PinyinReading.pinyin_numeric.label("first_pinyin"))
+            .join(min_id_subq, PinyinReading.id == min_id_subq.c.min_id)
+            .subquery()
+        )
+        stmt = stmt.outerjoin(first_pinyin_subq, first_pinyin_subq.c.character_id == Character.id)
+        if sort == "name_asc":
+            stmt = stmt.order_by(func.lower(first_pinyin_subq.c.first_pinyin).asc())
+        else:
+            stmt = stmt.order_by(func.lower(first_pinyin_subq.c.first_pinyin).desc())
     elif sort in ("created_at_asc", "updated_at_asc"):
         stmt = stmt.order_by(NotebookEntry.added_at.asc())
     else:
