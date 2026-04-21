@@ -45,7 +45,7 @@
 
 /* ── Flashcard card status colors ───────────────────────── */
 .fc-status-learned {
-  background-color: #f0fdf4;
+  background-color: #dcfce7;
   border-color: #86efac !important;
   transition: background-color 0.45s ease, border-color 0.45s ease;
 }
@@ -54,7 +54,7 @@
   transition: border-color 0.45s ease;
 }
 .fc-status-not_learned {
-  background-color: #fef2f2;
+  background-color: #fee2e2;
   border-color: #fca5a5 !important;
   transition: background-color 0.45s ease, border-color 0.45s ease;
 }
@@ -63,14 +63,14 @@
   transition: border-color 0.45s ease;
 }
 .dark .fc-status-learned {
-  background-color: #052e16;
+  background-color: #064e1e;
   border-color: #166534 !important;
 }
 .dark .fc-status-learned .fc-divider {
   border-color: #166534;
 }
 .dark .fc-status-not_learned {
-  background-color: #2d0a0a;
+  background-color: #450a0a;
   border-color: #7f1d1d !important;
 }
 .dark .fc-status-not_learned .fc-divider {

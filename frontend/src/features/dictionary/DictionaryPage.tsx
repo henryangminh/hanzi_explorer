@@ -1,8 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams, Link } from 'react-router-dom'
-import { Search, ChevronDown, ChevronUp, BookmarkPlus, X, BookOpen } from 'lucide-react'
-import { useState } from 'react'
+import { Search, ChevronDown, ChevronUp, BookmarkPlus, X, Check, BookOpen } from 'lucide-react'
 import type { DictLiteResponse } from '@/types'
 import { CharDetailPanel } from '@/features/shared/CharDetailPanel'
 import { Button } from '@/components/ui/Button'
@@ -11,7 +10,9 @@ import { ColorizedPinyin, ColorizedHanzi } from '@/lib/pinyinColor'
 import { SaveToNotebookModal } from '@/features/shared/SaveToNotebookModal'
 import { useAuthStore } from '@/store/auth.store'
 import { useDictionaryStore } from '@/store/dictionary.store'
+import { useFlashcardStore } from '@/store/flashcard.store'
 import { SearchHistoryPanel, SearchHistoryPopup } from '@/features/search-history/SearchHistoryPanel'
+import api from '@/lib/axios'
 
 // ── Single entry card ─────────────────────────────────────
 
@@ -19,24 +20,48 @@ function EntryCard({
   lite,
   pinyinFilter,
   autoExpand = false,
+  fcStatus,
+  onStatusChange,
   onNoteSaved,
   onWordClick,
 }: {
   lite: DictLiteResponse
   pinyinFilter?: string
   autoExpand?: boolean
+  fcStatus?: 'learned' | 'not_learned' | null
+  onStatusChange?: (char: string, status: 'learned' | 'not_learned' | null) => void
   onNoteSaved: () => void
   onWordClick?: (word: string) => void
 }) {
   const { t } = useTranslation()
+  const user = useAuthStore((s) => s.user)
   const [collapsed, setCollapsed] = useState(!autoExpand)
   const [saveModalOpen, setSaveModalOpen] = useState(false)
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [ripple, setRipple] = useState<{ key: number; x: number; y: number; color: string } | null>(null)
+  const rippleKey = useRef(0)
+
+  function handleStatus(clicked: 'learned' | 'not_learned', e: React.MouseEvent) {
+    e.stopPropagation()
+    const newStatus = fcStatus === clicked ? null : clicked
+    const rect = cardRef.current?.getBoundingClientRect()
+    if (rect) {
+      rippleKey.current += 1
+      setRipple({
+        key: rippleKey.current,
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+        color: clicked === 'learned' ? 'rgba(16,185,129,0.35)' : 'rgba(239,68,68,0.35)',
+      })
+      setTimeout(() => setRipple(null), 560)
+    }
+    onStatusChange?.(lite.char, newStatus)
+  }
 
   const isMultiChar = lite.char.length > 1
   const firstCedict = lite.cedict[0] ?? null
   const firstCvdict = lite.cvdict?.[0] ?? null
   const firstXdhy = lite.xdhy?.[0] ?? null
-  // Fallback chain for header display
   const previewPinyin = firstCedict?.pinyin ?? firstCvdict?.pinyin ?? firstXdhy?.pinyin ?? null
   const previewTraditional = firstCedict?.traditional ?? firstCvdict?.traditional ?? firstXdhy?.traditional ?? null
   const previewMeaning = firstCedict?.meaning_en
@@ -45,18 +70,39 @@ function EntryCard({
     ?? null
   const hasAnyPreview = previewPinyin !== null || previewMeaning !== null
 
+  const statusClass = fcStatus === 'learned' ? 'fc-status-learned'
+    : fcStatus === 'not_learned' ? 'fc-status-not_learned'
+    : undefined
+
   return (
-    <div className={cn(
-      'border border-[var(--color-border)] rounded-xl overflow-hidden',
-      isMultiChar && 'border-[var(--color-accent)]'
-    )}>
+    <div
+      ref={cardRef}
+      className={cn(
+        'relative border rounded-xl overflow-hidden',
+        !statusClass && (isMultiChar ? 'border-[var(--color-accent)]' : 'border-[var(--color-border)]'),
+        statusClass,
+      )}
+    >
+      {ripple && (
+        <span
+          key={ripple.key}
+          className="fc-ripple"
+          style={{ left: ripple.x - 28, top: ripple.y - 28, backgroundColor: ripple.color }}
+        />
+      )}
+
       {saveModalOpen && (
         <SaveToNotebookModal char={lite.char} onClose={() => setSaveModalOpen(false)} />
       )}
 
       {/* Header */}
       <div
-        className="relative flex items-center gap-3 px-4 py-3 bg-[var(--color-bg-surface)] hover:bg-[var(--color-bg-subtle)] transition-colors cursor-pointer"
+        className={cn(
+          'relative flex items-center gap-3 px-4 py-3 transition-colors cursor-pointer',
+          statusClass
+            ? 'bg-transparent hover:bg-black/5 dark:hover:bg-white/5'
+            : 'bg-[var(--color-bg-surface)] hover:bg-[var(--color-bg-subtle)]',
+        )}
         onClick={() => {
           if (window.getSelection()?.toString()) return
           setCollapsed((v) => !v)
@@ -109,7 +155,7 @@ function EntryCard({
           )}
         </div>
 
-        <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
           {firstCedict?.hsk_level && (
             <span className="text-xs bg-[var(--color-bg-subtle)] px-2 py-0.5 rounded-full text-[var(--color-text-muted)]">
               HSK {firstCedict.hsk_level}
@@ -119,6 +165,34 @@ function EntryCard({
             <span className="text-xs px-2 py-0.5 rounded border border-[var(--color-accent)] text-[var(--color-accent)] shrink-0">
               {t('dictionary.separable')}
             </span>
+          )}
+          {user && (
+            <>
+              <button
+                onClick={(e) => handleStatus('not_learned', e)}
+                className={cn(
+                  'w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors shrink-0',
+                  fcStatus === 'not_learned'
+                    ? 'border-red-400 bg-red-400 text-white'
+                    : 'border-red-400 text-red-400 hover:bg-red-400 hover:text-white',
+                )}
+                title="Chưa thuộc"
+              >
+                <X size={10} strokeWidth={2.5} />
+              </button>
+              <button
+                onClick={(e) => handleStatus('learned', e)}
+                className={cn(
+                  'w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors shrink-0',
+                  fcStatus === 'learned'
+                    ? 'border-emerald-500 bg-emerald-500 text-white'
+                    : 'border-emerald-500 text-emerald-500 hover:bg-emerald-500 hover:text-white',
+                )}
+                title="Đã thuộc"
+              >
+                <Check size={10} strokeWidth={2.5} />
+              </button>
+            </>
           )}
           <button
             onClick={() => setSaveModalOpen(true)}
@@ -138,7 +212,7 @@ function EntryCard({
       </div>
 
       {!collapsed && (
-        <div className="px-4 pb-4 pt-2 bg-[var(--color-bg-surface)] border-t border-[var(--color-border)]">
+        <div className={cn('px-4 pb-4 pt-2 border-t border-[var(--color-border)]', statusClass ? 'bg-transparent' : 'bg-[var(--color-bg-surface)]')}>
           <CharDetailPanel
             char={lite.char}
             initialEntry={lite}
@@ -173,7 +247,10 @@ export function DictionaryPage() {
     finishTab,
   } = useDictionaryStore()
 
+  const { widgets, updateCardStatus } = useFlashcardStore()
+  const [flashcardStatuses, setFlashcardStatuses] = useState<Record<string, 'learned' | 'not_learned' | null>>({})
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
+
   const [historyPopupOpen, setHistoryPopupOpen] = useState(false)
 
   const handledParamRef = useRef(false)
@@ -253,6 +330,28 @@ export function DictionaryPage() {
   const handleHistorySearch = (char: string) => {
     setQuery(char)
     runSearch(char)
+  }
+
+  // Fetch flashcard statuses when active tab finishes loading
+  useEffect(() => {
+    if (!activeTab || activeTab.loading || !user || activeTab.results.length === 0) return
+    const chars = [...new Set(activeTab.results.map((r) => r.char))].join(',')
+    api.get<Record<string, 'learned' | 'not_learned' | null>>(
+      `/notebooks/flashcards/statuses?chars=${encodeURIComponent(chars)}`
+    )
+      .then(({ data }) => setFlashcardStatuses((prev) => ({ ...prev, ...data })))
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab?.id, activeTab?.loading])
+
+  async function handleFlashcardStatus(char: string, status: 'learned' | 'not_learned' | null) {
+    setFlashcardStatuses((prev) => ({ ...prev, [char]: status }))
+    try {
+      await api.put('/notebooks/flashcards/status', { char, status })
+    } catch { /* silent */ }
+    for (const w of widgets) {
+      if (w.cards.some((c) => c.char === char)) updateCardStatus(w.id, char, status)
+    }
   }
 
   return (
@@ -360,7 +459,7 @@ export function DictionaryPage() {
 
             {activeTab.results.flatMap((lite, idx) => {
               const pinyins = new Set<string>()
-              const normalizePinyin = (p: string) => p.replace(/[·\.\/]+/g, '').toLowerCase()
+              const normalizePinyin = (p: string) => p.replace(/[·\.\/\s-]+/g, '').toLowerCase()
 
               lite.cedict.forEach(x => { if (x.pinyin) pinyins.add(normalizePinyin(x.pinyin)) })
               if (lite.cvdict) {
@@ -376,6 +475,8 @@ export function DictionaryPage() {
                     key={`${activeTab.id}-${lite.char}`}
                     lite={lite}
                     autoExpand={idx === 0}
+                    fcStatus={flashcardStatuses[lite.char] ?? null}
+                    onStatusChange={handleFlashcardStatus}
                     onNoteSaved={() => { }}
                     onWordClick={runSearch}
                   />
@@ -393,7 +494,6 @@ export function DictionaryPage() {
                   xdhy: lite.xdhy?.filter(filterFn) || [],
                 }
 
-                // If filtering removed everything (shouldn't happen), skip
                 if (filteredLite.cedict.length === 0 && filteredLite.cvdict?.length === 0 && filteredLite.xdhy?.length === 0) return null
 
                 return (
@@ -402,6 +502,8 @@ export function DictionaryPage() {
                     lite={filteredLite}
                     pinyinFilter={pyLower}
                     autoExpand={idx === 0 && pyIdx === 0}
+                    fcStatus={flashcardStatuses[lite.char] ?? null}
+                    onStatusChange={handleFlashcardStatus}
                     onNoteSaved={() => { }}
                     onWordClick={runSearch}
                   />

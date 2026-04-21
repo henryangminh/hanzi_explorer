@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash2, X, ChevronDown, ChevronLeft, BookmarkPlus, Pencil } from 'lucide-react'
+import { Plus, Trash2, X, Check, ChevronDown, ChevronLeft, BookmarkPlus, Pencil } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import api from '@/lib/axios'
 import { cn } from '@/lib/cn'
@@ -16,6 +16,7 @@ import type { NotebookEntryPreview, NotebookResponse, NotebookSortOrder } from '
 import { useUIStore } from '@/store/ui.store'
 import { useNavigate } from 'react-router-dom'
 import { useDictionaryStore } from '@/store/dictionary.store'
+import { useFlashcardStore } from '@/store/flashcard.store'
 
 const SORT_OPTIONS: { value: NotebookSortOrder; labelKey: string }[] = [
   { value: 'updated_at_desc', labelKey: 'notebooks.sortUpdatedDesc' },
@@ -45,6 +46,10 @@ function NotebookEntriesModal({
   const [entries, setEntries] = useState<NotebookEntryPreview[]>([])
   const [sort, setSort] = useState<NotebookSortOrder>('updated_at_desc')
   const [loading, setLoading] = useState(true)
+  const [fcStatuses, setFcStatuses] = useState<Record<string, 'learned' | 'not_learned' | null>>({})
+  const [ripple, setRipple] = useState<{ char: string; key: number; x: number; y: number; color: string } | null>(null)
+  const rippleKey = useRef(0)
+  const { widgets, updateCardStatus } = useFlashcardStore()
   const [removingChar, setRemovingChar] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -143,6 +148,41 @@ function NotebookEntriesModal({
     return () => controller.abort()
   }, [notebook.id, sort])
 
+  useEffect(() => {
+    if (loading || entries.length === 0) return
+    const chars = entries.map((e) => e.char).join(',')
+    api.get<Record<string, 'learned' | 'not_learned' | null>>(
+      `/notebooks/flashcards/statuses?chars=${encodeURIComponent(chars)}`
+    )
+      .then(({ data }) => setFcStatuses(data))
+      .catch(() => {})
+  }, [loading, entries.length])
+
+  async function handleFcStatus(char: string, clicked: 'learned' | 'not_learned', e: React.MouseEvent) {
+    e.stopPropagation()
+    const newStatus = fcStatuses[char] === clicked ? null : clicked
+    const card = (e.currentTarget as HTMLElement).closest('[data-fc-card]')
+    if (card) {
+      const rect = card.getBoundingClientRect()
+      rippleKey.current += 1
+      setRipple({
+        char,
+        key: rippleKey.current,
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+        color: clicked === 'learned' ? 'rgba(16,185,129,0.35)' : 'rgba(239,68,68,0.35)',
+      })
+      setTimeout(() => setRipple(null), 560)
+    }
+    setFcStatuses((prev) => ({ ...prev, [char]: newStatus }))
+    try {
+      await api.put('/notebooks/flashcards/status', { char, status: newStatus })
+    } catch { /* silent */ }
+    for (const w of widgets) {
+      if (w.cards.some((c) => c.char === char)) updateCardStatus(w.id, char, newStatus)
+    }
+  }
+
   const handleSelectChar = (char: string) => {
     if (selectedChar === char) {
       setSelectedChar(null)
@@ -190,8 +230,18 @@ function NotebookEntriesModal({
                 </span>
               )}
             </div>
-            <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-              {entries.length} {t('notebooks.entries')}
+            <p className="text-xs text-[var(--color-text-muted)] mt-0.5 flex flex-wrap gap-x-2">
+              <span>{entries.length} {t('notebooks.entries')}</span>
+              {Object.keys(fcStatuses).length > 0 && (() => {
+                const learned = Object.values(fcStatuses).filter((s) => s === 'learned').length
+                const unlearned = Object.values(fcStatuses).filter((s) => s === 'not_learned').length
+                return (
+                  <>
+                    {learned > 0 && <span style={{ color: '#0d9363' }} className="font-semibold">Đã học: {learned}</span>}
+                    {unlearned > 0 && <span className="text-red-500 dark:text-red-400 font-semibold">Chưa học: {unlearned}</span>}
+                  </>
+                )
+              })()}
             </p>
             {notebook.description && (
               <p className="text-xs text-[var(--color-text-muted)] mt-0.5 italic">
@@ -308,10 +358,23 @@ function NotebookEntriesModal({
                         {rowEntries.map((entry) => (
                           <div
                             key={entry.id}
+                            data-fc-card
                             onClick={() => handleSelectChar(entry.char)}
-                            className="text-left flex flex-col gap-1 px-3 py-2.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)] hover:border-[var(--color-primary)] transition-colors cursor-pointer"
+                            className={cn(
+                              'relative overflow-hidden text-left flex flex-col gap-1 px-3 py-2.5 rounded-xl border transition-colors cursor-pointer',
+                              fcStatuses[entry.char] === 'learned' ? 'fc-status-learned'
+                                : fcStatuses[entry.char] === 'not_learned' ? 'fc-status-not_learned'
+                                : 'border-[var(--color-border)] bg-[var(--color-bg-subtle)] hover:border-[var(--color-primary)]',
+                            )}
                           >
-                            <div className="flex items-start justify-between gap-2">
+                            {ripple?.char === entry.char && (
+                              <span
+                                key={ripple.key}
+                                className="fc-ripple"
+                                style={{ left: ripple.x - 28, top: ripple.y - 28, backgroundColor: ripple.color }}
+                              />
+                            )}
+                            <div className="flex items-start justify-between gap-1.5">
                               {/* Selectable char + traditional */}
                               <div
                                 className="flex items-baseline gap-1.5 flex-wrap min-w-0 select-text"
@@ -329,16 +392,42 @@ function NotebookEntriesModal({
                                   <span className="font-cjk text-2xl text-[var(--color-text-muted)] leading-none cursor-text">({entry.traditional})</span>
                                 )}
                               </div>
-                              {canEdit && (
+                              <div className="flex items-center gap-1 shrink-0 mt-0.5" onClick={(e) => e.stopPropagation()}>
                                 <button
-                                  onClick={(e) => { e.stopPropagation(); handleRemoveEntry(entry) }}
-                                  disabled={removingChar === entry.char}
-                                  className="p-0.5 rounded text-[var(--color-text-muted)] hover:text-red-400 transition-colors disabled:opacity-40 shrink-0 mt-0.5"
-                                  title={t('notebooks.removeEntry')}
+                                  onClick={(e) => handleFcStatus(entry.char, 'not_learned', e)}
+                                  className={cn(
+                                    'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors',
+                                    fcStatuses[entry.char] === 'not_learned'
+                                      ? 'border-red-400 bg-red-400 text-white'
+                                      : 'border-red-400 text-red-400 hover:bg-red-400 hover:text-white',
+                                  )}
+                                  title="Chưa thuộc"
                                 >
-                                  <X size={11} />
+                                  <X size={8} strokeWidth={2.5} />
                                 </button>
-                              )}
+                                <button
+                                  onClick={(e) => handleFcStatus(entry.char, 'learned', e)}
+                                  className={cn(
+                                    'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors',
+                                    fcStatuses[entry.char] === 'learned'
+                                      ? 'border-emerald-500 bg-emerald-500 text-white'
+                                      : 'border-emerald-500 text-emerald-500 hover:bg-emerald-500 hover:text-white',
+                                  )}
+                                  title="Đã thuộc"
+                                >
+                                  <Check size={8} strokeWidth={2.5} />
+                                </button>
+                                {canEdit && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleRemoveEntry(entry) }}
+                                    disabled={removingChar === entry.char}
+                                    className="p-0.5 rounded text-[var(--color-text-muted)] hover:text-red-400 transition-colors disabled:opacity-40"
+                                    title={t('notebooks.removeEntry')}
+                                  >
+                                    <X size={11} />
+                                  </button>
+                                )}
+                              </div>
                             </div>
                             {/* Selectable pinyin / sino_vn / meanings — w-fit so only text area is selectable */}
                             {entry.pinyins.length > 0 && (

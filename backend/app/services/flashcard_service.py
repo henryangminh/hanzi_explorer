@@ -169,6 +169,21 @@ def get_marked_flashcards(
     return _rows_to_responses(rows)
 
 
+def get_flashcard_statuses(
+    session: Session,
+    user_id: int,
+    chars: list[str],
+) -> dict[str, str | None]:
+    if not chars:
+        return {}
+    rows = session.exec(
+        select(UserFlashcard)
+        .where(UserFlashcard.user_id == user_id)
+        .where(UserFlashcard.char.in_(chars))
+    ).all()
+    return {r.char: r.status for r in rows}
+
+
 def update_flashcard_status(
     session: Session,
     user_id: int,

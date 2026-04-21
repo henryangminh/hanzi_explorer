@@ -328,7 +328,7 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, pinyinF
     : null)
 
   if (entry && pinyinFilter) {
-    const normalizePinyin = (p: string) => p.replace(/[·\.\/]+/g, '').toLowerCase()
+    const normalizePinyin = (p: string) => p.replace(/[·\.\/\s-]+/g, '').toLowerCase()
     const filterFn = (item: any) => !item.pinyin || normalizePinyin(item.pinyin) === pinyinFilter.toLowerCase()
     entry = {
       ...entry,
@@ -363,7 +363,7 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, pinyinF
   const traditional = entry.cedict[0]?.traditional ?? entry.cvdict?.[0]?.traditional ?? entry.xdhy?.[0]?.traditional ?? null
   // Best pinyin for colorizing the top title — prefer space-separated (cedict/cvdict) then xdhy
   const titlePinyin = entry.cedict[0]?.pinyin ?? entry.cvdict?.[0]?.pinyin ?? entry.xdhy?.[0]?.pinyin ?? null
-  const charCount = [...entry.char].length
+
 
   return (
     <div className="flex flex-col gap-4">
@@ -515,7 +515,7 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, pinyinF
                               <div className="flex items-center gap-2 flex-wrap">
                                 <ColorizedPinyin
                                   pinyin={inner.exactPinyin}
-                                  n={inner.exactPinyin.split(/[\s-]+/).length}
+                                  n={[...group.simplified].length}
                                   className="text-[var(--color-text-muted)] font-medium"
                                 />
                               </div>
