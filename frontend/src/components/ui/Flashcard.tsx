@@ -22,12 +22,12 @@ export function Flashcard({ card, onStatusChange, compact = false }: FlashcardPr
   const cardRef = useRef<HTMLDivElement>(null)
   const [ripple, setRipple] = useState<Ripple | null>(null)
   const rippleKey = useRef(0)
+  const [showDef, setShowDef] = useState(false)
 
   function handleStatus(clicked: 'learned' | 'not_learned', e: React.MouseEvent) {
     e.stopPropagation()
     const newStatus = card.status === clicked ? null : clicked
 
-    // Fire ripple from click position relative to card
     const rect = cardRef.current?.getBoundingClientRect()
     if (rect) {
       rippleKey.current += 1
@@ -85,31 +85,53 @@ export function Flashcard({ card, onStatusChange, compact = false }: FlashcardPr
             {card.pinyins[0]}
           </span>
         )}
-      </div>
-
-      <div className="fc-divider mx-3 border-t border-[var(--color-border)]" />
-
-      {/* Meanings */}
-      <div className={cn('px-3 flex flex-col gap-1 justify-center', compact ? 'py-2 min-h-[44px]' : 'py-3 min-h-[64px]')}>
-        {card.cedict_brief && (
-          <p className="text-[16px] text-[var(--color-text)] line-clamp-2 leading-snug">
-            {card.cedict_brief}
-          </p>
-        )}
-        {card.cvdict_brief && (
-          <p className="text-[16px] text-[var(--color-text-muted)] line-clamp-2 leading-snug">
-            {card.cvdict_brief}
-          </p>
-        )}
-        {!card.cedict_brief && !card.cvdict_brief && (
-          <p className="text-[16px] text-[var(--color-text-muted)] italic">—</p>
+        {showDef && card.sino_vn && (
+          <span className="text-xs text-[var(--color-text-muted)] font-medium tracking-wide">
+            {card.sino_vn}
+          </span>
         )}
       </div>
+
+      {showDef && (
+        <div className="fc-reveal">
+          <div className="fc-divider mx-3 border-t border-[var(--color-border)]" />
+          <div className={cn('px-3 flex flex-col gap-1 justify-center', compact ? 'py-2 min-h-[44px]' : 'py-3 min-h-[64px]')}>
+            {card.cedict_brief && (
+              <p className="text-[16px] text-[var(--color-text)] line-clamp-2 leading-snug">
+                {card.cedict_brief}
+              </p>
+            )}
+            {card.cvdict_brief && (
+              <p className="text-[16px] text-[var(--color-text-muted)] line-clamp-2 leading-snug">
+                {card.cvdict_brief}
+              </p>
+            )}
+            {!card.cedict_brief && !card.cvdict_brief && (
+              <p className="text-[16px] text-[var(--color-text-muted)] italic">—</p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="fc-divider mx-3 border-t border-[var(--color-border)]" />
 
       {/* Action buttons */}
       <div className={cn('flex items-center justify-center gap-4', compact ? 'py-2' : 'py-3')}>
+        <button
+          type="button"
+          className={cn(
+            'rounded-full border-2 flex items-center justify-center transition-colors font-bold',
+            compact ? 'w-7 h-7 text-[11px]' : 'w-9 h-9 text-sm',
+            showDef
+              ? 'border-sky-500 bg-sky-500 text-white'
+              : 'border-sky-500 text-sky-500 hover:bg-sky-500 hover:text-white',
+          )}
+          onClick={(e) => { e.stopPropagation(); setShowDef((v) => !v) }}
+          tabIndex={-1}
+        >
+          ?
+        </button>
+
         <button
           type="button"
           className={cn(
@@ -124,6 +146,7 @@ export function Flashcard({ card, onStatusChange, compact = false }: FlashcardPr
         >
           <X size={compact ? 12 : 15} strokeWidth={2.5} />
         </button>
+
         <button
           type="button"
           className={cn(

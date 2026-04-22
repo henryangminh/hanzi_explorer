@@ -54,7 +54,26 @@ def _pinyins(raw: str | None) -> list[str]:
     return [numeric_to_diacritic(p.strip()) for p in raw.split("|||") if p.strip()]
 
 
-def _rows_to_responses(rows) -> list[FlashcardCardResponse]:
+def _build_sino_vn_map(session: Session, char_pinyin_pairs: list[tuple[str, str]]) -> dict[str, str]:
+    """Return {char: first_hanviet} for each (char, first_pinyin_numeric) pair."""
+    from app.services.sino_vn_service import _get_db_readings, _combine
+
+    result: dict[str, str] = {}
+    for char, pinyin_numeric in char_pinyin_pairs:
+        if not pinyin_numeric:
+            continue
+        chars_list = list(char)
+        syllables = pinyin_numeric.strip().split()
+        if len(chars_list) != len(syllables):
+            continue
+        parts = [_get_db_readings(session, c, s) for c, s in zip(chars_list, syllables)]
+        combined = _combine(parts)
+        if combined:
+            result[char] = combined[0]
+    return result
+
+
+def _rows_to_responses(rows, sino_vn_map: dict[str, str]) -> list[FlashcardCardResponse]:
     return [
         FlashcardCardResponse(
             char=row[0],
@@ -62,9 +81,118 @@ def _rows_to_responses(rows) -> list[FlashcardCardResponse]:
             cedict_brief=_cedict_brief(row[2]),
             cvdict_brief=_cvdict_brief(row[3]),
             status=row[4],
+            sino_vn=sino_vn_map.get(row[0]),
         )
         for row in rows
     ]
+
+
+_WIDGET_SQL = """
+    WITH sampled AS (
+        SELECT DISTINCT char_id
+        FROM notebook_entries
+        WHERE notebook_id IN ({ids})
+        ORDER BY RANDOM()
+        LIMIT :count
+    ),
+    source_chars AS (
+        SELECT s.char_id, uf.status
+        FROM sampled s
+        JOIN characters c ON c.id = s.char_id
+        LEFT JOIN user_flashcards uf ON uf.user_id = :user_id AND uf.char = c.simplified
+    ),
+    en_min AS (
+        SELECT character_id, MIN(id) AS min_id
+        FROM definitions
+        WHERE source_id = :cedict_id AND language = 'en'
+          AND character_id IN (SELECT char_id FROM source_chars)
+        GROUP BY character_id
+    ),
+    vi_min AS (
+        SELECT character_id, MIN(id) AS min_id
+        FROM definitions
+        WHERE source_id = :cvdict_id AND language = 'vi'
+          AND character_id IN (SELECT char_id FROM source_chars)
+        GROUP BY character_id
+    ),
+    py AS (
+        SELECT pr.character_id,
+               GROUP_CONCAT(pr.pinyin_numeric, '|||') AS pinyins_raw
+        FROM (
+            SELECT character_id, pinyin_numeric
+            FROM pinyin_readings
+            WHERE character_id IN (SELECT char_id FROM source_chars)
+            GROUP BY character_id, pinyin_numeric
+            ORDER BY character_id, MIN(id)
+        ) pr
+        GROUP BY pr.character_id
+    )
+    SELECT c.simplified, py.pinyins_raw,
+           en_d.meaning_text, vi_d.meaning_text, sc.status
+    FROM source_chars sc
+    JOIN characters c ON c.id = sc.char_id
+    LEFT JOIN en_min   ON en_min.character_id = sc.char_id
+    LEFT JOIN definitions en_d ON en_d.id     = en_min.min_id
+    LEFT JOIN vi_min   ON vi_min.character_id = sc.char_id
+    LEFT JOIN definitions vi_d ON vi_d.id     = vi_min.min_id
+    LEFT JOIN py       ON py.character_id      = sc.char_id
+"""
+
+_MARKED_SQL = """
+    WITH source_chars AS (
+        SELECT c.id AS char_id, uf.status
+        FROM user_flashcards uf
+        JOIN characters c ON c.simplified = uf.char
+        WHERE uf.user_id = :user_id AND uf.status IS NOT NULL
+    ),
+    en_min AS (
+        SELECT character_id, MIN(id) AS min_id
+        FROM definitions
+        WHERE source_id = :cedict_id AND language = 'en'
+          AND character_id IN (SELECT char_id FROM source_chars)
+        GROUP BY character_id
+    ),
+    vi_min AS (
+        SELECT character_id, MIN(id) AS min_id
+        FROM definitions
+        WHERE source_id = :cvdict_id AND language = 'vi'
+          AND character_id IN (SELECT char_id FROM source_chars)
+        GROUP BY character_id
+    ),
+    py AS (
+        SELECT pr.character_id,
+               GROUP_CONCAT(pr.pinyin_numeric, '|||') AS pinyins_raw
+        FROM (
+            SELECT character_id, pinyin_numeric
+            FROM pinyin_readings
+            WHERE character_id IN (SELECT char_id FROM source_chars)
+            GROUP BY character_id, pinyin_numeric
+            ORDER BY character_id, MIN(id)
+        ) pr
+        GROUP BY pr.character_id
+    )
+    SELECT c.simplified, py.pinyins_raw,
+           en_d.meaning_text, vi_d.meaning_text, sc.status
+    FROM source_chars sc
+    JOIN characters c ON c.id = sc.char_id
+    LEFT JOIN en_min   ON en_min.character_id = sc.char_id
+    LEFT JOIN definitions en_d ON en_d.id     = en_min.min_id
+    LEFT JOIN vi_min   ON vi_min.character_id = sc.char_id
+    LEFT JOIN definitions vi_d ON vi_d.id     = vi_min.min_id
+    LEFT JOIN py       ON py.character_id      = sc.char_id
+    ORDER BY sc.status, c.simplified
+"""
+
+
+def _extract_char_pinyin_pairs(rows) -> list[tuple[str, str]]:
+    """Extract (char, first_pinyin_numeric) from raw SQL rows."""
+    pairs = []
+    for row in rows:
+        char = row[0]
+        pinyins_raw = row[1]
+        first_pinyin = pinyins_raw.split("|||")[0].strip() if pinyins_raw else ""
+        pairs.append((char, first_pinyin))
+    return pairs
 
 
 def get_flashcards(
@@ -77,59 +205,12 @@ def get_flashcards(
     ids_str = ",".join(str(i) for i in notebook_ids)
 
     rows = session.execute(
-        text(f"""
-            WITH sampled AS (
-                SELECT DISTINCT char_id
-                FROM notebook_entries
-                WHERE notebook_id IN ({ids_str})
-                ORDER BY RANDOM()
-                LIMIT :count
-            ),
-            source_chars AS (
-                SELECT s.char_id, uf.status
-                FROM sampled s
-                JOIN characters c ON c.id = s.char_id
-                LEFT JOIN user_flashcards uf ON uf.user_id = :user_id AND uf.char = c.simplified
-            ),
-            en_min AS (
-                SELECT character_id, MIN(id) AS min_id
-                FROM definitions
-                WHERE source_id = :cedict_id AND language = 'en'
-                  AND character_id IN (SELECT char_id FROM source_chars)
-                GROUP BY character_id
-            ),
-            vi_min AS (
-                SELECT character_id, MIN(id) AS min_id
-                FROM definitions
-                WHERE source_id = :cvdict_id AND language = 'vi'
-                  AND character_id IN (SELECT char_id FROM source_chars)
-                GROUP BY character_id
-            ),
-            py AS (
-                SELECT pr.character_id,
-                       GROUP_CONCAT(pr.pinyin_numeric, '|||') AS pinyins_raw
-                FROM (
-                    SELECT character_id, pinyin_numeric
-                    FROM pinyin_readings
-                    WHERE character_id IN (SELECT char_id FROM source_chars)
-                    GROUP BY character_id, pinyin_numeric
-                    ORDER BY character_id, MIN(id)
-                ) pr
-                GROUP BY pr.character_id
-            )
-            SELECT c.simplified, py.pinyins_raw,
-                   en_d.meaning_text, vi_d.meaning_text, sc.status
-            FROM source_chars sc
-            JOIN characters c ON c.id = sc.char_id
-            LEFT JOIN en_min   ON en_min.character_id = sc.char_id
-            LEFT JOIN definitions en_d ON en_d.id     = en_min.min_id
-            LEFT JOIN vi_min   ON vi_min.character_id = sc.char_id
-            LEFT JOIN definitions vi_d ON vi_d.id     = vi_min.min_id
-            LEFT JOIN py       ON py.character_id      = sc.char_id
-        """),
+        text(_WIDGET_SQL.format(ids=ids_str)),
         {"count": count, "cedict_id": cedict_id, "cvdict_id": cvdict_id, "user_id": user_id},
     ).fetchall()
-    return _rows_to_responses(rows)
+
+    sino_vn_map = _build_sino_vn_map(session, _extract_char_pinyin_pairs(rows))
+    return _rows_to_responses(rows, sino_vn_map)
 
 
 def get_marked_flashcards(
@@ -139,53 +220,12 @@ def get_marked_flashcards(
     cedict_id, cvdict_id = _fetch_source_ids(session)
 
     rows = session.execute(
-        text("""
-            WITH source_chars AS (
-                SELECT c.id AS char_id, uf.status
-                FROM user_flashcards uf
-                JOIN characters c ON c.simplified = uf.char
-                WHERE uf.user_id = :user_id AND uf.status IS NOT NULL
-            ),
-            en_min AS (
-                SELECT character_id, MIN(id) AS min_id
-                FROM definitions
-                WHERE source_id = :cedict_id AND language = 'en'
-                  AND character_id IN (SELECT char_id FROM source_chars)
-                GROUP BY character_id
-            ),
-            vi_min AS (
-                SELECT character_id, MIN(id) AS min_id
-                FROM definitions
-                WHERE source_id = :cvdict_id AND language = 'vi'
-                  AND character_id IN (SELECT char_id FROM source_chars)
-                GROUP BY character_id
-            ),
-            py AS (
-                SELECT pr.character_id,
-                       GROUP_CONCAT(pr.pinyin_numeric, '|||') AS pinyins_raw
-                FROM (
-                    SELECT character_id, pinyin_numeric
-                    FROM pinyin_readings
-                    WHERE character_id IN (SELECT char_id FROM source_chars)
-                    GROUP BY character_id, pinyin_numeric
-                    ORDER BY character_id, MIN(id)
-                ) pr
-                GROUP BY pr.character_id
-            )
-            SELECT c.simplified, py.pinyins_raw,
-                   en_d.meaning_text, vi_d.meaning_text, sc.status
-            FROM source_chars sc
-            JOIN characters c ON c.id = sc.char_id
-            LEFT JOIN en_min   ON en_min.character_id = sc.char_id
-            LEFT JOIN definitions en_d ON en_d.id     = en_min.min_id
-            LEFT JOIN vi_min   ON vi_min.character_id = sc.char_id
-            LEFT JOIN definitions vi_d ON vi_d.id     = vi_min.min_id
-            LEFT JOIN py       ON py.character_id      = sc.char_id
-            ORDER BY sc.status, c.simplified
-        """),
+        text(_MARKED_SQL),
         {"user_id": user_id, "cedict_id": cedict_id, "cvdict_id": cvdict_id},
     ).fetchall()
-    return _rows_to_responses(rows)
+
+    sino_vn_map = _build_sino_vn_map(session, _extract_char_pinyin_pairs(rows))
+    return _rows_to_responses(rows, sino_vn_map)
 
 
 def get_flashcard_statuses(

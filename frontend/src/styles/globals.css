@@ -94,6 +94,15 @@
 .dark .fc-status-not_learned .fc-divider {
   border-color: #7f1d1d;
 }
+/* ── Flashcard definition reveal ────────────────────────── */
+@keyframes fc-reveal {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fc-reveal {
+  animation: fc-reveal 0.22s ease-out forwards;
+}
+
 /* ── Flashcard ripple ────────────────────────────────────── */
 @keyframes fc-ripple {
   from { transform: scale(0); opacity: 0.45; }

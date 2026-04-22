@@ -198,6 +198,7 @@ export type NotebookSortOrder =
 export interface FlashcardEntry {
   char: string
   pinyins: string[]
+  sino_vn: string | null
   cedict_brief: string | null
   cvdict_brief: string | null
   status: 'learned' | 'not_learned' | null

@@ -66,6 +66,7 @@ class AddEntryRequest(BaseModel):
 class FlashcardCardResponse(BaseModel):
     char: str
     pinyins: list[str] = []
+    sino_vn: Optional[str] = None
     cedict_brief: Optional[str] = None
     cvdict_brief: Optional[str] = None
     status: Optional[str] = None
