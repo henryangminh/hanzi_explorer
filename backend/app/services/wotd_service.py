@@ -119,11 +119,25 @@ def get_wotd_for_date(
     status_by_char = {fc.char: fc.status for fc in flashcard_rows}
 
     # 7. Build response, preserving original char order
+    from app.services.flashcard_service import _build_sino_vn_map
+
     char_order = {c: i for i, c in enumerate(chars)}
+    
+    char_pinyin_pairs = []
+    for ch in chars:
+        c = char_by_simplified.get(ch)
+        if c:
+            pys = pinyins_by_char.get(c.id, [])
+            first_py = pys[0] if pys else ""
+            char_pinyin_pairs.append((ch, first_py))
+            
+    sino_vn_map = _build_sino_vn_map(session, char_pinyin_pairs)
+
     results = [
         FlashcardCardResponse(
             char=ch,
             pinyins=[numeric_to_diacritic(p) for p in pinyins_by_char.get(c.id, [])],
+            sino_vn=sino_vn_map.get(ch),
             cedict_brief=clean_meaning(cedict_by_char[c.id]).split(";")[0].strip() if c.id in cedict_by_char else None,
             cvdict_brief=cvdict_by_char[c.id].split("/")[0].strip() if c.id in cvdict_by_char else None,
             status=status_by_char.get(ch),

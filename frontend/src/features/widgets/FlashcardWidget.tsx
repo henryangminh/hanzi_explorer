@@ -188,7 +188,7 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
 
     const storedDate = getStoredDateStr(w.lastRefreshed)
 
-    if (storedDate === today && w.cards.length > 0) {
+    if (storedDate === today && w.cards.length > 0 && w.cards[0].sino_vn !== undefined) {
       // Already have today's cards — still ensure DB record exists (idempotent)
       try {
         await api.post('/wotd', { date: today, chars: w.cards.map((c) => c.char) })
