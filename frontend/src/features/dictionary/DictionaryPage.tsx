@@ -212,7 +212,7 @@ function EntryCard({
       </div>
 
       {!collapsed && (
-        <div className={cn('px-4 pb-4 pt-2 border-t border-[var(--color-border)]', statusClass ? 'bg-transparent' : 'bg-[var(--color-bg-surface)]')}>
+        <div className="px-4 pb-4 pt-2 border-t border-[var(--color-border)] bg-[var(--color-bg-surface)]">
           <CharDetailPanel
             char={lite.char}
             initialEntry={lite}

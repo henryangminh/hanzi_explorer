@@ -112,7 +112,7 @@ def update_notebook(
 ):
     nb = _get_notebook_or_404(session, notebook_id)
     _assert_can_edit(nb, user)
-    return notebook_service.update_notebook(session, nb, data)
+    return notebook_service.update_notebook(session, nb, data, user.id)
 
 
 @router.delete("/{notebook_id}", status_code=status.HTTP_204_NO_CONTENT)

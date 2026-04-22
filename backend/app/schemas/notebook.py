@@ -23,6 +23,8 @@ class NotebookResponse(BaseModel):
     owner_id: Optional[int]
     sort_order: int
     entry_count: int
+    learned_count: int = 0
+    not_learned_count: int = 0
     created_at: datetime
     updated_at: datetime
 

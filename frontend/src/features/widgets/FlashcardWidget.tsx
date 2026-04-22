@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, Settings, RefreshCw, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Settings, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/cn'
 import api from '@/lib/axios'
@@ -160,6 +160,7 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
     return { year: d.getFullYear(), month: d.getMonth() }
   })
   const [calExpanded, setCalExpanded] = useState(false)
+  const [countdown, setCountdown] = useState('')
 
   // Which cards to display
   const activeCards: FlashcardEntry[] =
@@ -281,24 +282,43 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
       return () => clearInterval(timer)
     }
 
-    // Custom widget: check cache expiry on mount and periodically
-    const checkAndRefresh = () => {
-      const { widgets } = useFlashcardStore.getState()
-      const w = widgets.find((x) => x.id === widget.id)
-      if (!w || w.notebookIds.length === 0) return
-      const elapsed = w.lastRefreshed
-        ? Date.now() - new Date(w.lastRefreshed).getTime()
-        : Infinity
-      if (elapsed >= getIntervalMs(w.intervalValue, w.intervalUnit)) {
-        fetchCards(w.notebookIds, w.count)
-      }
-    }
-
-    checkAndRefresh()
-    const timer = setInterval(checkAndRefresh, 60_000)
-    return () => clearInterval(timer)
+    // Custom widget: countdown effect handles refresh timing
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Countdown ticker for non-WOTD widgets
+  useEffect(() => {
+    if (widget.isDefault) return
+    let triggered = false
+
+    const tick = () => {
+      if (triggered) return
+      const { widgets } = useFlashcardStore.getState()
+      const w = widgets.find((x) => x.id === widget.id)
+      if (!w || w.notebookIds.length === 0) { setCountdown(''); return }
+
+      const intervalMs = getIntervalMs(w.intervalValue, w.intervalUnit)
+      const elapsed = w.lastRefreshed ? Date.now() - new Date(w.lastRefreshed).getTime() : Infinity
+      const remaining = Math.max(0, intervalMs - elapsed)
+
+      if (remaining === 0) {
+        triggered = true
+        fetchCards(w.notebookIds, w.count)
+        setCountdown('00:00:00')
+        return
+      }
+
+      const totalSecs = Math.ceil(remaining / 1000)
+      const h = Math.floor(totalSecs / 3600)
+      const m = Math.floor((totalSecs % 3600) / 60)
+      const s = totalSecs % 60
+      setCountdown(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`)
+    }
+
+    tick()
+    const timer = setInterval(tick, 1000)
+    return () => clearInterval(timer)
+  }, [widget.id, widget.isDefault, widget.lastRefreshed, widget.intervalValue, widget.intervalUnit, fetchCards])
 
   // ── Calendar date selection ───────────────────────────────
 
@@ -434,20 +454,6 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
         <div className="flex items-center justify-between min-w-0">
           <h3 className="text-sm font-semibold text-[var(--color-text)] truncate">{widget.name}</h3>
           <div className="flex items-center gap-0.5 flex-shrink-0 ml-2">
-            {!widget.isDefault && (
-              <button
-                type="button"
-                onClick={() => fetchCards(widget.notebookIds, widget.count)}
-                disabled={loading}
-                title={t('dashboard.refresh')}
-                className={cn(
-                  'p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors',
-                  loading && 'opacity-50 cursor-not-allowed',
-                )}
-              >
-                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-              </button>
-            )}
             <button
               type="button"
               onClick={() => setSettingsOpen(true)}
@@ -518,9 +524,13 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
           </p>
         )}
 
-        {/* Spacer for non-WOTD widgets to match WOTD calendar row height */}
+        {/* Countdown for non-WOTD widgets */}
         {!widget.isDefault && !showLoading && (
-          <div aria-hidden className="border-t border-[var(--color-border)] pt-2 h-5" />
+          <div className="border-t border-[var(--color-border)] pt-2">
+            <p className="text-xs text-[var(--color-text-muted)] text-center">
+              {countdown ? t('dashboard.refreshIn', { time: countdown }) : ''}
+            </p>
+          </div>
         )}
 
         {/* WOTD Calendar toggle + expandable panel */}

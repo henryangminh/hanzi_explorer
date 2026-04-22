@@ -151,6 +151,7 @@ export default {
       save: 'Save',
       delete: 'Delete widget',
       refresh: 'Refresh',
+      refreshIn: 'Refreshes in {{time}}',
       noCards: 'No vocabulary available',
       noSource: 'No source selected',
       noNotebooks: 'No notebooks available',

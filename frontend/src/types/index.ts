@@ -156,6 +156,8 @@ export interface NotebookResponse {
   type: 'global' | 'private'
   owner_id: number | null
   entry_count: number
+  learned_count: number
+  not_learned_count: number
   created_at: string
   updated_at: string
 }

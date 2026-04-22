@@ -35,18 +35,25 @@ function NotebookEntriesModal({
   onClose,
   onDeleted,
   onEdit,
+  onCountsChanged,
 }: {
   notebook: NotebookResponse
   canEdit: boolean
   onClose: () => void
   onDeleted: () => void
   onEdit?: () => void
+  onCountsChanged?: (learned: number, notLearned: number) => void
 }) {
   const { t } = useTranslation()
   const [entries, setEntries] = useState<NotebookEntryPreview[]>([])
   const [sort, setSort] = useState<NotebookSortOrder>('updated_at_desc')
   const [loading, setLoading] = useState(true)
   const [fcStatuses, setFcStatuses] = useState<Record<string, 'learned' | 'not_learned' | null>>({})
+  const [filterStatuses, setFilterStatuses] = useState<Set<'learned' | 'not_learned' | 'unseen'>>(
+    new Set(['learned', 'not_learned', 'unseen'])
+  )
+  const [filterOpen, setFilterOpen] = useState(false)
+  const filterRef = useRef<HTMLDivElement>(null)
   const [ripple, setRipple] = useState<{ char: string; key: number; x: number; y: number; color: string } | null>(null)
   const rippleKey = useRef(0)
   const { widgets, updateCardStatus } = useFlashcardStore()
@@ -61,13 +68,33 @@ function NotebookEntriesModal({
 
   const parentRef = useRef<HTMLDivElement>(null)
 
+  const filteredEntries = useMemo(() => {
+    const allSelected = filterStatuses.size === 3
+    if (allSelected) return entries
+    return entries.filter((e) => {
+      const s = fcStatuses[e.char]
+      if (s === 'learned') return filterStatuses.has('learned')
+      if (s === 'not_learned') return filterStatuses.has('not_learned')
+      return filterStatuses.has('unseen')
+    })
+  }, [entries, fcStatuses, filterStatuses])
+
   const entryRows = useMemo(() => {
     const rows = []
-    for (let i = 0; i < entries.length; i += 2) {
-      rows.push(entries.slice(i, i + 2))
+    for (let i = 0; i < filteredEntries.length; i += 2) {
+      rows.push(filteredEntries.slice(i, i + 2))
     }
     return rows
-  }, [entries])
+  }, [filteredEntries])
+
+  useEffect(() => {
+    if (!filterOpen) return
+    const handler = (e: PointerEvent) => {
+      if (!filterRef.current?.contains(e.target as Node)) setFilterOpen(false)
+    }
+    document.addEventListener('pointerdown', handler)
+    return () => document.removeEventListener('pointerdown', handler)
+  }, [filterOpen])
 
   const rowVirtualizer = useVirtualizer({
     count: entryRows.length,
@@ -154,7 +181,14 @@ function NotebookEntriesModal({
     api.get<Record<string, 'learned' | 'not_learned' | null>>(
       `/notebooks/flashcards/statuses?chars=${encodeURIComponent(chars)}`
     )
-      .then(({ data }) => setFcStatuses(data))
+      .then(({ data }) => {
+        setFcStatuses(data)
+        const vals = Object.values(data)
+        onCountsChanged?.(
+          vals.filter((s) => s === 'learned').length,
+          vals.filter((s) => s === 'not_learned').length,
+        )
+      })
       .catch(() => {})
   }, [loading, entries.length])
 
@@ -174,7 +208,13 @@ function NotebookEntriesModal({
       })
       setTimeout(() => setRipple(null), 560)
     }
-    setFcStatuses((prev) => ({ ...prev, [char]: newStatus }))
+    const newStatuses = { ...fcStatuses, [char]: newStatus }
+    setFcStatuses(newStatuses)
+    const vals = Object.values(newStatuses)
+    onCountsChanged?.(
+      vals.filter((s) => s === 'learned').length,
+      vals.filter((s) => s === 'not_learned').length,
+    )
     try {
       await api.put('/notebooks/flashcards/status', { char, status: newStatus })
     } catch { /* silent */ }
@@ -231,7 +271,7 @@ function NotebookEntriesModal({
               )}
             </div>
             <p className="text-xs text-[var(--color-text-muted)] mt-0.5 flex flex-wrap gap-x-2">
-              <span>{entries.length} {t('notebooks.entries')}</span>
+              <span>{filteredEntries.length}{filteredEntries.length !== entries.length ? `/${entries.length}` : ''} {t('notebooks.entries')}</span>
               {Object.keys(fcStatuses).length > 0 && (() => {
                 const learned = Object.values(fcStatuses).filter((s) => s === 'learned').length
                 const unlearned = Object.values(fcStatuses).filter((s) => s === 'not_learned').length
@@ -278,14 +318,61 @@ function NotebookEntriesModal({
           </div>
         </div>
 
-        {/* Sort — only in list view */}
+        {/* Sort + Filter — only in list view */}
         {!selectedChar && (
-          <div className="px-6 py-2 shrink-0">
+          <div className="px-6 py-2 shrink-0 flex items-center gap-2">
             <Select
               value={sort}
               options={SORT_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
               onChange={setSort}
             />
+            {/* Multi-select filter dropdown */}
+            <div ref={filterRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setFilterOpen((v) => !v)}
+                className={cn(
+                  'inline-flex items-center gap-1.5 whitespace-nowrap',
+                  'text-sm px-3 py-1.5 rounded-lg',
+                  'border border-[var(--color-border-md)]',
+                  'bg-[var(--color-bg-surface)] text-[var(--color-text-muted)]',
+                  'hover:bg-[var(--color-bg-subtle)] transition-colors outline-none cursor-pointer',
+                  filterStatuses.size < 3 && 'border-[var(--color-primary)] text-[var(--color-primary)]',
+                )}
+              >
+                Lọc {filterStatuses.size < 3 && `(${filterStatuses.size})`}
+                <ChevronDown size={13} className={cn('transition-transform duration-150 shrink-0', filterOpen && 'rotate-180')} />
+              </button>
+              {filterOpen && (
+                <div className={cn(
+                  'absolute top-full mt-1 z-[200] w-36',
+                  'bg-[var(--color-bg-surface)] border border-[var(--color-border)]',
+                  'rounded-lg shadow-lg overflow-hidden py-1',
+                )}>
+                  {([ ['learned', 'Đã học'], ['not_learned', 'Chưa học'], ['unseen', 'Chưa xem'] ] as const).map(([key, label]) => (
+                    <label
+                      key={key}
+                      className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-[var(--color-bg-subtle)] transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filterStatuses.has(key)}
+                        onChange={() => {
+                          setFilterStatuses((prev) => {
+                            const next = new Set(prev)
+                            if (next.has(key)) { if (next.size > 1) next.delete(key) }
+                            else next.add(key)
+                            return next
+                          })
+                        }}
+                        className="accent-[var(--color-primary)] w-3.5 h-3.5"
+                      />
+                      <span className="text-sm text-[var(--color-text)]">{label}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -364,7 +451,7 @@ function NotebookEntriesModal({
                               'relative overflow-hidden text-left flex flex-col gap-1 px-3 py-2.5 rounded-xl border transition-colors cursor-pointer',
                               fcStatuses[entry.char] === 'learned' ? 'fc-status-learned'
                                 : fcStatuses[entry.char] === 'not_learned' ? 'fc-status-not_learned'
-                                : 'border-[var(--color-border)] bg-[var(--color-bg-subtle)] hover:border-[var(--color-primary)]',
+                                : 'nb-card-unseen border-[var(--color-border)] hover:border-[var(--color-primary)]',
                             )}
                           >
                             {ripple?.char === entry.char && (
@@ -432,7 +519,7 @@ function NotebookEntriesModal({
                             {/* Selectable pinyin / sino_vn / meanings — w-fit so only text area is selectable */}
                             {entry.pinyins.length > 0 && (
                               <p
-                                className="w-fit text-xs leading-tight cursor-text select-text"
+                                className="w-fit text-sm leading-tight cursor-text select-text"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 {entry.pinyins.map((p, pi) => {
@@ -455,7 +542,7 @@ function NotebookEntriesModal({
                             )}
                             {entry.cedict_brief && (
                               <p
-                                className="w-fit max-w-full text-xs text-[var(--color-text-muted)] line-clamp-1 leading-tight cursor-text select-text"
+                                className="w-fit max-w-full text-sm text-[var(--color-text-muted)] line-clamp-1 leading-tight cursor-text select-text"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 {entry.cedict_brief}
@@ -463,7 +550,7 @@ function NotebookEntriesModal({
                             )}
                             {entry.cvdict_brief && (
                               <p
-                                className="w-fit max-w-full text-xs text-[var(--color-primary)] line-clamp-1 leading-tight cursor-text select-text"
+                                className="w-fit max-w-full text-sm text-[var(--color-primary)] line-clamp-1 leading-tight cursor-text select-text"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 {entry.cvdict_brief}
@@ -688,6 +775,13 @@ function NotebookCard({
   onEdit?: () => void
 }) {
   const { t } = useTranslation()
+  const total = notebook.entry_count
+  const learnedPct = total > 0 ? (notebook.learned_count / total) * 100 : 0
+  const notLearnedPct = total > 0 ? (notebook.not_learned_count / total) * 100 : 0
+  const restPct = learnedPct + notLearnedPct
+  const progressBg = total > 0 && restPct > 0
+    ? `linear-gradient(to right, rgba(16,185,129,0.25) 0%, rgba(16,185,129,0.25) ${learnedPct}%, rgba(239,68,68,0.25) ${learnedPct}%, rgba(239,68,68,0.25) ${restPct}%, var(--color-bg-surface) ${restPct}%)`
+    : undefined
   return (
     <div
       onClick={onClick}
@@ -695,6 +789,7 @@ function NotebookCard({
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick() }}
       className="w-full text-left flex flex-col gap-1 px-3 py-2.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-surface)] hover:border-[var(--color-primary)] hover:bg-[var(--color-bg-subtle)] transition-colors cursor-pointer"
+      style={progressBg ? { background: progressBg } : undefined}
     >
       <div className="flex items-start justify-between gap-1.5">
         <p className="text-sm font-semibold text-[var(--color-text)] truncate">{notebook.name}</p>
@@ -757,6 +852,12 @@ export function NotebooksPage() {
   const handleNotebookSaved = (updated: NotebookResponse) => {
     setNotebooks((prev) => prev.map((n) => n.id === updated.id ? updated : n))
     setOpenNotebook((prev) => prev?.id === updated.id ? updated : prev)
+  }
+
+  const handleCountsChanged = (notebookId: number, learned: number, notLearned: number) => {
+    setNotebooks((prev) => prev.map((n) =>
+      n.id === notebookId ? { ...n, learned_count: learned, not_learned_count: notLearned } : n
+    ))
   }
 
   const globalNotebooks = notebooks.filter((n) => n.type === 'global')
@@ -872,6 +973,7 @@ export function NotebooksPage() {
             setNotebooks((prev) => prev.filter((n) => n.id !== openNotebook.id))
           }}
           onEdit={canEdit(openNotebook) ? () => setEditingNotebook(openNotebook) : undefined}
+          onCountsChanged={(learned, notLearned) => handleCountsChanged(openNotebook.id, learned, notLearned)}
         />
       )}
 

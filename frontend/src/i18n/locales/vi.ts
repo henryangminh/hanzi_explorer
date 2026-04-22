@@ -159,6 +159,7 @@ export default {
       save: 'Lưu',
       delete: 'Xoá widget',
       refresh: 'Làm mới',
+      refreshIn: 'Làm mới trong {{time}}',
       noCards: 'Không có từ vựng nào',
       noSource: 'Chưa chọn nguồn từ vựng',
       noNotebooks: 'Không có sổ tay nào',

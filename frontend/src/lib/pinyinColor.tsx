@@ -1,10 +1,10 @@
-// Tone colors — light mode
+// Tone colors via CSS variables — light/dark handled in globals.css
 const TONE_COLORS: Record<1 | 2 | 3 | 4 | 5, string> = {
-  1: '#1a70b8', // ā ē ī — xanh dương (bằng)
-  2: '#0d9363', // á é í — emerald   (sắc)
-  3: '#7c3aed', // ǎ ě ǐ — tím       (hỏi)
-  4: '#c8282a', // à è ì — đỏ đậm   (nặng)
-  5: '#52525b', // a e i  — xám      (khinh thanh)
+  1: 'var(--tone-1)', // bằng
+  2: 'var(--tone-2)', // sắc
+  3: 'var(--tone-3)', // hỏi
+  4: 'var(--tone-4)', // nặng
+  5: 'var(--tone-5)', // khinh thanh
 }
 
 function getTone(syllable: string): 1 | 2 | 3 | 4 | 5 {
@@ -125,6 +125,25 @@ interface ColorizedPinyinProps {
  */
 export function ColorizedPinyin({ pinyin, n, className }: ColorizedPinyinProps) {
   if (n !== undefined && n > 1) {
+    if (pinyin.includes('//')) {
+      const groups = pinyin.split('//')
+      return (
+        <span className={className} style={{ whiteSpace: 'pre-wrap' }}>
+          {groups.map((group, gi) => {
+            const syls = group.split(/\s+/).filter(Boolean)
+            const toRender = syls.length > 0 ? syls : [group]
+            return (
+              <span key={gi}>
+                {gi > 0 && <span>//</span>}
+                {toRender.map((syl, i) => (
+                  <span key={i} style={{ color: TONE_COLORS[getTone(syl)] }}>{syl}</span>
+                ))}
+              </span>
+            )
+          })}
+        </span>
+      )
+    }
     const syllables = splitSyllables(pinyin, n)
     return (
       <span className={className} style={{ whiteSpace: 'pre-wrap' }}>

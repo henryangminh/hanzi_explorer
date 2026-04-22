@@ -220,7 +220,7 @@ export function FlashcardWidgetSettings({ widget, allNotebooks, onSave, onDelete
                 ] as const).map(({ value, labelKey, hintKey }) => (
                   <label
                     key={value}
-                    className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg border border-[var(--color-border)] cursor-pointer transition-colors hover:bg-[var(--color-bg-subtle)]"
+                    className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-[var(--color-border)] cursor-pointer transition-colors hover:bg-[var(--color-bg-subtle)]"
                     style={repeatMode === value ? { borderColor: 'var(--color-primary)', background: 'var(--color-bg-subtle)' } : {}}
                   >
                     <input
@@ -229,7 +229,7 @@ export function FlashcardWidgetSettings({ widget, allNotebooks, onSave, onDelete
                       value={value}
                       checked={repeatMode === value}
                       onChange={() => setRepeatMode(value)}
-                      className="accent-[var(--color-primary)] mt-0.5 flex-shrink-0"
+                      className="accent-[var(--color-primary)] flex-shrink-0"
                     />
                     <div>
                       <span className="text-sm text-[var(--color-text)] font-medium">{t(labelKey)}</span>

@@ -7,6 +7,7 @@ from sqlmodel import Session, select, func
 from app.core.cedict_utils import clean_meaning
 from app.core.pinyin import numeric_to_diacritic
 from app.models.character import Character, Definition, DictionarySource, PinyinReading
+from app.models.note import UserFlashcard
 from app.models.notebook import Notebook, NotebookEntry
 from app.models.sino_vn import SinoVietnamese
 from app.schemas.notebook import (
@@ -37,9 +38,25 @@ def _sort_notebooks(query, sort: SortOrder):
     return query.order_by(Notebook.updated_at.desc())
 
 
-def _to_response(session: Session, nb: Notebook) -> NotebookResponse:
+def _to_response(session: Session, nb: Notebook, user_id: int) -> NotebookResponse:
     count = session.exec(
         select(func.count(NotebookEntry.id)).where(NotebookEntry.notebook_id == nb.id)
+    ).one()
+    learned = session.exec(
+        select(func.count(UserFlashcard.id))
+        .join(Character, Character.simplified == UserFlashcard.char)
+        .join(NotebookEntry, NotebookEntry.char_id == Character.id)
+        .where(NotebookEntry.notebook_id == nb.id)
+        .where(UserFlashcard.user_id == user_id)
+        .where(UserFlashcard.status == "learned")
+    ).one()
+    not_learned = session.exec(
+        select(func.count(UserFlashcard.id))
+        .join(Character, Character.simplified == UserFlashcard.char)
+        .join(NotebookEntry, NotebookEntry.char_id == Character.id)
+        .where(NotebookEntry.notebook_id == nb.id)
+        .where(UserFlashcard.user_id == user_id)
+        .where(UserFlashcard.status == "not_learned")
     ).one()
     return NotebookResponse(
         id=nb.id,
@@ -49,6 +66,8 @@ def _to_response(session: Session, nb: Notebook) -> NotebookResponse:
         owner_id=nb.owner_id,
         sort_order=nb.sort_order,
         entry_count=count,
+        learned_count=learned,
+        not_learned_count=not_learned,
         created_at=nb.created_at,
         updated_at=nb.updated_at,
     )
@@ -81,7 +100,7 @@ def list_notebooks(
     private_notebooks = session.exec(private_stmt).all()
 
     all_notebooks = list(global_notebooks) + list(private_notebooks)
-    return [_to_response(session, nb) for nb in all_notebooks]
+    return [_to_response(session, nb, user_id) for nb in all_notebooks]
 
 
 def get_notebook(session: Session, notebook_id: int, user_id: int) -> Optional[NotebookDetail]:
@@ -132,13 +151,14 @@ def create_notebook(
     session.add(nb)
     session.commit()
     session.refresh(nb)
-    return _to_response(session, nb)
+    return _to_response(session, nb, user_id)
 
 
 def update_notebook(
     session: Session,
     nb: Notebook,
     data: NotebookUpdate,
+    user_id: int,
 ) -> NotebookResponse:
     if data.name is not None:
         nb.name = data.name
@@ -150,7 +170,7 @@ def update_notebook(
     session.add(nb)
     session.commit()
     session.refresh(nb)
-    return _to_response(session, nb)
+    return _to_response(session, nb, user_id)
 
 
 def delete_notebook(session: Session, nb: Notebook) -> None:
