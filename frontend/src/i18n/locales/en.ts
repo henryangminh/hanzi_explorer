@@ -91,6 +91,9 @@ export default {
       save: 'Save changes',
       saved: 'Saved!',
     },
+    pagination: {
+      perPage: 'per page',
+    },
     common: {
       loading: 'Loading...',
       streamingLoading: 'Finding more treasures',

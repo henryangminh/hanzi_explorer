@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timezone
 
 from sqlalchemy import text
@@ -7,6 +8,15 @@ from app.core.cedict_utils import clean_meaning
 from app.core.pinyin import numeric_to_diacritic
 from app.models.note import UserFlashcard
 from app.schemas.notebook import FlashcardCardResponse, FlashcardStatusUpdate
+
+_CEDICT_SKIP = re.compile(
+    r'^(old variant of|variant of|surname\b|CL:)',
+    re.IGNORECASE,
+)
+_CVDICT_SKIP = re.compile(
+    r'^(biến thể cũ|họ\b)',
+    re.IGNORECASE,
+)
 
 
 def _fetch_source_ids(session: Session) -> tuple[int, int]:
@@ -20,13 +30,22 @@ def _fetch_source_ids(session: Session) -> tuple[int, int]:
 def _cedict_brief(raw: str | None) -> str | None:
     if not raw:
         return None
-    return clean_meaning(raw).split(";")[0].strip()
+    cleaned = clean_meaning(raw)
+    for part in cleaned.split(";"):
+        part = part.strip()
+        if part and not _CEDICT_SKIP.match(part):
+            return part
+    return None
 
 
 def _cvdict_brief(raw: str | None) -> str | None:
     if not raw:
         return None
-    return raw.split("/")[0].strip()
+    for part in raw.split("/"):
+        part = part.strip()
+        if part and not _CVDICT_SKIP.match(part):
+            return part
+    return None
 
 
 def _pinyins(raw: str | None) -> list[str]:

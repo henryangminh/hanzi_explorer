@@ -92,17 +92,17 @@ export function Flashcard({ card, onStatusChange, compact = false }: FlashcardPr
       {/* Meanings */}
       <div className={cn('px-3 flex flex-col gap-1 justify-center', compact ? 'py-2 min-h-[44px]' : 'py-3 min-h-[64px]')}>
         {card.cedict_brief && (
-          <p className="text-[11px] text-[var(--color-text)] line-clamp-2 leading-snug">
+          <p className="text-[16px] text-[var(--color-text)] line-clamp-2 leading-snug">
             {card.cedict_brief}
           </p>
         )}
         {card.cvdict_brief && (
-          <p className="text-[11px] text-[var(--color-text-muted)] line-clamp-2 leading-snug">
+          <p className="text-[16px] text-[var(--color-text-muted)] line-clamp-2 leading-snug">
             {card.cvdict_brief}
           </p>
         )}
         {!card.cedict_brief && !card.cvdict_brief && (
-          <p className="text-[11px] text-[var(--color-text-muted)] italic">—</p>
+          <p className="text-[16px] text-[var(--color-text-muted)] italic">—</p>
         )}
       </div>
 

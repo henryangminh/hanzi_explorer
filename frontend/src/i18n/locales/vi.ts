@@ -98,6 +98,9 @@ export default {
       save: 'Lưu thay đổi',
       saved: 'Đã lưu!',
     },
+    pagination: {
+      perPage: 'từ/trang',
+    },
     common: {
       loading: 'Đang tải...',
       streamingLoading: 'Đang tìm kiếm thêm kho báu',
