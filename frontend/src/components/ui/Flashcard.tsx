@@ -23,6 +23,17 @@ export function Flashcard({ card, onStatusChange, compact = false }: FlashcardPr
   const [ripple, setRipple] = useState<Ripple | null>(null)
   const rippleKey = useRef(0)
   const [showDef, setShowDef] = useState(false)
+  const [hidingDef, setHidingDef] = useState(false)
+
+  function toggleDef(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (showDef) {
+      setHidingDef(true)
+      setTimeout(() => { setShowDef(false); setHidingDef(false) }, 200)
+    } else {
+      setShowDef(true)
+    }
+  }
 
   function handleStatus(clicked: 'learned' | 'not_learned', e: React.MouseEvent) {
     e.stopPropagation()
@@ -55,7 +66,7 @@ export function Flashcard({ card, onStatusChange, compact = false }: FlashcardPr
       ref={cardRef}
       className={cn(
         'relative flex flex-col border border-[var(--color-border-md)] rounded-xl shadow w-full overflow-hidden',
-        compact ? 'min-h-[190px]' : 'min-h-[304px]',
+        compact ? 'h-[200px]' : 'h-[420px]',
         statusClass ?? 'bg-[var(--color-bg)] transition-colors duration-[450ms]',
       )}
     >
@@ -80,20 +91,20 @@ export function Flashcard({ card, onStatusChange, compact = false }: FlashcardPr
         >
           {card.char}
         </span>
-        {card.pinyins.length > 0 && (
-          <span className="text-xs text-[var(--color-primary)] font-medium tracking-wide">
+        {showDef && card.pinyins.length > 0 && (
+          <span className={cn('text-xs text-[var(--color-primary)] font-medium tracking-wide', hidingDef && 'fc-hide')}>
             {card.pinyins[0]}
           </span>
         )}
         {showDef && card.sino_vn && (
-          <span className="text-xs text-[var(--color-text-muted)] font-medium tracking-wide">
+          <span className={cn('text-xs text-[var(--color-text-muted)] font-medium tracking-wide', hidingDef && 'fc-hide')}>
             {card.sino_vn}
           </span>
         )}
       </div>
 
       {showDef && (
-        <div className="fc-reveal">
+        <div className={hidingDef ? 'fc-hide' : 'fc-reveal'}>
           <div className="fc-divider mx-3 border-t border-[var(--color-border)]" />
           <div className={cn('px-3 flex flex-col gap-1 justify-center', compact ? 'py-2 min-h-[44px]' : 'py-3 min-h-[64px]')}>
             {card.cedict_brief && (
@@ -126,7 +137,7 @@ export function Flashcard({ card, onStatusChange, compact = false }: FlashcardPr
               ? 'border-sky-500 bg-sky-500 text-white'
               : 'border-sky-500 text-sky-500 hover:bg-sky-500 hover:text-white',
           )}
-          onClick={(e) => { e.stopPropagation(); setShowDef((v) => !v) }}
+          onClick={toggleDef}
           tabIndex={-1}
         >
           ?

@@ -448,7 +448,7 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
 
   return (
     <>
-      <div className="bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-xl p-4 flex flex-col gap-3">
+      <div className="bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-xl px-1 py-4 flex flex-col gap-3">
 
         {/* Header */}
         <div className="flex items-center justify-between min-w-0">
@@ -479,9 +479,9 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
                 : t('dashboard.noCards')}
           </div>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-0.5">
             <button type="button" onClick={prev}
-              className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors flex-shrink-0">
+              className="p-0.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors flex-shrink-0">
               <ChevronLeft size={20} />
             </button>
 
@@ -511,7 +511,7 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
             </div>
 
             <button type="button" onClick={next}
-              className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors flex-shrink-0">
+              className="p-0.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors flex-shrink-0">
               <ChevronRight size={20} />
             </button>
           </div>

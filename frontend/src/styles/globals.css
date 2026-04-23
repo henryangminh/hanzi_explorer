@@ -102,6 +102,13 @@
 .fc-reveal {
   animation: fc-reveal 0.22s ease-out forwards;
 }
+@keyframes fc-hide {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(8px); }
+}
+.fc-hide {
+  animation: fc-hide 0.18s ease-in forwards;
+}
 
 /* ── Flashcard ripple ────────────────────────────────────── */
 @keyframes fc-ripple {
