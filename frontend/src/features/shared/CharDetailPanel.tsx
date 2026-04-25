@@ -374,8 +374,10 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, pinyinF
         ) : (
           <span className="font-cjk text-3xl text-[var(--color-text)] leading-none">{entry.char}</span>
         )}
-        {traditional && traditional !== entry.char && (
-          <span className="font-cjk text-3xl text-[var(--color-text-muted)] leading-none">({traditional})</span>
+        {traditional && traditional !== entry.char && !traditional.includes('⁑') && (
+          <span className="font-cjk text-3xl text-[var(--color-text-muted)] leading-none">
+            ({titlePinyin ? <ColorizedHanzi char={traditional} pinyin={titlePinyin} /> : traditional})
+          </span>
         )}
       </div>
 

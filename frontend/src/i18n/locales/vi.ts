@@ -89,6 +89,15 @@ export default {
       strokes: 'Số nét',
       hsk: 'HSK',
     },
+    handwriting: {
+      title: 'Nhận diện chữ viết tay',
+      hint: 'Vẽ một chữ Hán để nhận diện',
+      undo: 'Xoá nét cuối',
+      clear: 'Xoá hết',
+      use: 'Dùng ký tự này',
+      recognizing: 'Đang nhận diện...',
+      noResult: 'Không nhận diện được',
+    },
     // profile
     profile: {
       title: 'Hồ sơ',
@@ -188,9 +197,6 @@ export default {
     flashcardLarge: {
       hintNav: 'chuyển thẻ',
       hintClose: 'đóng',
-    },
-    common: {
-      close: 'Đóng',
     },
     flashcards: {
       title: 'Flashcards',

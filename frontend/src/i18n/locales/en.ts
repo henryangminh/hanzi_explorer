@@ -83,6 +83,15 @@ export default {
       strokes: 'Strokes',
       hsk: 'HSK',
     },
+    handwriting: {
+      title: 'Handwriting Recognition',
+      hint: 'Draw a Chinese character to recognize',
+      undo: 'Undo stroke',
+      clear: 'Clear all',
+      use: 'Use this character',
+      recognizing: 'Recognizing...',
+      noResult: 'Not recognized',
+    },
     profile: {
       title: 'Profile',
       displayName: 'Display name',
@@ -180,9 +189,6 @@ export default {
     flashcardLarge: {
       hintNav: 'navigate',
       hintClose: 'close',
-    },
-    common: {
-      close: 'Close',
     },
     flashcards: {
       title: 'Flashcards',

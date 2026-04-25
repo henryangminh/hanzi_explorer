@@ -11,3 +11,5 @@ aiofiles==23.2.1
 pydantic-settings==2.3.0
 pandas
 hanzipy==1.0.4
+paddleocr>=2.7.0
+Pillow>=10.0.0

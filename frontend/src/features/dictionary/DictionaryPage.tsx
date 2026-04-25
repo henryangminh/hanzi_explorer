@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams, Link } from 'react-router-dom'
-import { Search, ChevronDown, ChevronUp, BookmarkPlus, X, Check, BookOpen } from 'lucide-react'
+import { Search, ChevronDown, ChevronUp, BookmarkPlus, X, Check, BookOpen, PenLine } from 'lucide-react'
 import type { DictLiteResponse } from '@/types'
 import { CharDetailPanel } from '@/features/shared/CharDetailPanel'
 import { Button } from '@/components/ui/Button'
+import { HandwritingPad } from '@/components/ui/HandwritingPad'
 import { cn } from '@/lib/cn'
 import { ColorizedPinyin, ColorizedHanzi } from '@/lib/pinyinColor'
 import { SaveToNotebookModal } from '@/features/shared/SaveToNotebookModal'
@@ -120,7 +121,7 @@ function EntryCard({
               {lite.char}
             </span>
           )}
-          {previewTraditional && previewTraditional !== lite.char && previewPinyin && (
+          {previewTraditional && previewTraditional !== lite.char && !previewTraditional.includes('⁑') && previewPinyin && (
             <span className={cn('font-cjk leading-none text-[var(--color-text-muted)] cursor-text', isMultiChar ? 'text-3xl' : 'text-2xl')}>
               (<ColorizedHanzi char={previewTraditional} pinyin={previewPinyin} />)
             </span>
@@ -252,8 +253,52 @@ export function DictionaryPage() {
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
 
   const [historyPopupOpen, setHistoryPopupOpen] = useState(false)
+  
+  const [handwritingMounted, setHandwritingMounted] = useState(false)
+  const [handwritingVisible, setHandwritingVisible] = useState(false)
+
+  const openHandwriting = () => {
+    setHandwritingMounted(true)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setHandwritingVisible(true)
+      })
+    })
+  }
+
+  const closeHandwriting = () => {
+    setHandwritingVisible(false)
+    setTimeout(() => {
+      setHandwritingMounted(false)
+    }, 200) // 200ms transition
+  }
+
+  const toggleHandwriting = () => {
+    if (handwritingMounted) {
+      closeHandwriting()
+    } else {
+      openHandwriting()
+    }
+  }
 
   const handledParamRef = useRef(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  function insertAtCursor(char: string) {
+    const input = inputRef.current
+    if (!input) {
+      setQuery(query + char)
+      return
+    }
+    const start = input.selectionStart ?? input.value.length
+    const end = input.selectionEnd ?? input.value.length
+    const newVal = input.value.slice(0, start) + char + input.value.slice(end)
+    setQuery(newVal)
+    // Restore cursor after React re-renders the controlled input
+    requestAnimationFrame(() => {
+      input.setSelectionRange(start + char.length, start + char.length)
+    })
+  }
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null
 
@@ -324,6 +369,9 @@ export function DictionaryPage() {
 
   const handleSearch = async (e?: React.SyntheticEvent) => {
     e?.preventDefault()
+    if (window.innerWidth < 640 && handwritingMounted) {
+      closeHandwriting()
+    }
     await runSearch(query)
   }
 
@@ -383,25 +431,76 @@ export function DictionaryPage() {
           )}
         </div>
 
-        <form onSubmit={handleSearch} className="flex gap-2">
-          <div className="relative flex-1">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Nhập từ cần tra (vd: 我可以游泳, 指导, bukeqi, ming2tian1)"
-              className={cn(
-                'w-full pl-9 pr-3 py-2 rounded-lg text-sm font-cjk',
-                'bg-[var(--color-bg-surface)] text-[var(--color-text)]',
-                'border border-[var(--color-border)] focus:border-[var(--color-primary)]',
-                'outline-none transition-colors placeholder:text-[var(--color-text-muted)] placeholder:font-sans'
+        <div className="relative">
+          <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
+              <input
+                ref={inputRef}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Nhập từ cần tra (vd: 我可以游泳, 指导, bukeqi, ming2tian1)"
+                className={cn(
+                  'w-full pl-9 pr-9 py-2 rounded-lg text-sm font-cjk',
+                  'bg-[var(--color-bg-surface)] text-[var(--color-text)]',
+                  'border border-[var(--color-border)] focus:border-[var(--color-primary)]',
+                  'outline-none transition-colors placeholder:text-[var(--color-text-muted)] placeholder:font-sans'
+                )}
+              />
+              {query.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => { setQuery(''); inputRef.current?.focus() }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors p-0.5"
+                  title="Clear"
+                >
+                  <X size={15} />
+                </button>
               )}
-            />
-          </div>
-          <Button type="submit" isLoading={activeTab?.loading && activeTab.results.length === 0}>
-            {t('dictionary.title')}
-          </Button>
-        </form>
+            </div>
+            <div className="flex gap-2 max-sm:justify-between">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-1/4 sm:w-auto justify-center sm:flex-none"
+                onClick={toggleHandwriting}
+                title={t('handwriting.title')}
+              >
+                <PenLine size={16} />
+              </Button>
+              <Button 
+                type="submit" 
+                className="w-1/4 sm:w-auto justify-center sm:flex-none"
+                isLoading={activeTab?.loading && activeTab.results.length === 0}
+              >
+                {t('dictionary.title')}
+              </Button>
+            </div>
+          </form>
+
+          {handwritingMounted && (
+            <div 
+              className={cn(
+                "z-[50] transition-all duration-200 ease-out origin-top-right",
+                // desktop base
+                "sm:absolute sm:right-0 sm:top-full sm:mt-1", 
+                // mobile base
+                "max-sm:fixed max-sm:bottom-0 max-sm:left-0 max-sm:right-0 max-sm:pointer-events-none max-sm:flex max-sm:justify-center",
+                // active visible styles
+                handwritingVisible 
+                  ? "opacity-100 sm:scale-100 max-sm:translate-y-0" 
+                  : "opacity-0 sm:scale-95 sm:-translate-y-2 max-sm:translate-y-full"
+              )}
+            >
+              <div className="w-full sm:w-auto pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                <HandwritingPad
+                  onInsertChar={insertAtCursor}
+                  onClose={closeHandwriting}
+                />
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* ── Tabs ── */}
         {tabs.length > 0 && (
