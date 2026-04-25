@@ -175,6 +175,14 @@ export default {
       repeatUnlearnedHint: 'Only show cards marked with red (not learned)',
       repeatNone: 'No repeat',
       repeatNoneHint: 'Never repeat any previously seen card',
+      expandWidget: 'Expand',
+    },
+    flashcardLarge: {
+      hintNav: 'navigate',
+      hintClose: 'close',
+    },
+    common: {
+      close: 'Close',
     },
     flashcards: {
       title: 'Flashcards',

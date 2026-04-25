@@ -44,17 +44,20 @@ export const useFlashcardStore = create<FlashcardState>()(
     (set) => ({
       widgets: [],
 
-      addWidget: (config) => set((state) => ({
-        widgets: [
-          ...state.widgets,
-          {
-            ...config,
-            id: generateId(),
-            cards: [],
-            lastRefreshed: null,
-          },
-        ],
-      })),
+      addWidget: (config) => set((state) => {
+        if (state.widgets.length >= 3) return state
+        return {
+          widgets: [
+            ...state.widgets,
+            {
+              ...config,
+              id: generateId(),
+              cards: [],
+              lastRefreshed: null,
+            },
+          ],
+        }
+      }),
 
       updateWidget: (id, updates) => set((state) => ({
         widgets: state.widgets.map((w) =>

@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, Settings, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Settings, Loader2, Expand } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/cn'
 import api from '@/lib/axios'
 import type { FlashcardEntry, NotebookResponse } from '@/types'
 import { useFlashcardStore, getIntervalMs, type FlashcardWidgetConfig, type RepeatMode } from '@/store/flashcard.store'
 import { Flashcard } from '@/components/ui/Flashcard'
+import { FlashcardLarge } from '@/components/ui/FlashcardLarge'
+import { MiniCalendar } from '@/components/ui/MiniCalendar'
 import { FlashcardWidgetSettings } from './FlashcardWidgetSettings'
 
 // ── Helpers ───────────────────────────────────────────────
@@ -19,114 +21,6 @@ function getStoredDateStr(iso: string | null): string | null {
   if (!iso) return null
   const d = new Date(iso)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-// ── Mini calendar ─────────────────────────────────────────
-
-interface CalendarProps {
-  year: number
-  month: number
-  wotdDates: Set<string>
-  viewDate: string | null   // null = today (current cards)
-  today: string
-  onSelect: (date: string) => void
-  onPrevMonth: () => void
-  onNextMonth: () => void
-}
-
-function MiniCalendar({ year, month, wotdDates, viewDate, today, onSelect, onPrevMonth, onNextMonth }: CalendarProps) {
-  const { i18n } = useTranslation()
-  const isVi = i18n.language === 'vi'
-
-  const monthLabel = new Date(year, month).toLocaleDateString(
-    isVi ? 'vi-VN' : 'en-US',
-    { month: 'long', year: 'numeric' },
-  )
-
-  const dayHeaders = isVi
-    ? ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
-    : ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
-
-  // Monday-first grid
-  const firstDow = (new Date(year, month, 1).getDay() + 6) % 7
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const cells: (string | null)[] = [
-    ...Array(firstDow).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => {
-      const d = i + 1
-      return `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-    }),
-  ]
-  while (cells.length % 7 !== 0) cells.push(null)
-
-  // selected = viewDate if set, otherwise today
-  const selected = viewDate ?? today
-
-  return (
-    <div className="mt-2 select-none">
-      {/* Month nav */}
-      <div className="flex items-center justify-between mb-1">
-        <button
-          type="button"
-          onClick={onPrevMonth}
-          className="p-0.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors"
-        >
-          <ChevronLeft size={13} />
-        </button>
-        <span className="text-[11px] font-medium text-[var(--color-text)] capitalize">{monthLabel}</span>
-        <button
-          type="button"
-          onClick={onNextMonth}
-          className="p-0.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors"
-        >
-          <ChevronRight size={13} />
-        </button>
-      </div>
-
-      {/* Day headers */}
-      <div className="grid grid-cols-7 mb-0.5">
-        {dayHeaders.map((d) => (
-          <span key={d} className="text-center text-[9px] font-medium text-[var(--color-text-muted)] py-0.5">
-            {d}
-          </span>
-        ))}
-      </div>
-
-      {/* Day cells */}
-      <div className="grid grid-cols-7 gap-y-0.5">
-        {cells.map((dateStr, i) => {
-          if (!dateStr) return <div key={`pad-${i}`} />
-
-          const isToday = dateStr === today
-          const isSelected = dateStr === selected
-          const hasWOTD = wotdDates.has(dateStr)
-          const isFuture = dateStr > today
-          const isClickable = (hasWOTD || isToday) && !isFuture
-
-          return (
-            <button
-              key={dateStr}
-              type="button"
-              onClick={() => isClickable && onSelect(dateStr)}
-              disabled={!isClickable}
-              className={cn(
-                'relative flex flex-col items-center justify-center h-6 rounded transition-colors text-[10px] w-full',
-                isSelected && 'bg-[var(--color-primary)] text-[var(--color-primary-fg)] font-semibold',
-                !isSelected && isToday && 'ring-1 ring-[var(--color-primary)] text-[var(--color-primary)] font-semibold',
-                !isSelected && !isToday && isClickable && 'text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)]',
-                !isClickable && 'text-[var(--color-border-md)] cursor-default',
-              )}
-            >
-              {parseInt(dateStr.slice(-2), 10)}
-              {hasWOTD && !isSelected && (
-                <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[var(--color-primary)]" />
-              )}
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
 }
 
 // ── Main component ────────────────────────────────────────
@@ -144,6 +38,7 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [largeOpen, setLargeOpen] = useState(false)
   const [exitClass, setExitClass] = useState('')
   const [enterKey, setEnterKey] = useState(0)
   const [entering, setEntering] = useState(false)
@@ -451,9 +346,17 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
       <div className="bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-xl px-1 py-4 flex flex-col gap-3">
 
         {/* Header */}
-        <div className="flex items-center justify-between min-w-0">
+        <div className="flex items-center justify-between min-w-0 px-2.5">
           <h3 className="text-sm font-semibold text-[var(--color-text)] truncate">{widget.name}</h3>
           <div className="flex items-center gap-0.5 flex-shrink-0 ml-2">
+            <button
+              type="button"
+              onClick={() => setLargeOpen(true)}
+              title={t('dashboard.expandWidget')}
+              className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors"
+            >
+              <Expand size={13} />
+            </button>
             <button
               type="button"
               onClick={() => setSettingsOpen(true)}
@@ -588,6 +491,20 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
           onSave={handleSaveSettings}
           onDelete={widget.isDefault ? undefined : handleDelete}
           onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {largeOpen && (
+        <FlashcardLarge
+          cards={activeCards}
+          initialIndex={safeIndex}
+          onClose={() => setLargeOpen(false)}
+          onStatusChange={(char, status) => handleCardStatusChange(char, status)}
+          isWotd={widget.isDefault}
+          wotdDates={wotdDates}
+          viewDate={viewDate}
+          onSelectDate={selectCalendarDate}
+          onBackToToday={backToToday}
         />
       )}
     </>

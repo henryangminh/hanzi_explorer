@@ -183,6 +183,14 @@ export default {
       repeatUnlearnedHint: 'Chỉ hiện những từ đã đánh dấu đỏ (chưa học)',
       repeatNone: 'Không lặp',
       repeatNoneHint: 'Không lặp lại bất kì từ nào đã xem',
+      expandWidget: 'Mở rộng',
+    },
+    flashcardLarge: {
+      hintNav: 'chuyển thẻ',
+      hintClose: 'đóng',
+    },
+    common: {
+      close: 'Đóng',
     },
     flashcards: {
       title: 'Flashcards',

@@ -66,7 +66,7 @@ export function Flashcard({ card, onStatusChange, compact = false }: FlashcardPr
       ref={cardRef}
       className={cn(
         'relative flex flex-col border border-[var(--color-border-md)] rounded-xl shadow w-full overflow-hidden',
-        compact ? 'h-[200px]' : 'h-[420px]',
+        'aspect-[3/5]',
         statusClass ?? 'bg-[var(--color-bg)] transition-colors duration-[450ms]',
       )}
     >

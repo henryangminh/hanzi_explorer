@@ -101,14 +101,16 @@ export function HomePage() {
         ))}
 
         {/* Add-widget button */}
-        <button
-          type="button"
-          onClick={() => setAddingWidget(true)}
-          className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-[var(--color-border)] rounded-xl p-8 text-[var(--color-text-muted)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors min-h-[120px]"
-        >
-          <Plus size={22} />
-          <span className="text-sm font-medium">{t('dashboard.addWidget')}</span>
-        </button>
+        {widgets.length < 3 && (
+          <button
+            type="button"
+            onClick={() => setAddingWidget(true)}
+            className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-[var(--color-border)] rounded-xl p-8 text-[var(--color-text-muted)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors min-h-[120px]"
+          >
+            <Plus size={22} />
+            <span className="text-sm font-medium">{t('dashboard.addWidget')}</span>
+          </button>
+        )}
       </div>
 
       {/* Add-widget settings modal */}
