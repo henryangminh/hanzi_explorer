@@ -1,12 +1,14 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, Check } from 'lucide-react'
+import { X, Check, Expand } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { formatUmlaut } from '@/lib/pinyinColor'
 import type { FlashcardEntry } from '@/types'
 
 interface FlashcardProps {
   card: FlashcardEntry
   onStatusChange?: (status: 'learned' | 'not_learned' | null) => void
+  onExpand?: () => void
   compact?: boolean
 }
 
@@ -17,7 +19,7 @@ interface Ripple {
   color: string
 }
 
-export function Flashcard({ card, onStatusChange, compact = false }: FlashcardProps) {
+export function Flashcard({ card, onStatusChange, onExpand, compact = false }: FlashcardProps) {
   const navigate = useNavigate()
   const cardRef = useRef<HTMLDivElement>(null)
   const [ripple, setRipple] = useState<Ripple | null>(null)
@@ -83,6 +85,17 @@ export function Flashcard({ card, onStatusChange, compact = false }: FlashcardPr
         />
       )}
 
+      {onExpand && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onExpand() }}
+          className="absolute top-2 right-2 p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors z-10"
+          title="Mở rộng"
+        >
+          <Expand size={compact ? 12 : 14} />
+        </button>
+      )}
+
       {/* Character + pinyin */}
       <div className={cn('flex-1 flex flex-col items-center justify-center px-4 gap-1', compact ? 'pt-4 pb-2' : 'pt-6 pb-3')}>
         <span
@@ -93,7 +106,7 @@ export function Flashcard({ card, onStatusChange, compact = false }: FlashcardPr
         </span>
         {showDef && card.pinyins.length > 0 && (
           <span className={cn('text-xs text-[var(--color-primary)] font-medium tracking-wide', hidingDef && 'fc-hide')}>
-            {card.pinyins[0]}
+            {formatUmlaut(card.pinyins[0])}
           </span>
         )}
         {showDef && card.sino_vn && (

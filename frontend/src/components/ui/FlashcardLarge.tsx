@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { X, Check, ChevronLeft, ChevronRight, X as CloseIcon } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X as CloseIcon, Check, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { formatUmlaut } from '@/lib/pinyinColor'
 import type { FlashcardEntry } from '@/types'
 import { MiniCalendar } from './MiniCalendar'
 
@@ -179,7 +180,7 @@ export function FlashcardLarge({
               >
                 <div
                   className={cn(
-                    'flex flex-col border border-[var(--color-border-md)] rounded-2xl shadow-2xl w-full h-full overflow-hidden',
+                    '@container flex flex-col border border-[var(--color-border-md)] rounded-2xl shadow-2xl w-full h-full overflow-hidden',
                     statusClass ?? 'bg-[var(--color-bg)] transition-colors duration-[450ms]',
                   )}
                 >
@@ -191,16 +192,23 @@ export function FlashcardLarge({
                     className="flex flex-col items-center justify-center px-6 gap-2 py-4 min-h-0"
                     style={{ flex: 2 }}
                   >
-                    <span
-                      className="font-cjk font-bold text-[var(--color-text)] leading-none select-none cursor-pointer hover:text-[var(--color-primary)] transition-colors"
-                      style={{ fontSize: 'clamp(3rem, 10cqh, 7rem)' }}
+                    <div
+                      className="font-cjk font-bold text-[var(--color-text)] leading-none select-none cursor-pointer hover:text-[var(--color-primary)] transition-colors text-center"
+                      style={{
+                        fontSize: card.char.length >= 4 
+                          ? 'clamp(2.5rem, 22.5cqw, 4.25rem)' 
+                          : card.char.length === 3
+                            ? 'clamp(3rem, 28cqw, 5.5rem)'
+                            : 'clamp(3.5rem, 12cqh, 7rem)',
+                        wordBreak: 'keep-all'
+                      }}
                       onClick={() => goToDict(`/dictionary?q=${encodeURIComponent(card.char)}`)}
                     >
                       {card.char}
-                    </span>
+                    </div>
                     {showDef && card.pinyins.length > 0 && (
                       <span className={cn('text-xl text-[var(--color-primary)] font-medium tracking-wide', hidingDef && 'fc-hide')}>
-                        {card.pinyins[0]}
+                        {formatUmlaut(card.pinyins[0])}
                       </span>
                     )}
                     {showDef && card.sino_vn && (

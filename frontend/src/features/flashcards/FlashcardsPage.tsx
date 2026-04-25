@@ -5,6 +5,7 @@ import { cn } from '@/lib/cn'
 import api from '@/lib/axios'
 import { useFlashcardStore } from '@/store/flashcard.store'
 import { Flashcard } from '@/components/ui/Flashcard'
+import { FlashcardLarge } from '@/components/ui/FlashcardLarge'
 import { Pagination } from '@/components/ui/Pagination'
 import type { FlashcardEntry } from '@/types'
 
@@ -24,6 +25,15 @@ export function FlashcardsPage() {
   const [learnedPageSize, setLearnedPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [unlearnedPage, setUnlearnedPage] = useState(1)
   const [unlearnedPageSize, setUnlearnedPageSize] = useState(DEFAULT_PAGE_SIZE)
+
+  const [largeCards, setLargeCards] = useState<FlashcardEntry[]>([])
+  const [largeIndex, setLargeIndex] = useState<number>(0)
+
+  const handleOpenLarge = (card: FlashcardEntry, sourceCards: FlashcardEntry[]) => {
+    const idx = sourceCards.findIndex((c) => c.char === card.char)
+    setLargeCards(sourceCards)
+    setLargeIndex(Math.max(0, idx))
+  }
 
   const fetchMarked = useCallback(async () => {
     setLoading(true)
@@ -140,6 +150,7 @@ export function FlashcardsPage() {
                       key={card.char}
                       card={card}
                       compact
+                      onExpand={() => handleOpenLarge(card, learned)}
                       onStatusChange={(status) => handleStatusChange(card.char, status)}
                     />
                   ))}
@@ -178,6 +189,7 @@ export function FlashcardsPage() {
                       key={card.char}
                       card={card}
                       compact
+                      onExpand={() => handleOpenLarge(card, unlearned)}
                       onStatusChange={(status) => handleStatusChange(card.char, status)}
                     />
                   ))}
@@ -194,6 +206,15 @@ export function FlashcardsPage() {
             )
           )}
         </>
+      )}
+
+      {largeCards.length > 0 && (
+        <FlashcardLarge
+          cards={largeCards}
+          initialIndex={largeIndex}
+          onClose={() => setLargeCards([])}
+          onStatusChange={handleStatusChange}
+        />
       )}
     </div>
   )

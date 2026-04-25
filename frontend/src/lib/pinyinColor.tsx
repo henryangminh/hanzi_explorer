@@ -15,6 +15,15 @@ function getTone(syllable: string): 1 | 2 | 3 | 4 | 5 {
   return 5
 }
 
+export function formatUmlaut(s: string): string {
+  return s
+    .replace(/ū:/g, 'ǖ')
+    .replace(/ú:/g, 'ǘ')
+    .replace(/ǔ:/g, 'ǚ')
+    .replace(/ù:/g, 'ǜ')
+    .replace(/u:/g, 'ü')
+}
+
 // ── Syllable splitter for no-space tone-marked pinyin (xdhy format) ──────────
 
 // Maps tone-marked vowels + bare ü → ASCII base (ü → v for matching)
@@ -124,9 +133,10 @@ interface ColorizedPinyinProps {
  * When n is provided and pinyin has no spaces, uses syllable DP splitting (xdhy format).
  */
 export function ColorizedPinyin({ pinyin, n, className }: ColorizedPinyinProps) {
+  const p = formatUmlaut(pinyin)
   if (n !== undefined && n > 1) {
-    if (pinyin.includes('//')) {
-      const groups = pinyin.split('//')
+    if (p.includes('//')) {
+      const groups = p.split('//')
       return (
         <span className={className} style={{ whiteSpace: 'pre-wrap' }}>
           {groups.map((group, gi) => {
@@ -144,7 +154,7 @@ export function ColorizedPinyin({ pinyin, n, className }: ColorizedPinyinProps) 
         </span>
       )
     }
-    const syllables = splitSyllables(pinyin, n)
+    const syllables = splitSyllables(p, n)
     return (
       <span className={className} style={{ whiteSpace: 'pre-wrap' }}>
         {syllables.map((syl, i) => (
@@ -155,7 +165,7 @@ export function ColorizedPinyin({ pinyin, n, className }: ColorizedPinyinProps) 
   }
 
   // Space/slash-separated format: split while keeping delimiters for display
-  const parts = pinyin.split(/(\s+|\/\/)/)
+  const parts = p.split(/(\s+|\/\/)/)
   return (
     <span className={className}>
       {parts.map((part, i) => {
@@ -185,7 +195,8 @@ interface ColorizedHanziProps {
  */
 export function ColorizedHanzi({ char, pinyin, className }: ColorizedHanziProps) {
   const chars = [...char]
-  const syllables = splitSyllables(pinyin, chars.length)
+  const p = formatUmlaut(pinyin)
+  const syllables = splitSyllables(p, chars.length)
 
   return (
     <span className={className}>
