@@ -145,10 +145,19 @@ export function FlashcardLarge({
         Navbar ends at pt-14 (56px). Card starts at 56+48 = 104px.
         Counter center at 56+24 = 80px → equidistant 24px from both edges.
       */}
-      <div className="flex-none h-12 flex items-center justify-center px-4">
-        <p className="text-sm text-[var(--color-text-muted)]">
+      <div className="flex-none h-12 flex items-center px-4">
+        <button
+          type="button"
+          onClick={triggerClose}
+          title={t('common.back')}
+          className="sm:hidden p-2 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
+        >
+          <ChevronLeft size={20} />
+        </button>
+        <p className="flex-1 text-center text-sm text-[var(--color-text-muted)]">
           {total > 0 ? `${safeIndex + 1} / ${total}` : '—'}
         </p>
+        <div className="sm:hidden w-9" />
       </div>
 
       {/*
@@ -253,7 +262,7 @@ export function FlashcardLarge({
           {/* Right column: close (top-aligned to counter) + next (center) — share same X */}
           <div className="flex-none h-full relative flex flex-col items-center">
             {/* Positioned absolutely to overlap perfectly with the top row (h-12) */}
-            <div className="absolute -top-12 h-12 flex items-center justify-center">
+            <div className="absolute -top-12 h-12 items-center justify-center hidden sm:flex">
               <button
                 type="button"
                 onClick={triggerClose}

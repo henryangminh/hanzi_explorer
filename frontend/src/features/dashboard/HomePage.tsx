@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { cn } from '@/lib/cn'
 import api from '@/lib/axios'
 import { useAuthStore } from '@/store/auth.store'
 import { useFlashcardStore, type FlashcardWidgetConfig } from '@/store/flashcard.store'
@@ -30,6 +31,8 @@ export function HomePage() {
   const [allNotebooks, setAllNotebooks] = useState<NotebookResponse[]>([])
   const [notebooksLoaded, setNotebooksLoaded] = useState(false)
   const [addingWidget, setAddingWidget] = useState(false)
+  const [mobileIndex, setMobileIndex] = useState(0)
+  const mobileTouchStartX = useRef<number | null>(null)
 
   // ── Load notebooks ────────────────────────────────────────
   useEffect(() => {
@@ -81,6 +84,33 @@ export function HomePage() {
     setAddingWidget(false)
   }
 
+  // ── Mobile carousel helpers ───────────────────────────────
+  // Include add-widget slot as last carousel item when < 3 widgets
+  const mobileItems: Array<{ type: 'widget'; id: string } | { type: 'add' }> = [
+    ...sortedWidgets.map((w) => ({ type: 'widget' as const, id: w.id })),
+    ...(widgets.length < 3 ? [{ type: 'add' as const }] : []),
+  ]
+  const safeMobileIndex = mobileItems.length > 0 ? mobileIndex % mobileItems.length : 0
+
+  function navMobile(dir: 'prev' | 'next') {
+    const len = mobileItems.length
+    if (len === 0) return
+    setMobileIndex((i) => dir === 'next' ? (i + 1) % len : (i - 1 + len) % len)
+  }
+
+  function handleMobileTouchStart(e: React.TouchEvent) {
+    mobileTouchStartX.current = e.touches[0].clientX
+  }
+
+  function handleMobileTouchEnd(e: React.TouchEvent) {
+    if (mobileTouchStartX.current === null) return
+    const delta = e.changedTouches[0].clientX - mobileTouchStartX.current
+    if (Math.abs(delta) > 40) navMobile(delta < 0 ? 'next' : 'prev')
+    mobileTouchStartX.current = null
+  }
+
+  const currentMobileItem = mobileItems[safeMobileIndex]
+
   // ── Render ────────────────────────────────────────────────
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 flex flex-col gap-6">
@@ -90,8 +120,78 @@ export function HomePage() {
         {t('dashboard.greeting', { name: user?.display_name ?? '' })}
       </h1>
 
-      {/* Widget grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+      {/* Mobile carousel (< sm) */}
+      <div className="sm:hidden flex flex-col gap-3">
+        {/* Grid overlay: all items in same cell so height = tallest item, no layout shift */}
+        <div
+          className="grid grid-rows-1 grid-cols-1 [touch-action:pan-y]"
+          onTouchStart={handleMobileTouchStart}
+          onTouchEnd={handleMobileTouchEnd}
+        >
+          {sortedWidgets.map((w) => {
+            const isActive = currentMobileItem?.type === 'widget' && currentMobileItem.id === w.id
+            return (
+              <div
+                key={w.id}
+                className="row-start-1 col-start-1"
+                style={{ visibility: isActive ? 'visible' : 'hidden', pointerEvents: isActive ? 'auto' : 'none' }}
+              >
+                <FlashcardWidget widget={w} allNotebooks={allNotebooks} />
+              </div>
+            )
+          })}
+          {widgets.length < 3 && (
+            <div
+              className="row-start-1 col-start-1 flex items-center justify-center"
+              style={{
+                visibility: currentMobileItem?.type === 'add' ? 'visible' : 'hidden',
+                pointerEvents: currentMobileItem?.type === 'add' ? 'auto' : 'none',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setAddingWidget(true)}
+                className="w-full flex flex-col items-center justify-center gap-2 border-2 border-dashed border-[var(--color-border)] rounded-xl p-8 text-[var(--color-text-muted)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors min-h-[120px]"
+              >
+                <Plus size={22} />
+                <span className="text-sm font-medium">{t('dashboard.addWidget')}</span>
+              </button>
+            </div>
+          )}
+        </div>
+        {mobileItems.length > 1 && (
+          <div className="flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => navMobile('prev')}
+              className="p-1 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <div className="flex gap-2">
+              {mobileItems.map((_, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    'w-1.5 h-1.5 rounded-full transition-colors',
+                    i === safeMobileIndex ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-border)]',
+                  )}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => navMobile('next')}
+              className="p-1 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Desktop grid (>= sm) */}
+      <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
         {sortedWidgets.map((widget) => (
           <FlashcardWidget
             key={widget.id}
@@ -99,8 +199,6 @@ export function HomePage() {
             allNotebooks={allNotebooks}
           />
         ))}
-
-        {/* Add-widget button */}
         {widgets.length < 3 && (
           <button
             type="button"
