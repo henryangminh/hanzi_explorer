@@ -1,9 +1,10 @@
 from sqlmodel import Session, select
 
-from app.models.character import Character, PinyinReading
+from app.models.character import Character
 from app.models.sino_vn import SinoVietnamese
 from app.models.synonym_antonym import Antonym, SynonymMember
 from app.schemas.dictionary import WordInfo
+from app.services.character_lookup import get_primary_reading
 
 
 def _get_word_info(session: Session, word: str) -> WordInfo:
@@ -13,11 +14,7 @@ def _get_word_info(session: Session, word: str) -> WordInfo:
     # Pinyin: first reading of the word's character
     char_row = session.exec(select(Character).where(Character.simplified == word)).first()
     if char_row:
-        pr = session.exec(
-            select(PinyinReading)
-            .where(PinyinReading.character_id == char_row.id)
-            .order_by(PinyinReading.id)
-        ).first()
+        pr = get_primary_reading(session, char_row.id)
         pinyin = pr.pinyin if pr else ''
 
     # Hán Việt: compose reading char by char (first sv reading per char)
@@ -66,5 +63,5 @@ def lookup_antonyms(session: Session, char: str) -> list[WordInfo]:
     as_word1 = session.exec(select(Antonym.word2).where(Antonym.word1 == char)).all()
     as_word2 = session.exec(select(Antonym.word1).where(Antonym.word2 == char)).all()
 
-    words = list({*as_word1, *as_word2})
+    words = list(dict.fromkeys([*as_word1, *as_word2]))  # dedupe, keep a stable order
     return [_get_word_info(session, w) for w in words]

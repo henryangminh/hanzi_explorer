@@ -1,281 +1,22 @@
-import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, ArrowLeft, BookmarkPlus } from 'lucide-react'
-import { useRadicalList } from './useRadicals'
-import { cn } from '@/lib/cn'
-import { ColorizedPinyin, ColorizedHanzi } from '@/lib/pinyinColor'
-import type { RadicalSummary } from '@/types'
-import api from '@/lib/axios'
-import { SaveToNotebookModal } from '@/features/shared/SaveToNotebookModal'
-import { CharDetailPanel } from '@/features/shared/CharDetailPanel'
+import { groupByStrokeCount } from '@/lib/groupBy'
 import { useUIStore } from '@/store/ui.store'
-import { useNavigate } from 'react-router-dom'
-import { useDictionaryStore } from '@/store/dictionary.store'
-
-interface CharCard { char: string; pinyin: string; meaning_en: string; stroke_count?: number | null }
-
-// ── Char detail panel (inside popup) ─────────────────────
-// Dùng CharDetailPanel shared — tự fetch DB data + Wiktionary lazy
-
-function CharDetail({ char, onBack }: { char: string; onBack: () => void }) {
-  const { t } = useTranslation()
-  const navigate = useNavigate()
-  const { tabs, setActiveTabId } = useDictionaryStore()
-  const [saveModalOpen, setSaveModalOpen] = useState(false)
-  const [headerInfo, setHeaderInfo] = useState<{ pinyin: string; sinoVn: string[] } | null>(null)
-
-  const handleGoToDict = (word: string) => {
-    const existingTab = tabs.find((t) => t.query === word && t.results.length > 0)
-    if (existingTab) {
-      setActiveTabId(existingTab.id)
-      navigate('/dictionary')
-    } else {
-      navigate(`/dictionary?q=${encodeURIComponent(word)}`)
-    }
-  }
-
-  return (
-    <div className="flex flex-col h-full">
-      {saveModalOpen && (
-        <SaveToNotebookModal char={char} onClose={() => setSaveModalOpen(false)} />
-      )}
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--color-border)] shrink-0">
-        <button onClick={onBack}
-          title={t('common.back')}
-          className="p-1.5 rounded-lg hover:bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] transition-colors">
-          <ArrowLeft size={16} />
-        </button>
-        <div className="flex-1 min-w-0 flex items-baseline gap-x-2.5 flex-wrap">
-          {headerInfo?.pinyin
-            ? <ColorizedHanzi char={char} pinyin={headerInfo.pinyin} className="font-cjk text-4xl leading-none" />
-            : <span className="font-cjk text-4xl text-[var(--color-primary)] leading-none">{char}</span>}
-          {headerInfo && (
-            <span className="text-sm text-[var(--color-text-muted)]">
-              <ColorizedPinyin pinyin={headerInfo.pinyin} n={[...char].length} />
-              {headerInfo.sinoVn.length > 0 && (
-                <span className="ml-1.5 text-[var(--color-primary)]">· {headerInfo.sinoVn.join(', ')}</span>
-              )}
-            </span>
-          )}
-        </div>
-        <button
-          onClick={() => setSaveModalOpen(true)}
-          className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-bg-subtle)] transition-colors shrink-0"
-          title={t('notebooks.saveToNotebook')}
-        >
-          <BookmarkPlus size={16} />
-        </button>
-      </div>
-
-      {/* Body — CharDetailPanel handles all loading: DB data first, then Wiktionary */}
-      <div className="flex-1 overflow-y-auto px-4 py-3">
-        <CharDetailPanel
-          char={char}
-          showNotes={true}
-          onDataLoaded={(entry) => setHeaderInfo({
-            pinyin: entry.cedict[0]?.pinyin ?? '',
-            sinoVn: entry.sino_vn ?? [],
-          })}
-          onWordClick={handleGoToDict}
-        />
-      </div>
-    </div>
-  )
-}
-
-
-// ── Radical char grid popup ───────────────────────────────
-
-function RadicalPopup({
-  radical,
-  onClose,
-}: {
-  radical: RadicalSummary
-  onClose: () => void
-}) {
-  const [chars, setChars] = useState<CharCard[]>([])
-  const [loading, setLoading] = useState(true)
-  const { selectedRadicalChar, setSelectedRadicalChar } = useUIStore()
-
-  useEffect(() => {
-    setLoading(true)
-    api.get(`/radicals/${encodeURIComponent(radical.radical)}/chars`)
-      .then(({ data }) => setChars(data.chars ?? []))
-      .finally(() => setLoading(false))
-  }, [radical.radical])
-
-  return (
-    <div className="flex flex-col h-full">
-      {selectedRadicalChar ? (
-        <CharDetail char={selectedRadicalChar} onBack={() => setSelectedRadicalChar(null)} />
-      ) : (
-        <>
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-border)] shrink-0">
-            <div className="flex items-center gap-4">
-              <div className="flex gap-2">
-                {radical.radical.split(',').map((form) => (
-                  <div key={form} className="w-14 h-14 rounded-2xl bg-[var(--color-bg-subtle)] border border-[var(--color-border)] flex items-center justify-center">
-                    <span className="font-cjk text-4xl text-[var(--color-primary)]">{form}</span>
-                  </div>
-                ))}
-              </div>
-              <div>
-                <p className="font-semibold text-lg text-[var(--color-text)]">{radical.pinyin}</p>
-                <p className="text-sm text-[var(--color-text-muted)]">
-                  {radical.meaning_en && <span className="mr-1">{radical.meaning_en}</span>}
-                  {radical.meaning_vi && <span>· {radical.meaning_vi}</span>}
-                </p>
-                {radical.stroke_count && (
-                  <p className="text-xs text-[var(--color-text-muted)] mt-0.5">{radical.stroke_count} nét</p>
-                )}
-              </div>
-            </div>
-            <button onClick={onClose}
-              title="Đóng"
-              className="p-2 rounded-lg hover:bg-[var(--color-bg-subtle)] text-[var(--color-text-muted)] transition-colors">
-              <X size={18} />
-            </button>
-          </div>
-
-          {/* Char grid */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {loading && (
-              <p className="text-sm text-[var(--color-text-muted)]">Đang tải...</p>
-            )}
-            {!loading && chars.length === 0 && (
-              <p className="text-sm text-[var(--color-text-muted)] italic">Không có dữ liệu</p>
-            )}
-            {!loading && chars.length > 0 && (() => {
-              const sorted = [...chars].sort((a, b) => {
-                if (a.stroke_count == null) return 1
-                if (b.stroke_count == null) return -1
-                return a.stroke_count - b.stroke_count
-              })
-              const groups = sorted.reduce<Record<number, CharCard[]>>((acc, c) => {
-                const key = c.stroke_count ?? 0
-                if (!acc[key]) acc[key] = []
-                acc[key].push(c)
-                return acc
-              }, {})
-              return (
-                <>
-                  <p className="text-xs text-[var(--color-text-muted)] mb-3">
-                    {chars.length} chữ có chứa bộ thủ này
-                  </p>
-                  {Object.entries(groups).map(([strokes, group]) => (
-                    <div key={strokes} className="mb-4">
-                      <p className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
-                        {strokes} nét · {group.length} chữ
-                      </p>
-                      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
-                        {group.map((c) => (
-                          <div
-                            key={c.char}
-                            onClick={() => setSelectedRadicalChar(c.char)}
-                            className={cn(
-                              'flex flex-col items-center gap-1 py-3 px-2 rounded-xl border transition-all cursor-pointer',
-                              'bg-[var(--color-bg-surface)] border-[var(--color-border)]',
-                              'hover:border-[var(--color-primary)] hover:bg-[var(--color-bg-subtle)]',
-                              'active:scale-95'
-                            )}
-                          >
-                            <span
-                              className="font-cjk text-3xl text-[var(--color-text)] leading-none select-text cursor-text"
-                              onClick={(e) => e.stopPropagation()}
-                            >{c.char}</span>
-                            {c.pinyin && (
-                              <span
-                                className="text-xs text-[var(--color-text-muted)] leading-tight text-center select-text cursor-text"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {c.pinyin}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </>
-              )
-            })()}
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
-// ── Radical card ──────────────────────────────────────────
-
-function RadicalCard({ radical, onClick }: { radical: RadicalSummary; onClick: () => void }) {
-  const displayRadical = radical.radical.split(',').join('、')
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'flex flex-col items-center gap-1 p-3 rounded-2xl border transition-all cursor-pointer',
-        'bg-[var(--color-bg-surface)] border-[var(--color-border)]',
-        'hover:border-[var(--color-primary)] hover:bg-[var(--color-bg-subtle)]',
-        'active:scale-95'
-      )}
-    >
-      <span className={cn(
-        'font-cjk text-[var(--color-text)] leading-none mt-1',
-        displayRadical.length >= 5 ? 'text-lg' : displayRadical.length >= 3 ? 'text-2xl' : 'text-3xl'
-      )}>{displayRadical}</span>
-      <span className="text-xs text-[var(--color-primary)] font-medium">{radical.pinyin}</span>
-      <span className="text-xs text-[var(--color-text-muted)] text-center leading-tight line-clamp-1">
-        {radical.meaning_en ?? radical.meaning_vi}
-      </span>
-    </button>
-  )
-}
-
-// ── Modal ─────────────────────────────────────────────────
-
-function Modal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
-  return (
-    <div
-      className="fixed top-14 inset-x-0 bottom-0 z-[39] flex items-end sm:items-center justify-center p-0 sm:p-4"
-      style={{ background: 'rgba(0,0,0,0.5)' }}
-      onClick={onClose}
-    >
-      <div
-        className={cn(
-          'w-full sm:max-w-2xl bg-[var(--color-bg-surface)] flex flex-col overflow-hidden',
-          'rounded-t-2xl sm:rounded-2xl border border-[var(--color-border)]',
-          'h-full sm:max-h-[90vh]'
-        )}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {children}
-      </div>
-    </div>
-  )
-}
-
-// ── Main page ─────────────────────────────────────────────
+import type { RadicalSummary } from '@/types'
+import { RadicalCard } from './components/RadicalCard'
+import { RadicalPopup } from './components/RadicalPopup'
+import { StrokeGroupHeading } from './components/StrokeGroupHeading'
+import { TILE_GRID } from './components/tileStyles'
+import { useRadicalList } from './hooks/useRadicalList'
 
 export function RadicalsPage() {
   const { t } = useTranslation()
   const { radicals, loading } = useRadicalList()
   const { selectedRadical, setSelectedRadical, setSelectedRadicalChar } = useUIStore()
 
-  const sorted = [...radicals].sort((a, b) => {
-    if (a.stroke_count == null) return 1
-    if (b.stroke_count == null) return -1
-    return a.stroke_count - b.stroke_count
-  })
-
-  const groups = sorted.reduce<Record<number, RadicalSummary[]>>((acc, r) => {
-    const key = r.stroke_count ?? 0
-    if (!acc[key]) acc[key] = []
-    acc[key].push(r)
-    return acc
-  }, {})
+  function open(radical: RadicalSummary | null) {
+    setSelectedRadical(radical)
+    setSelectedRadicalChar(null)
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -287,25 +28,17 @@ export function RadicalsPage() {
       {loading && <p className="text-sm text-[var(--color-text-muted)]">{t('common.loading')}</p>}
 
       <div className="flex flex-col gap-5">
-        {Object.entries(groups).map(([strokes, items]) => (
+        {groupByStrokeCount(radicals).map(([strokes, items]) => (
           <div key={strokes}>
-            <p className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2">
-              {strokes} nét · {items.length} bộ
-            </p>
-            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
-              {items.map((r) => (
-                <RadicalCard key={r.id} radical={r} onClick={() => { setSelectedRadical(r); setSelectedRadicalChar(null); }} />
-              ))}
+            <StrokeGroupHeading>{t('radicals.strokeGroup', { strokes, count: items.length })}</StrokeGroupHeading>
+            <div className={TILE_GRID}>
+              {items.map((r) => <RadicalCard key={r.id} radical={r} onClick={() => open(r)} />)}
             </div>
           </div>
         ))}
       </div>
 
-      {selectedRadical && (
-        <Modal onClose={() => { setSelectedRadical(null); setSelectedRadicalChar(null); }}>
-          <RadicalPopup radical={selectedRadical} onClose={() => { setSelectedRadical(null); setSelectedRadicalChar(null); }} />
-        </Modal>
-      )}
+      {selectedRadical && <RadicalPopup radical={selectedRadical} onClose={() => open(null)} />}
     </div>
   )
 }

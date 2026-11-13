@@ -5,12 +5,14 @@ import { ArrowLeft, KeyRound } from 'lucide-react'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
-import api from '@/lib/axios'
+import { getErrorDetail } from '@/lib/axios'
+import { usersApi } from '@/api/usersApi'
 
 export function ChangePasswordPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
 
+  const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [saving, setSaving] = useState(false)
@@ -32,17 +34,14 @@ export function ChangePasswordPage() {
 
     setSaving(true)
     try {
-      await api.patch('/users/profile', {
-        new_password: newPassword,
-      })
+      await usersApi.changePassword(currentPassword, newPassword)
       setSaved(true)
+      setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
       setTimeout(() => navigate('/settings'), 1500)
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } })
-        ?.response?.data?.detail
-      setError(msg ?? t('common.error'))
+      setError(getErrorDetail(err) ?? t('common.error'))
     } finally {
       setSaving(false)
     }
@@ -75,13 +74,21 @@ export function ChangePasswordPage() {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <Input
+            id="currentPassword"
+            label={t('settings.currentPassword')}
+            type="password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            autoComplete="current-password"
+            autoFocus
+          />
+          <Input
             id="newPassword"
             label={t('settings.newPassword')}
             type="password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             autoComplete="new-password"
-            autoFocus
           />
           <Input
             id="confirmPassword"
@@ -105,7 +112,7 @@ export function ChangePasswordPage() {
             >
               {t('common.cancel')}
             </Button>
-            <Button type="submit" isLoading={saving} disabled={!newPassword || !confirmPassword}>
+            <Button type="submit" isLoading={saving} disabled={!currentPassword || !newPassword || !confirmPassword}>
               {t('settings.changePassword')}
             </Button>
           </div>

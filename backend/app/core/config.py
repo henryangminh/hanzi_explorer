@@ -12,8 +12,9 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 10080  # 7 days
 
-    # Database
-    database_url: str = "sqlite:///./data/hanzi.db"
+    # Database — app.db holds user data (read/write); dictionary.db is reference data (read-only)
+    database_url: str = "sqlite:///./data/app.db"
+    dictionary_db_path: str = "./data/dictionary.db"
 
     # CORS
     cors_origins: List[str] = ["http://localhost:5173"]

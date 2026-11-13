@@ -61,9 +61,16 @@ desktop.ini
 htmlcov/
 .tox/
 
-# ── SQLite WAL ───────────────────────────────────────────
+# ── SQLite ───────────────────────────────────────────────
 *.db-shm
 *.db-wal
+*.db-journal
+# User data — never commit. (backend/data/dictionary.db IS committed.)
+backend/data/app.db
+# Legacy single-file DB, replaced by dictionary.db + app.db (see migration/README.md)
+backend/data/hanzi.db
+# Crawled data: large, rebuilt only by re-crawling for weeks — back it up instead
+migration/crawled/
 
 # ── Logs ─────────────────────────────────────────────────
 *.log

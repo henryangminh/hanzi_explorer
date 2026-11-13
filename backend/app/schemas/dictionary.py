@@ -1,6 +1,8 @@
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 
+from app.schemas.note import UserNoteResponse
+
 
 class CedictEntry(BaseModel):
     id: int
@@ -20,26 +22,6 @@ class ExternalSource(BaseModel):
     label: str
     data: Dict[str, Any]
     from_cache: bool = False
-
-
-class UserNoteResponse(BaseModel):
-    id: int
-    char: str
-    title: str
-    detail: Optional[str]
-    updated_at: Optional[str] = None
-    pinyin: str = ''
-    sino_vn: List[str] = []
-
-
-class NoteCreate(BaseModel):
-    title: str
-    detail: Optional[str] = None
-
-
-class NoteUpdate(BaseModel):
-    title: str
-    detail: Optional[str] = None
 
 
 class CvdictEntry(BaseModel):
@@ -85,6 +67,7 @@ class DictLiteResponse(BaseModel):
     cvdict: List[CvdictEntry] = []
     xdhy: List[XdhyEntry] = []
     sino_vn: List[str] = []     # Hán Việt readings, e.g. ["phán đoán"]
+    sino_vn_by_reading: Dict[str, List[str]] = {}  # per reading (diacritic pinyin): 上 → {"shǎng": ["thướng"], "shàng": ["thượng"]}
     hsk_tags: List[str] = []
     synonyms: List[WordInfo] = []
     antonyms: List[WordInfo] = []
@@ -101,8 +84,9 @@ class DictionaryResponse(BaseModel):
     xdhy: List[XdhyEntry] = []
     external: List[ExternalSource]
     user_notes: List[UserNoteResponse] = []
-    hsk_tags: List[str] = []    # HSK notebook names from drkameleon DB
+    hsk_tags: List[str] = []    # names of global notebooks (HSK lists...) containing the word
     sino_vn: List[str] = []     # Hán Việt readings, e.g. ["phán đoán"]
+    sino_vn_by_reading: Dict[str, List[str]] = {}  # per reading (diacritic pinyin): 上 → {"shǎng": ["thướng"], "shàng": ["thượng"]}
     hanzipy: Optional[HanzipyData] = None
     synonyms: List[WordInfo] = []
     antonyms: List[WordInfo] = []

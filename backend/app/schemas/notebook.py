@@ -42,10 +42,6 @@ class NotebookEntryResponse(BaseModel):
         from_attributes = True
 
 
-class NotebookDetail(NotebookResponse):
-    entries: list[NotebookEntryResponse]
-
-
 class NotebookEntryPreview(BaseModel):
     """Entry with brief CEDICT / CVDICT meanings for the notebook grid view."""
     id: int
@@ -61,17 +57,3 @@ class NotebookEntryPreview(BaseModel):
 
 class AddEntryRequest(BaseModel):
     char: str
-
-
-class FlashcardCardResponse(BaseModel):
-    char: str
-    pinyins: list[str] = []
-    sino_vn: Optional[str] = None
-    cedict_brief: Optional[str] = None
-    cvdict_brief: Optional[str] = None
-    status: Optional[str] = None
-
-
-class FlashcardStatusUpdate(BaseModel):
-    char: str
-    status: Optional[Literal['learned', 'not_learned']] = None

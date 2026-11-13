@@ -10,6 +10,13 @@ export interface User {
   created_at: string
 }
 
+export interface AdminUserUpdate {
+  display_name?: string
+  is_admin?: boolean
+  is_active?: boolean
+  new_password?: string
+}
+
 export interface TokenResponse {
   access_token: string
   token_type: string
@@ -88,6 +95,8 @@ export interface DictLiteResponse {
   cvdict: CvdictEntry[]
   xdhy: XdhyEntry[]
   sino_vn: string[]
+  /** Hán Việt per reading, keyed by diacritic pinyin */
+  sino_vn_by_reading?: Record<string, string[]>
   hsk_tags: string[]
   synonyms: WordInfo[]
   antonyms: WordInfo[]
@@ -106,6 +115,8 @@ export interface DictionaryResponse {
   user_notes: UserNoteResponse[]
   hsk_tags: string[]
   sino_vn: string[]
+  /** Hán Việt per reading, keyed by diacritic pinyin */
+  sino_vn_by_reading?: Record<string, string[]>
   hanzipy: HanzipyData | null
   synonyms: WordInfo[]
   antonyms: WordInfo[]
@@ -120,24 +131,18 @@ export interface RadicalSummary {
   meaning_en: string
   meaning_vi: string | null
   stroke_count: number | null
-  compound_count: number
 }
 
-export interface CompoundItem {
+export interface RadicalChar {
   char: string
   pinyin: string
   meaning_en: string
-  note: string | null
+  stroke_count?: number | null
 }
 
-export interface RadicalDetail {
-  id: number
+export interface RadicalCharsResponse {
   radical: string
-  pinyin: string
-  meaning_en: string
-  meaning_vi: string | null
-  stroke_count: number | null
-  compounds: CompoundItem[]
+  chars: RadicalChar[]
 }
 
 // ── Settings ─────────────────────────────────────────────
@@ -181,10 +186,6 @@ export interface NotebookEntryPreview {
   is_separable: boolean
 }
 
-export interface NotebookDetail extends NotebookResponse {
-  entries: NotebookEntryResponse[]
-}
-
 export type NotebookSortOrder =
   | 'updated_at_desc'
   | 'updated_at_asc'
@@ -195,14 +196,23 @@ export type NotebookSortOrder =
 
 // ── Flashcard ─────────────────────────────────────────────
 
+export type FlashcardStatus = 'learned' | 'not_learned'
+
+export interface FlashcardReading {
+  pinyin: string
+  sino_vn: string | null
+}
+
 export interface FlashcardEntry {
   char: string
-  pinyins: string[]
-  sino_vn: string | null
+  /** Every reading of the word with its Hán Việt, primary first */
+  readings: FlashcardReading[]
   cedict_brief: string | null
   cvdict_brief: string | null
-  status: 'learned' | 'not_learned' | null
+  status: FlashcardStatus | null
 }
+
+export type FlashcardStatusMap = Record<string, FlashcardStatus | null>
 
 // ── Search History ────────────────────────────────────────
 

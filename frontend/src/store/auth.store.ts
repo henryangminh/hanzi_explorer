@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { User } from '@/types'
-import api from '@/lib/axios'
+import { authApi } from '@/api/authApi'
 
 interface AuthState {
   user: User | null
@@ -22,10 +22,10 @@ export const useAuthStore = create<AuthState>()(
       login: async (username, password) => {
         set({ isLoading: true })
         try {
-          const { data } = await api.post('/auth/login', { username, password })
-          localStorage.setItem('access_token', data.access_token)
-          set({ token: data.access_token })
-          const { data: user } = await api.get('/auth/me')
+          const { access_token } = await authApi.login(username, password)
+          localStorage.setItem('access_token', access_token)
+          set({ token: access_token })
+          const user = await authApi.me()
           set({ user, isLoading: false })
           return user
         } catch (err) {
@@ -41,8 +41,7 @@ export const useAuthStore = create<AuthState>()(
 
       fetchMe: async () => {
         try {
-          const { data } = await api.get('/auth/me')
-          set({ user: data })
+          set({ user: await authApi.me() })
         } catch {
           set({ user: null, token: null })
         }

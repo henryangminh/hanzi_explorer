@@ -1,0 +1,2 @@
+# Only needed by dictionary/03_import_xdhy.py (reads the .mdx file). Everything else uses the stdlib.
+mdict-utils

@@ -16,6 +16,7 @@ import { UserRoute } from './UserRoute'
 import { AdminLayout } from '@/components/layout/AdminLayout'
 import { DashboardPage } from '@/features/admin/DashboardPage'
 import { UsersPage } from '@/features/admin/UsersPage'
+import { ComingSoon } from '@/components/ui/ComingSoon'
 
 export const router = createBrowserRouter([
   {
@@ -58,9 +59,9 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="dashboard" replace /> },
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'users', element: <UsersPage /> },
-      { path: 'data', element: <div>Quản trị Dữ Liệu - Coming Soon</div> },
-      { path: 'moderation', element: <div>Kiểm duyệt - Coming Soon</div> },
-      { path: 'notebooks', element: <div>Sổ tay chung - Coming Soon</div> },
+      { path: 'data', element: <ComingSoon titleKey="admin.layout.data" /> },
+      { path: 'moderation', element: <ComingSoon titleKey="admin.layout.moderation" /> },
+      { path: 'notebooks', element: <ComingSoon titleKey="admin.layout.notebooks" /> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

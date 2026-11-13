@@ -48,7 +48,9 @@ HTTP Request
 ### models/ — DB Table Definitions
 
 - Chỉ chứa `SQLModel` class định nghĩa bảng. Không có logic.
-- Mỗi file nhóm các bảng liên quan: `character.py` chứa Character, PinyinReading, Definition, DictionarySource, ExternalCache.
+- Model chia theo database (xem mục 4):
+  - **dictionary.db** (read-only, `__table_args__ = {"schema": DICTIONARY_SCHEMA}`): `character.py`, `radical.py`, `sino_vn.py`, `synonym_antonym.py`
+  - **app.db** (read/write): `user.py`, `note.py`, `notebook.py`, `search_history.py`, `wotd.py`, `cache.py`
 
 ### schemas/ — Request/Response Schemas
 
@@ -125,13 +127,26 @@ Mỗi domain chức năng phải có file service riêng:
 
 | Domain | API file | Service file |
 |---|---|---|
-| Notebooks (sổ tay) | `api/v1/notebooks.py` | `services/notebook_service.py` |
+| Từ điển (lookup, lite/full entry) | `api/v1/dictionary.py` | `services/dictionary_service.py` |
+| Tìm kiếm (chọn chế độ, tách từ) | `api/v1/dictionary.py` (`/search`) | `services/search_service.py` |
+| Ghi chú của user | `api/v1/notes.py` | `services/note_service.py` |
+| Notebooks (sổ tay) | `api/v1/notebooks.py` (+ `notebook_access.py`) | `services/notebook_service.py` |
 | Flashcards | `api/v1/flashcards.py` | `services/flashcard_service.py` |
 | Word of the Day | `api/v1/wotd.py` | `services/wotd_service.py` |
-| Dictionary | `api/v1/dictionary.py` | `services/dictionary_service.py` |
 | Radicals | `api/v1/radicals.py` | `services/radical_service.py` |
-| Synonyms/Antonyms | (gọi từ dictionary) | `services/synonym_antonym_service.py` |
-| Hanzi decomposition | (gọi từ radicals) | `services/hanzi_service.py` |
+| Lịch sử tìm kiếm | `api/v1/search_history.py` | `services/search_history_service.py` |
+| User / settings / admin | `api/v1/users.py`, `settings.py`, `admin.py` | `services/user_service.py`, `admin_service.py` |
+
+Service dùng chung (không có router riêng):
+
+| Service | Trách nhiệm |
+|---|---|
+| `character_lookup.py` | Đọc hàng từ điển: character, readings, definitions, source ids, batch brief lookup |
+| `sino_vn_service.py` | Âm Hán Việt (`compose_from_db` từ DB, `compute_sino_vn` có thêm hvdic) |
+| `wiktionary_service.py` + `wiktionary_parser.py` | Gọi + parse Wiktionary EN/VI |
+| `cache_service.py` | Cache có TTL cho dữ liệu bên ngoài (`external_cache`) |
+| `synonym_antonym_service.py` | Từ đồng/trái nghĩa |
+| `hanzi_service.py` | Chữ chứa một bộ thủ/thành phần; phân rã hanzipy |
 
 **KHÔNG** được gộp hai domain khác nhau vào cùng một file API hoặc service.
 
@@ -175,9 +190,30 @@ return session.exec(select(Character).where(...)).all()
 
 Nếu một file không còn dùng nữa, xóa ngay. Không để lại comment như `# Obsolete, use X instead` mà vẫn giữ file. Ví dụ: `lookup_cvdict.py` đã bị xóa vì logic đã chuyển vào `dictionary_service.py`.
 
+### 3.8 Dữ liệu từ điển là read-only — dữ liệu user không được chạm vào
+
+- Backend **không bao giờ** ghi vào `dictionary.db`. SQLite đã chặn ở tầng kết nối (`ATTACH ... mode=ro`), nhưng
+  cũng không được viết code thử ghi (ví dụ: tạo "stub" character khi user thêm một từ chưa có trong từ điển).
+- Dữ liệu user tham chiếu từ điển bằng **chuỗi chữ giản thể** (`char`), **không** bằng `characters.id`
+  (id thay đổi mỗi lần build lại từ điển). Dùng `dictionary_service.resolve_simplified()` để chuẩn hoá input phồn thể.
+- Join từ bảng user sang bảng từ điển phải dùng **LEFT/outer join** theo `simplified`: từ của user có thể không có
+  trong từ điển.
+- Data scripts / import / migration nằm ở `migration/` (cùng cấp `backend/`), **không** nằm trong `backend/`.
+  `backend/scripts/` chỉ giữ công cụ vận hành dùng code app (`create_admin.py`).
+
 ---
 
 ## 4. Cấu trúc DB quan trọng
+
+Có 2 file SQLite (chi tiết: `migration/README.md`):
+
+| File | Vai trò | Schema do ai quản lý |
+|---|---|---|
+| `data/app.db` | DB chính (read/write): users, user_notes, user_flashcards, notebooks, notebook_entries, search_history, wotd_history, external_cache | Backend (`init_db` → `create_all` chỉ cho bảng app) |
+| `data/dictionary.db` | Attach read-only với schema `dictionary` | `migration/schema/dictionary.sql` |
+
+Raw SQL tham chiếu bảng từ điển phải ghi rõ schema: `dictionary.characters`, `dictionary.definitions`, ...
+ORM tự thêm schema nhờ `__table_args__`.
 
 ### Bảng characters — nguồn sự thật duy nhất cho ký tự
 
@@ -189,7 +225,7 @@ Nếu một file không còn dùng nữa, xóa ngay. Không để lại comment 
 
 - Một hàng = một nghĩa từ một nguồn cụ thể
 - `source_id` → `dictionary_sources` (CC-CEDICT, CVDICT, ...)
-- `language`: `'en'` hoặc `'vi'`
+- `language`: `'en'` (CC-CEDICT), `'vi'` (CVDICT), `'zh'` (现代汉语词典 — `meaning_text` là JSON)
 - Để lấy nghĩa đầu tiên: `ORDER BY id LIMIT 1` hoặc `MIN(id)` trong GROUP BY
 
 ### Bảng pinyin_readings — đọc âm
@@ -206,7 +242,15 @@ Nếu một file không còn dùng nữa, xóa ngay. Không để lại comment 
 ### dictionary_sources — registry nguồn từ điển
 
 - Luôn resolve `id` bằng ORM trước khi dùng, không hardcode
-- Tên quan trọng: `'CC-CEDICT'` (tiếng Anh), `'CVDICT'` (tiếng Việt)
+- Tên quan trọng: `'CC-CEDICT'` (tiếng Anh), `'CVDICT'` (tiếng Việt), `'现代汉语词典'`
+- `dictionary_service.get_brief_source_ids()` trả `(cedict_id, cvdict_id)`; `batch_brief_lookup()` lấy pinyin +
+  nghĩa đầu tiên cho nhiều character một lần — dùng lại thay vì viết lại vòng query.
+
+### notebook_entries — từ trong sổ tay (app.db)
+
+- `char`: chữ giản thể dạng text, unique theo `(notebook_id, char)`
+- Sổ `type='global'` (HSK, Thành ngữ...) cũng là dữ liệu app: admin sửa được trong app; seed lần đầu bằng
+  `migration/seed_global_notebooks.py`
 
 ---
 

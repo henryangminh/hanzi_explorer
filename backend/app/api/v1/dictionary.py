@@ -1,38 +1,28 @@
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
+
 from app.core.deps import CurrentUser, DbSession
-from app.schemas.dictionary import DictLiteResponse, DictionaryResponse, NoteCreate, NoteUpdate, UserNoteResponse
-from app.services import dictionary_service
+from app.schemas.dictionary import DictLiteResponse, DictionaryResponse
+from app.services import dictionary_service, search_history_service, search_service
 
 router = APIRouter(prefix="/dictionary", tags=["dictionary"])
 
-@router.get("/notes", response_model=list[UserNoteResponse])
-def list_all_notes(current_user: CurrentUser, session: DbSession):
-    """Get all notes of the current user across all characters."""
-    return dictionary_service.get_all_user_notes(session, current_user.id)
+MAX_QUERY_LENGTH = 50
 
 
-@router.get("/{char}/notes", response_model=list[UserNoteResponse])
-def list_notes(char: str, current_user: CurrentUser, session: DbSession):
-    return dictionary_service.get_user_notes(session, current_user.id, char)
-
-@router.post("/{char}/notes", response_model=UserNoteResponse, status_code=201)
-def create_note(char: str, body: NoteCreate, current_user: CurrentUser, session: DbSession):
-    return dictionary_service.create_user_note(session, current_user.id, char, body)
-
-@router.put("/{char}/notes/{note_id}", response_model=UserNoteResponse)
-def update_note(char: str, note_id: int, body: NoteUpdate, current_user: CurrentUser, session: DbSession):
-    return dictionary_service.update_user_note(session, current_user.id, note_id, body)
-
-@router.delete("/{char}/notes/{note_id}", status_code=204)
-def delete_note(char: str, note_id: int, current_user: CurrentUser, session: DbSession):
-    dictionary_service.delete_user_note(session, current_user.id, note_id)
-    return Response(status_code=204)
+def _require_query(q: str) -> str:
+    q = q.strip()
+    if not q:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Query is empty")
+    if len(q) > MAX_QUERY_LENGTH:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail=f"Query too long (max {MAX_QUERY_LENGTH} chars)")
+    return q
 
 
 @router.get("/lookup", response_model=DictLiteResponse)
 def lookup_lite(q: str, current_user: CurrentUser, session: DbSession):
-    """Fast CEDICT + CVDICT lookup without external API calls. Used by notebook detail view."""
+    """Fast local-DB lookup without external API calls. Used by notebook detail view."""
     q = q.strip()
     if not q:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Query is empty")
@@ -47,37 +37,19 @@ async def search_phrase(q: str, current_user: CurrentUser, session: DbSession):
     - short (1-3 Chinese chars): prefix search with match score
     - pinyin (no Chinese chars): search by pinyin, supports tone numbers (ming2tian1) or no-tone (bukeqi)
 
-    Streams LITE results (CEDICT + CVDICT only, no Wiktionary) as NDJSON so the
-    client can render each entry immediately. Use GET /full/{char} to fetch the
-    full entry with Wiktionary data when the user expands a card.
+    Streams LITE results (local DB only, no Wiktionary) as NDJSON so the client can render each
+    entry immediately. Use GET /full/{char} to fetch the full entry when the user expands a card.
     """
-    from app.services.search_service import detect_search_mode, extract_all_words, short_search, pinyin_search, traditional_to_simplified
-    from app.services import search_history_service
+    q = search_service.traditional_to_simplified(session, _require_query(q))
+    tokens = search_service.find_words(session, q)
 
-    q = q.strip()
-    if not q:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Query is empty")
-    if len(q) > 50:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Query too long (max 50 chars)")
-
-    q = traditional_to_simplified(session, q)
-    mode = detect_search_mode(q)
-
-    if mode == 'sentence':
-        tokens = extract_all_words(session, q)
-    elif mode == 'short':
-        tokens = short_search(session, q)
-    else:  # pinyin
-        tokens = pinyin_search(session, q)[:30]
-
-    # Save to search history for regular (non-admin) users
+    # Admins have no search history
     if not current_user.is_admin:
         search_history_service.record_search(session, current_user.id, q)
 
     async def generate():
         for token in tokens:
-            entry = dictionary_service.get_lite_entry(session, token)
-            yield entry.model_dump_json() + '\n'
+            yield dictionary_service.get_lite_entry(session, token).model_dump_json() + '\n'
 
     return StreamingResponse(generate(), media_type='application/x-ndjson')
 

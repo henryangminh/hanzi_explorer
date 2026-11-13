@@ -1,14 +1,16 @@
 from typing import Optional
-from sqlalchemy import Index
 from sqlmodel import Field, SQLModel
+
+from app.models import DICTIONARY_SCHEMA
 
 
 class DictionarySource(SQLModel, table=True):
     """Registry of all imported dictionary sources."""
     __tablename__ = "dictionary_sources"
+    __table_args__ = {"schema": DICTIONARY_SCHEMA}
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(unique=True, index=True, max_length=100)  # "CC-CEDICT"
+    name: str = Field(max_length=100)                           # "CC-CEDICT"
     version: Optional[str] = Field(default=None, max_length=50) # "2026-03-27"
     entry_count: int = Field(default=0)
     imported_at: Optional[str] = Field(default=None)            # ISO datetime
@@ -20,16 +22,16 @@ class Character(SQLModel, table=True):
     One row per unique simplified form.
     """
     __tablename__ = "characters"
+    __table_args__ = {"schema": DICTIONARY_SCHEMA}
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    simplified: str = Field(unique=True, index=True, max_length=10)
+    simplified: str = Field(max_length=10)
     traditional: Optional[str] = Field(default=None, max_length=10)
     radical: Optional[str] = Field(default=None, max_length=10)
     radical_traditional: Optional[str] = Field(default=None, max_length=10)
     stroke_count: Optional[int] = None
     stroke_count_traditional: Optional[int] = None
     frequency: Optional[int] = None
-    is_common: bool = Field(default=False)
     is_separable: bool = Field(default=False)
     components: Optional[str] = Field(default=None)            # JSON array of component chars (simplified)
     components_traditional: Optional[str] = Field(default=None)  # JSON array of component chars (traditional)
@@ -41,40 +43,24 @@ class PinyinReading(SQLModel, table=True):
     A character can have multiple readings (polyphones), e.g. 中: zhōng and zhòng.
     """
     __tablename__ = "pinyin_readings"
-    __table_args__ = (
-        Index("ix_pinyin_readings_char_id", "character_id", "id"),
-    )
+    __table_args__ = {"schema": DICTIONARY_SCHEMA}
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    character_id: int = Field(foreign_key="characters.id")
-    pinyin: str = Field(max_length=100, index=True)          # diacritic form, e.g. "zhōng"
+    character_id: int = Field(foreign_key=f"{DICTIONARY_SCHEMA}.characters.id")
+    pinyin: str = Field(max_length=100)                                  # diacritic form, e.g. "zhōng"
     pinyin_numeric: Optional[str] = Field(default=None, max_length=100)  # numeric, e.g. "zhong1"
-    tone: Optional[int] = None
 
 
 class Definition(SQLModel, table=True):
     """
-    Unified definitions from all sources (CC-CEDICT, CVDICT, DrKameleon, etc.).
+    Unified definitions from all sources (CC-CEDICT, CVDICT, 现代汉语词典).
     One row per (character, source, meaning entry).
     """
     __tablename__ = "definitions"
-    __table_args__ = (
-        Index("ix_definitions_char_src_lang", "character_id", "source_id", "language", "id"),
-    )
+    __table_args__ = {"schema": DICTIONARY_SCHEMA}
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    character_id: int = Field(foreign_key="characters.id")
-    source_id: int = Field(foreign_key="dictionary_sources.id", index=True)
-    language: str = Field(max_length=5)     # 'en', 'vi'
+    character_id: int = Field(foreign_key=f"{DICTIONARY_SCHEMA}.characters.id")
+    source_id: int = Field(foreign_key=f"{DICTIONARY_SCHEMA}.dictionary_sources.id")
+    language: str = Field(max_length=5)     # 'en', 'vi', 'zh'
     meaning_text: str
-    pos: Optional[str] = None               # Part of speech (from DrKameleon)
-
-
-class ExternalCache(SQLModel, table=True):
-    __tablename__ = "external_cache"
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-    char: str = Field(index=True, max_length=10)
-    source: str = Field(max_length=50)
-    payload_json: str
-    cached_at: str

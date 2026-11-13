@@ -24,10 +24,11 @@ class Notebook(SQLModel, table=True):
 class NotebookEntry(SQLModel, table=True):
     __tablename__ = "notebook_entries"
     __table_args__ = (
-        UniqueConstraint("notebook_id", "char_id", name="uq_notebook_char"),
+        UniqueConstraint("notebook_id", "char", name="uq_notebook_char"),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     notebook_id: int = Field(foreign_key="notebooks.id", index=True)
-    char_id: int = Field(foreign_key="characters.id", index=True)
+    # Simplified form as plain text — never a dictionary row id, so entries survive a dictionary rebuild
+    char: str = Field(index=True, max_length=10)
     added_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

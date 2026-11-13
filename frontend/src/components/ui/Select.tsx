@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { useClickOutside } from '@/hooks/useClickOutside'
 
 export interface SelectOption<T extends string = string> {
   value: T
@@ -25,17 +26,7 @@ export function Select<T extends string>({
 }: SelectProps<T>) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const handler = (e: PointerEvent) => {
-      if (!containerRef.current?.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('pointerdown', handler)
-    return () => document.removeEventListener('pointerdown', handler)
-  }, [open])
+  useClickOutside(containerRef, open, () => setOpen(false))
 
   const selectedLabel = options.find((o) => o.value === value)?.label ?? ''
 

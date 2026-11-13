@@ -2,7 +2,7 @@ import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth.store'
 import { Users, Database, Shield, DatabaseBackup, LogOut, LayoutDashboard } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { Navbar } from './Navbar'
+import { Navbar } from './navbar/Navbar'
 import { useTranslation } from 'react-i18next'
 
 export function AdminLayout() {
@@ -57,7 +57,7 @@ export function AdminLayout() {
             <button
               onClick={logout}
               className="p-2 text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] rounded-lg transition-colors"
-              title="Đăng xuất"
+              title={t('nav.logout')}
             >
               <LogOut size={16} />
             </button>

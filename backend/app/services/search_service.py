@@ -13,6 +13,7 @@ from sqlalchemy import func
 from app.models.character import Character, PinyinReading
 
 _NO_FREQ = 999_999  # sentinel for NULL frequency — sort last
+MAX_PINYIN_RESULTS = 30
 
 
 def _freq_map(session: Session, words: List[str]) -> dict[str, int]:
@@ -234,3 +235,15 @@ def pinyin_search(session: Session, pinyin_input: str) -> List[str]:
     freq = _freq_map(session, [r[0] for r in results])
     results.sort(key=lambda x: (-x[1], len(x[0]), freq.get(x[0], _NO_FREQ)))
     return [r[0] for r in results]
+
+
+# ── Entry point ───────────────────────────────────────────
+
+def find_words(session: Session, query: str) -> List[str]:
+    """Dictionary words to show for a (simplified) search query, using the mode the query implies."""
+    mode = detect_search_mode(query)
+    if mode == 'sentence':
+        return extract_all_words(session, query)
+    if mode == 'short':
+        return short_search(session, query)
+    return pinyin_search(session, query)[:MAX_PINYIN_RESULTS]

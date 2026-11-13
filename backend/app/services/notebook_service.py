@@ -1,24 +1,24 @@
 from datetime import datetime, timezone
-from typing import Literal, Optional, Iterator
+from typing import Literal, Iterator
 
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select, func
 
 from app.core.cedict_utils import clean_meaning
 from app.core.pinyin import numeric_to_diacritic
-from app.models.character import Character, Definition, DictionarySource, PinyinReading
-from app.models.note import UserFlashcard
+from app.models.character import Character, PinyinReading
+from app.models.flashcard import UserFlashcard
 from app.models.notebook import Notebook, NotebookEntry
 from app.models.sino_vn import SinoVietnamese
 from app.schemas.notebook import (
     AddEntryRequest,
     NotebookCreate,
-    NotebookDetail,
     NotebookEntryPreview,
     NotebookEntryResponse,
     NotebookResponse,
     NotebookUpdate,
 )
+from app.services.character_lookup import batch_brief_lookup, resolve_simplified
 
 SortOrder = Literal["updated_at_desc", "updated_at_asc", "created_at_desc", "created_at_asc", "name_asc", "name_desc"]
 
@@ -44,16 +44,14 @@ def _to_response(session: Session, nb: Notebook, user_id: int) -> NotebookRespon
     ).one()
     learned = session.exec(
         select(func.count(UserFlashcard.id))
-        .join(Character, Character.simplified == UserFlashcard.char)
-        .join(NotebookEntry, NotebookEntry.char_id == Character.id)
+        .join(NotebookEntry, NotebookEntry.char == UserFlashcard.char)
         .where(NotebookEntry.notebook_id == nb.id)
         .where(UserFlashcard.user_id == user_id)
         .where(UserFlashcard.status == "learned")
     ).one()
     not_learned = session.exec(
         select(func.count(UserFlashcard.id))
-        .join(Character, Character.simplified == UserFlashcard.char)
-        .join(NotebookEntry, NotebookEntry.char_id == Character.id)
+        .join(NotebookEntry, NotebookEntry.char == UserFlashcard.char)
         .where(NotebookEntry.notebook_id == nb.id)
         .where(UserFlashcard.user_id == user_id)
         .where(UserFlashcard.status == "not_learned")
@@ -73,18 +71,6 @@ def _to_response(session: Session, nb: Notebook, user_id: int) -> NotebookRespon
     )
 
 
-def _get_or_create_character(session: Session, char: str) -> Character:
-    """Lookup character by simplified or traditional form, create stub if not found."""
-    c = session.exec(select(Character).where(Character.simplified == char)).first()
-    if not c:
-        c = session.exec(select(Character).where(Character.traditional == char)).first()
-    if not c:
-        c = Character(simplified=char)
-        session.add(c)
-        session.flush()
-    return c
-
-
 def list_notebooks(
     session: Session,
     user_id: int,
@@ -101,40 +87,6 @@ def list_notebooks(
 
     all_notebooks = list(global_notebooks) + list(private_notebooks)
     return [_to_response(session, nb, user_id) for nb in all_notebooks]
-
-
-def get_notebook(session: Session, notebook_id: int, user_id: int) -> Optional[NotebookDetail]:
-    nb = session.get(Notebook, notebook_id)
-    if nb is None:
-        return None
-    if nb.type == "private" and nb.owner_id != user_id:
-        return None
-    rows = session.exec(
-        select(NotebookEntry, Character)
-        .join(Character, NotebookEntry.char_id == Character.id)
-        .where(NotebookEntry.notebook_id == notebook_id)
-        .order_by(NotebookEntry.added_at.desc())
-    ).all()
-    entry_responses = [
-        NotebookEntryResponse(
-            id=entry.id,
-            notebook_id=entry.notebook_id,
-            char=char.simplified,
-            added_at=entry.added_at,
-        )
-        for entry, char in rows
-    ]
-    return NotebookDetail(
-        id=nb.id,
-        name=nb.name,
-        description=nb.description,
-        type=nb.type,
-        owner_id=nb.owner_id,
-        entry_count=len(rows),
-        created_at=nb.created_at,
-        updated_at=nb.updated_at,
-        entries=entry_responses,
-    )
 
 
 def create_notebook(
@@ -190,8 +142,8 @@ def add_entry(
     data: AddEntryRequest,
 ) -> NotebookEntryResponse:
     """Returns the entry. Raises ValueError if already exists."""
-    char_row = _get_or_create_character(session, data.char)
-    entry = NotebookEntry(notebook_id=nb.id, char_id=char_row.id)
+    # Traditional input is stored under its simplified headword; unknown words are stored as typed.
+    entry = NotebookEntry(notebook_id=nb.id, char=resolve_simplified(session, data.char))
     session.add(entry)
     try:
         session.flush()
@@ -206,22 +158,18 @@ def add_entry(
     return NotebookEntryResponse(
         id=entry.id,
         notebook_id=entry.notebook_id,
-        char=char_row.simplified,
+        char=entry.char,
         added_at=entry.added_at,
     )
 
 
 def remove_entry(session: Session, nb: Notebook, char: str) -> bool:
-    char_row = session.exec(
-        select(Character).where(
-            (Character.simplified == char) | (Character.traditional == char)
-        )
-    ).first()
-    if not char_row:
-        return False
     entry = session.exec(
         select(NotebookEntry)
-        .where(NotebookEntry.notebook_id == nb.id, NotebookEntry.char_id == char_row.id)
+        .where(
+            NotebookEntry.notebook_id == nb.id,
+            NotebookEntry.char.in_({char, resolve_simplified(session, char)}),
+        )
     ).first()
     if entry is None:
         return False
@@ -232,16 +180,28 @@ def remove_entry(session: Session, nb: Notebook, char: str) -> bool:
     return True
 
 
+def global_notebook_names_containing(session: Session, char: str) -> list[str]:
+    """Names of global notebooks (HSK lists, ...) that contain the word, in either script."""
+    candidates = {char, resolve_simplified(session, char)}
+    return list(session.exec(
+        select(Notebook.name)
+        .join(NotebookEntry, NotebookEntry.notebook_id == Notebook.id)
+        .where(NotebookEntry.char.in_(candidates), Notebook.type == "global")
+        .distinct()
+        .order_by(Notebook.name)
+    ).all())
+
+
 def stream_entries_preview(
     session: Session,
     notebook_id: int,
     sort: SortOrder = "updated_at_desc",
     chunk_size: int = 50,
 ) -> Iterator[NotebookEntryPreview]:
-    # 1. Base entries + characters query (with sort)
+    # 1. Base entries + characters query (with sort). Outer join: a word may be missing from the dictionary.
     stmt = (
         select(NotebookEntry, Character)
-        .join(Character, NotebookEntry.char_id == Character.id)
+        .outerjoin(Character, Character.simplified == NotebookEntry.char)
         .where(NotebookEntry.notebook_id == notebook_id)
     )
     if sort in ("name_asc", "name_desc"):
@@ -269,61 +229,15 @@ def stream_entries_preview(
     if not rows:
         return
 
-    # 2. Extract dictionary source IDs
-    sources = session.exec(
-        select(DictionarySource).where(DictionarySource.name.in_(["CC-CEDICT", "CVDICT"]))
-    ).all()
-    src_by_name = {s.name: s.id for s in sources}
-    cedict_id = src_by_name.get("CC-CEDICT", -1)
-    cvdict_id = src_by_name.get("CVDICT", -1)
-
     # Yield in batches to avoid fetching definitions for all 2000 entries at once
     for i in range(0, len(rows), chunk_size):
         chunk = rows[i:i + chunk_size]
-        char_ids = [char.id for _, char in chunk]
+        char_ids = [char.id for _, char in chunk if char]
 
-        # 3. All pinyin readings for chunk
-        all_pinyins = session.exec(
-            select(PinyinReading)
-            .where(PinyinReading.character_id.in_(char_ids))
-            .order_by(PinyinReading.character_id, PinyinReading.id)
-        ).all()
+        # 2. Pinyin readings + first CC-CEDICT / CVDICT definitions for chunk
+        pinyins_by_char, cedict_by_char, cvdict_by_char = batch_brief_lookup(session, char_ids)
 
-        pinyins_by_char: dict[int, list[str]] = {}
-        for pr in all_pinyins:
-            seen = pinyins_by_char.setdefault(pr.character_id, [])
-            if pr.pinyin_numeric and pr.pinyin_numeric not in seen:
-                seen.append(pr.pinyin_numeric)
-
-        # 4. First CC-CEDICT definition for chunk
-        en_defs = session.exec(
-            select(Definition)
-            .where(
-                Definition.character_id.in_(char_ids),
-                Definition.source_id == cedict_id,
-                Definition.language == "en",
-            )
-            .order_by(Definition.character_id, Definition.id)
-        ).all()
-        cedict_by_char: dict[int, str] = {}
-        for d in en_defs:
-            cedict_by_char.setdefault(d.character_id, d.meaning_text)
-
-        # 5. First CVDICT definition for chunk
-        vi_defs = session.exec(
-            select(Definition)
-            .where(
-                Definition.character_id.in_(char_ids),
-                Definition.source_id == cvdict_id,
-                Definition.language == "vi",
-            )
-            .order_by(Definition.character_id, Definition.id)
-        ).all()
-        cvdict_by_char: dict[int, str] = {}
-        for d in vi_defs:
-            cvdict_by_char.setdefault(d.character_id, d.meaning_text)
-
-        # 6. Sino-Vietnamese readings for primary pinyin
+        # 3. Sino-Vietnamese readings for primary pinyin
         first_pinyin_by_char = {
             char_id: readings[0]
             for char_id, readings in pinyins_by_char.items()
@@ -340,6 +254,9 @@ def stream_entries_preview(
 
         # Yield entries in chunk
         for entry, char in chunk:
+            if char is None:
+                yield NotebookEntryPreview(id=entry.id, char=entry.char, added_at=str(entry.added_at))
+                continue
             yield NotebookEntryPreview(
                 id=entry.id,
                 char=char.simplified,

@@ -19,16 +19,13 @@ def authenticate(session: Session, username: str, password: str) -> Optional[Use
     return user
 
 
-def create_user(session: Session, username: str, password: str, display_name: str) -> User:
-    user = User(
-        username=username,
-        hashed_password=hash_password(password),
-        display_name=display_name,
-    )
-    session.add(user)
-    session.commit()
-    session.refresh(user)
-    return user
+def _change_password(user: User, current_password: Optional[str], new_password: str) -> None:
+    """Users must confirm their current password to set a new one."""
+    if not current_password:
+        raise ValueError("Current password is required")
+    if not verify_password(current_password, user.hashed_password):
+        raise ValueError("Current password is incorrect")
+    user.hashed_password = hash_password(new_password)
 
 
 def update_user(session: Session, user: User, data: UserUpdate) -> User:
@@ -38,10 +35,8 @@ def update_user(session: Session, user: User, data: UserUpdate) -> User:
         user.language = data.language
     if data.theme is not None:
         user.theme = data.theme
-    if data.new_password and data.current_password:
-        if not verify_password(data.current_password, user.hashed_password):
-            raise ValueError("Current password is incorrect")
-        user.hashed_password = hash_password(data.new_password)
+    if data.new_password:
+        _change_password(user, data.current_password, data.new_password)
 
     user.updated_at = datetime.now(timezone.utc)
     session.add(user)

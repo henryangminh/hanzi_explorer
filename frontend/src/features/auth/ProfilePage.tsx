@@ -4,7 +4,8 @@ import { useAuthStore } from '@/store/auth.store'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
-import api from '@/lib/axios'
+import { getErrorDetail } from '@/lib/axios'
+import { usersApi } from '@/api/usersApi'
 
 export function ProfilePage() {
   const { t } = useTranslation()
@@ -20,16 +21,12 @@ export function ProfilePage() {
     setSaving(true)
     setError('')
     try {
-      await api.patch('/users/profile', {
-        display_name: displayName,
-      })
+      await usersApi.updateProfile(displayName)
       await fetchMe()
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } })
-        ?.response?.data?.detail
-      setError(msg ?? t('common.error'))
+      setError(getErrorDetail(err) ?? t('common.error'))
     } finally {
       setSaving(false)
     }

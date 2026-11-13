@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { FlashcardEntry } from '@/types'
+import type { FlashcardEntry, FlashcardStatus } from '@/types'
 
 export type IntervalUnit = 'minutes' | 'hours' | 'days'
 export type RepeatMode = 'random' | 'repeat_unlearned' | 'unlearned_only' | 'no_repeat'
@@ -24,8 +24,10 @@ interface FlashcardState {
   updateWidget: (id: string, updates: Partial<Omit<FlashcardWidgetConfig, 'id'>>) => void
   removeWidget: (id: string) => void
   setWidgetCards: (id: string, cards: FlashcardEntry[]) => void
-  updateCardStatus: (widgetId: string, char: string, status: 'learned' | 'not_learned' | null) => void
+  updateCardStatus: (widgetId: string, char: string, status: FlashcardStatus | null) => void
 }
+
+export const MAX_WIDGETS = 3
 
 function generateId(): string {
   return `w-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
@@ -45,7 +47,7 @@ export const useFlashcardStore = create<FlashcardState>()(
       widgets: [],
 
       addWidget: (config) => set((state) => {
-        if (state.widgets.length >= 3) return state
+        if (state.widgets.length >= MAX_WIDGETS) return state
         return {
           widgets: [
             ...state.widgets,
@@ -85,6 +87,17 @@ export const useFlashcardStore = create<FlashcardState>()(
         ),
       })),
     }),
-    { name: 'flashcard-storage' }
+    {
+      name: 'flashcard-storage',
+      version: 1,
+      // v1: cards carry every reading (`readings`) — drop cached cards so widgets reload them
+      migrate: (persisted, version) => {
+        const state = persisted as { widgets?: FlashcardWidgetConfig[] }
+        if (version < 1 && state.widgets) {
+          state.widgets = state.widgets.map((w) => ({ ...w, cards: [], lastRefreshed: null }))
+        }
+        return state as FlashcardState
+      },
+    }
   )
 )

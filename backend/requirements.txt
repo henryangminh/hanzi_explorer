@@ -4,12 +4,8 @@ sqlmodel==0.0.19
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
-python-multipart==0.0.9
 httpx==0.27.0
 python-dotenv==1.0.1
-aiofiles==23.2.1
+beautifulsoup4
 pydantic-settings==2.3.0
-pandas
 hanzipy==1.0.4
-paddleocr>=2.7.0
-Pillow>=10.0.0

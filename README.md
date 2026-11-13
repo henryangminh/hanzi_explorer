@@ -41,10 +41,15 @@ hanzi-explorer/
 │   │   ├── models/          # SQLModel table definitions
 │   │   ├── schemas/         # Pydantic request/response schemas
 │   │   └── services/        # Business logic
-│   ├── data/                # SQLite DB + CC-CEDICT raw file
-│   ├── scripts/             # One-time import/seed scripts
+│   ├── data/                # dictionary.db (read-only, committed) + app.db (user data, git-ignored)
+│   ├── scripts/             # create_admin.py
 │   ├── main.py
 │   └── requirements.txt
+├── migration/               # Raw dictionary sources + data pipeline (independent of app code)
+│   ├── sources/             # CC-CEDICT, CVDICT, 现汉7, Hán Việt, HSK, ...
+│   ├── schema/              # dictionary.db schema
+│   ├── dictionary/          # 01..11 scripts that build dictionary.db
+│   └── archive/             # Already-applied one-off migrations (reference only)
 └── frontend/
     └── src/
         ├── components/      # Shared UI (Button, Input, Card, Navbar)
@@ -79,16 +84,13 @@ cp .env.example .env
 # Install dependencies
 pip install -r requirements.txt
 
-# Create your user account
+# data/dictionary.db ships with the repo. To rebuild it from the raw sources, see migration/README.md.
+
+# Create app.db and your user account
 python scripts/create_admin.py
 
-# Import CC-CEDICT dictionary data
-# Download cedict_ts.u8 from https://www.mdbg.net/chinese/dictionary?page=cedict
-# Place it in backend/data/cedict_ts.u8, then:
-python scripts/import_cedict.py
-
-# Import radicals from CSV (place radical.csv in backend/data/)
-python scripts/import_radicals_csv.py
+# Seed the global HSK notebooks into app.db
+python ../migration/seed_global_notebooks.py
 
 # Start the server
 uvicorn main:app --reload --port 8000
@@ -126,7 +128,8 @@ Open `http://localhost:5173`. The Vite dev server proxies `/api/*` to `localhost
 | `SECRET_KEY` | JWT signing key — **change in production** | *(required)* |
 | `ALGORITHM` | JWT algorithm | `HS256` |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Token lifetime | `10080` (7 days) |
-| `DATABASE_URL` | SQLite path | `sqlite:///./data/hanzi.db` |
+| `DATABASE_URL` | User-data SQLite DB (read/write) | `sqlite:///./data/app.db` |
+| `DICTIONARY_DB_PATH` | Dictionary SQLite DB (attached read-only) | `./data/dictionary.db` |
 | `CORS_ORIGINS` | Allowed frontend origins | `["http://localhost:5173"]` |
 
 ---
@@ -135,11 +138,11 @@ Open `http://localhost:5173`. The Vite dev server proxies `/api/*` to `localhost
 
 | Script | Description |
 |---|---|
-| `scripts/create_admin.py` | Interactive prompt to create a user account |
-| `scripts/import_cedict.py` | Import CC-CEDICT into SQLite (run once, ~2 min) |
-| `scripts/import_radicals_csv.py` | Import 214 Kangxi radicals from `data/radical.csv` |
+| `backend/scripts/create_admin.py` | Interactive prompt to create a user account (creates `app.db` if missing) |
+| `migration/dictionary/*.py` | Build `dictionary.db` from `migration/sources/`, run in order 01 → 11 |
+| `migration/seed_global_notebooks.py` | Create the global HSK notebooks in `app.db` |
 
-All scripts must be run from the `backend/` directory.
+See [migration/README.md](migration/README.md) for the database layout and pipeline details.
 
 ---
 

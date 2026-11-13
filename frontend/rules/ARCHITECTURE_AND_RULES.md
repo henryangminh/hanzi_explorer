@@ -21,13 +21,15 @@ Dành cho cả người đọc lẫn AI agent làm việc trên codebase này.
 
 ```
 frontend/src/
-├── features/        ← Mỗi tính năng là một thư mục riêng (feature-based structure)
+├── api/             ← Mọi HTTP call, mỗi domain backend một file (notebooksApi, notesApi, ...)
+├── hooks/           ← Hook dùng chung nhiều feature (useClickOutside, useRipple, useSwipe, useGoToDictionary, ...)
+├── lib/             ← Hàm thuần không React: axios, ndjson, date, pinyin, groupBy, flashcardStatus
 ├── components/
-│   ├── ui/          ← Các component tái sử dụng thuần UI (Button, Card, Input, ...)
-│   └── layout/      ← Layout shells (AppLayout, AdminLayout)
+│   ├── ui/          ← Primitive UI (Button, ModalOverlay, ConfirmDialog, Tooltip, FlashcardStatusButtons, ...)
+│   └── layout/      ← Layout shells + navbar/
+├── features/<tên>/  ← <Tên>Page.tsx (chỉ ghép) + components/ + hooks/ + hàm thuần .ts
 ├── store/           ← Zustand stores, mỗi domain một file
 ├── types/           ← TypeScript interfaces toàn app (index.ts)
-├── lib/             ← Tiện ích nhỏ: axios.ts, cn.ts
 ├── router/          ← Route definitions và route guards
 ├── i18n/            ← Internationalization (locales)
 └── styles/          ← Global CSS
@@ -97,8 +99,10 @@ Mỗi tính năng (feature) là một thư mục chứa tất cả code liên qu
 
 ### lib/ — Shared Utilities
 
-- `axios.ts`: instance axios duy nhất với baseURL `/api/v1`, JWT interceptor, và 401 redirect.
+- `axios.ts`: instance axios duy nhất với baseURL `/api/v1`, JWT interceptor, và 401 redirect; `getErrorDetail(err)` lấy message `detail` từ lỗi FastAPI.
 - `cn.ts`: wrapper `clsx` để merge Tailwind class có điều kiện.
+- `pinyin.ts`: hàm thuần cho pinyin (`formatUmlaut`, `normalizePinyin` — dùng khi so sánh/gộp pinyin giữa các nguồn).
+- `pinyinColor.tsx`: component tô màu theo thanh điệu (`ColorizedPinyin`, `ColorizedHanzi`). File `.tsx` chỉ export component (yêu cầu của Fast Refresh) — hàm thuần đặt ở file `.ts`.
 
 ### router/ — Routing
 
@@ -110,6 +114,14 @@ Mỗi tính năng (feature) là một thư mục chứa tất cả code liên qu
 ---
 
 ## 4. Quy tắc bắt buộc
+
+### 4.0 Mỗi file / hàm một trách nhiệm
+
+- **Một component một file.** Page chỉ ghép các component và hook; không định nghĩa component con trong cùng file.
+- **Lấy dữ liệu / side effect → hook** (`features/<x>/hooks/useXxx.ts`); **logic thuần → file `.ts`** (test được, không React).
+- **Gọi API → `src/api/`**, không gọi axios trực tiếp trong component, hook hay store.
+- **Thấy cùng một đoạn JSX / logic ở 2 nơi → tách** vào `components/ui`, `hooks/` hoặc `lib/` trước khi viết lần thứ 3.
+- File `.tsx` chỉ export component (Fast Refresh); hằng số / hàm thuần đặt trong file `.ts` riêng.
 
 ### 4.1 Mọi API call phải dùng instance axios từ `@/lib/axios`
 

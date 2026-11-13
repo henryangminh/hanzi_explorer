@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import api from '@/lib/axios'
+import { usersApi } from '@/api/usersApi'
 
 interface SettingsState {
   theme: 'light' | 'dark'
@@ -25,7 +25,7 @@ export const useSettingsStore = create<SettingsState>()(
 
       syncToServer: async () => {
         const { theme, language } = get()
-        await api.patch('/settings', { theme, language })
+        await usersApi.saveSettings({ theme, language })
       },
     }),
     {

@@ -1,6 +1,7 @@
 from typing import Optional
-from sqlalchemy import Index
 from sqlmodel import Field, SQLModel
+
+from app.models import DICTIONARY_SCHEMA
 
 
 class SynonymGroup(SQLModel, table=True):
@@ -9,9 +10,10 @@ class SynonymGroup(SQLModel, table=True):
     Each group_code (e.g. 'Aa01A01') contains a set of synonymous words.
     """
     __tablename__ = "synonym_groups"
+    __table_args__ = {"schema": DICTIONARY_SCHEMA}
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    group_code: str = Field(max_length=20, unique=True, index=True)
+    group_code: str = Field(max_length=20)
 
 
 class SynonymMember(SQLModel, table=True):
@@ -21,13 +23,10 @@ class SynonymMember(SQLModel, table=True):
     then return all other words in those groups.
     """
     __tablename__ = "synonym_members"
-    __table_args__ = (
-        Index("ix_synonym_members_word", "word"),
-        Index("ix_synonym_members_group_id", "group_id"),
-    )
+    __table_args__ = {"schema": DICTIONARY_SCHEMA}
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    group_id: int = Field(foreign_key="synonym_groups.id")
+    group_id: int = Field(foreign_key=f"{DICTIONARY_SCHEMA}.synonym_groups.id")
     word: str = Field(max_length=50)
 
 
@@ -37,10 +36,7 @@ class Antonym(SQLModel, table=True):
     Lookup: find rows where word1=X or word2=X, return the partner.
     """
     __tablename__ = "antonyms"
-    __table_args__ = (
-        Index("ix_antonyms_word1", "word1"),
-        Index("ix_antonyms_word2", "word2"),
-    )
+    __table_args__ = {"schema": DICTIONARY_SCHEMA}
 
     id: Optional[int] = Field(default=None, primary_key=True)
     word1: str = Field(max_length=20)
