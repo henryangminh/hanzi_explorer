@@ -1,19 +1,17 @@
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { BookmarkPlus, ChevronDown, ChevronUp } from 'lucide-react'
+import { Flag } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { isSeparablePinyin } from '@/lib/pinyin'
 import { STATUS_RIPPLE_COLOR, statusClass, toggleStatus } from '@/lib/flashcardStatus'
 import { useRipple } from '@/hooks/useRipple'
-import { FlashcardStatusButtons } from '@/components/ui/FlashcardStatusButtons'
 import { Ripple } from '@/components/ui/Ripple'
 import type { DictLiteResponse, FlashcardStatus } from '@/types'
 import { CharDetailPanel } from '@/features/char-detail/CharDetailPanel'
+import { ReportWordModal } from '@/features/shared/ReportWordModal'
 import { SaveToNotebookModal } from '@/features/shared/SaveToNotebookModal'
 import { entryPreview } from '../entryPreview'
+import { EntryActions } from './EntryActions'
 import { EntrySummary } from './EntrySummary'
-
-const ICON_BUTTON = 'p-1 rounded text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] transition-colors'
 
 interface EntryCardProps {
   entry: DictLiteResponse
@@ -31,11 +29,10 @@ export function EntryCard({ entry, pinyinFilter, autoExpand = false, status, sho
   const { t } = useTranslation()
   const [collapsed, setCollapsed] = useState(!autoExpand)
   const [saveModalOpen, setSaveModalOpen] = useState(false)
+  const [reportModalOpen, setReportModalOpen] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
   const { ripple, trigger } = useRipple()
   const marked = statusClass(status)
-  const isSeparable = entry.xdhy?.some((x) => isSeparablePinyin(x.pinyin))
-  const hskLevel = entry.cedict[0]?.hsk_level
 
   function handleStatus(clicked: FlashcardStatus, e: React.MouseEvent) {
     e.stopPropagation()
@@ -54,10 +51,11 @@ export function EntryCard({ entry, pinyinFilter, autoExpand = false, status, sho
     >
       <Ripple ripple={ripple} />
       {saveModalOpen && <SaveToNotebookModal char={entry.char} onClose={() => setSaveModalOpen(false)} />}
+      {reportModalOpen && <ReportWordModal char={entry.char} onClose={() => setReportModalOpen(false)} />}
 
       <div
         className={cn(
-          'relative flex items-center gap-3 px-4 py-3 transition-colors cursor-pointer',
+          'relative flow-root px-4 py-3 transition-colors cursor-pointer',
           marked ? 'bg-transparent hover:bg-black/5 dark:hover:bg-white/5' : 'bg-[var(--color-bg-surface)] hover:bg-[var(--color-bg-subtle)]',
         )}
         onClick={() => {
@@ -65,30 +63,32 @@ export function EntryCard({ entry, pinyinFilter, autoExpand = false, status, sho
           setCollapsed((v) => !v)
         }}
       >
-        <EntrySummary entry={entry} preview={entryPreview(entry)} />
-
-        <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-          {hskLevel && (
-            <span className="text-xs bg-[var(--color-bg-subtle)] px-2 py-0.5 rounded-full text-[var(--color-text-muted)]">HSK {hskLevel}</span>
-          )}
-          {isSeparable && (
-            <span className="text-xs px-2 py-0.5 rounded border border-[var(--color-accent)] text-[var(--color-accent)] shrink-0">
-              {t('dictionary.separable')}
-            </span>
-          )}
-          {showStatus && <FlashcardStatusButtons status={status} size="sm" onClick={handleStatus} />}
-          <button onClick={() => setSaveModalOpen(true)} className={cn(ICON_BUTTON, 'hover:text-[var(--color-primary)]')} title={t('notebooks.saveToNotebook')}>
-            <BookmarkPlus size={14} />
-          </button>
-          <button title={`${t('common.expand')} / ${t('common.collapse')}`} onClick={() => setCollapsed((v) => !v)} className={ICON_BUTTON}>
-            {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-          </button>
+        {/* Floated so the text below the buttons can use the full width */}
+        <div className="float-right ml-3 mb-1">
+          <EntryActions
+            char={entry.char}
+            status={status}
+            showStatus={showStatus}
+            collapsed={collapsed}
+            onStatus={handleStatus}
+            onSave={() => setSaveModalOpen(true)}
+            onToggle={() => setCollapsed((v) => !v)}
+          />
         </div>
+        <EntrySummary entry={entry} preview={entryPreview(entry)} showTags={collapsed} />
       </div>
 
       {!collapsed && (
         <div className="px-4 pb-4 pt-2 border-t border-[var(--color-border)] bg-[var(--color-bg-surface)]">
-          <CharDetailPanel char={entry.char} initialEntry={entry} pinyinFilter={pinyinFilter} showNotes onWordClick={onWordClick} />
+          <CharDetailPanel char={entry.char} initialEntry={entry} pinyinFilter={pinyinFilter} showHeading={false} showNotes onWordClick={onWordClick} />
+          {/* Reporting sits at the end of the entry, once it has been read, instead of crowding the header */}
+          <button
+            onClick={() => setReportModalOpen(true)}
+            className="mt-4 ml-auto flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] hover:text-red-500 transition-colors"
+          >
+            <Flag size={12} />
+            {t('report.title')}
+          </button>
         </div>
       )}
     </div>

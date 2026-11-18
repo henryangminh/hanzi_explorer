@@ -2,8 +2,8 @@ from fastapi import APIRouter, HTTPException, status
 
 from app.core.deps import CurrentUser, DbSession
 from app.schemas.flashcard import FlashcardCardResponse
-from app.schemas.wotd import WOTDSaveRequest, WOTDSaveResponse
-from app.services import wotd_service
+from app.schemas.wotd import StudyDayRequest, WOTDSaveRequest, WOTDSaveResponse
+from app.services import study_day_service, wotd_service
 
 router = APIRouter(prefix="/wotd", tags=["wotd"])
 
@@ -16,6 +16,16 @@ def save_wotd(data: WOTDSaveRequest, session: DbSession, user: CurrentUser):
 @router.get("/dates", response_model=list[str])
 def get_wotd_dates(session: DbSession, user: CurrentUser):
     return wotd_service.get_wotd_dates(session, user.id)
+
+
+@router.post("/studied", status_code=status.HTTP_204_NO_CONTENT)
+def mark_studied(data: StudyDayRequest, session: DbSession, user: CurrentUser):
+    study_day_service.mark_studied(session, user.id, data.date)
+
+
+@router.get("/studied", response_model=list[str])
+def get_studied_dates(session: DbSession, user: CurrentUser):
+    return study_day_service.get_studied_dates(session, user.id)
 
 
 @router.get("/{date}", response_model=list[FlashcardCardResponse])

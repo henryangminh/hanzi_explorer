@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, BookmarkPlus } from 'lucide-react'
+import { ArrowLeft, Bookmark } from 'lucide-react'
 import { ColorizedHanzi, ColorizedPinyin } from '@/lib/pinyinColor'
 import { useGoToDictionary } from '@/hooks/useGoToDictionary'
 import { CharDetailPanel } from '@/features/char-detail/CharDetailPanel'
@@ -36,7 +36,7 @@ export function RadicalCharDetail({ char, onBack }: { char: string; onBack: () =
           className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-bg-subtle)] transition-colors shrink-0"
           title={t('notebooks.saveToNotebook')}
         >
-          <BookmarkPlus size={16} />
+          <Bookmark size={16} />
         </button>
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-3">

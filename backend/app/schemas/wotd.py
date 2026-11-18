@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class WOTDSaveRequest(BaseModel):
@@ -8,3 +8,7 @@ class WOTDSaveRequest(BaseModel):
 
 class WOTDSaveResponse(BaseModel):
     saved: bool
+
+
+class StudyDayRequest(BaseModel):
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")  # YYYY-MM-DD (local date from client)

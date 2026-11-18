@@ -17,6 +17,7 @@ const CLOSE_ANIMATION_MS = 200
 
 export interface WotdNavigation {
   wotdDates: Set<string>
+  studiedDates?: Set<string>
   viewDate: string | null
   onSelectDate: (date: string) => void
   onBackToToday: () => void

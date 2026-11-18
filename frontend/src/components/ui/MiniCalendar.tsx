@@ -6,6 +6,8 @@ export interface MiniCalendarProps {
   year: number
   month: number
   wotdDates: Set<string>
+  /** Days studied (part of the streak): marked with an orange dot. */
+  studiedDates?: Set<string>
   viewDate: string | null
   today: string
   onSelect: (date: string) => void
@@ -13,7 +15,7 @@ export interface MiniCalendarProps {
   onNextMonth: () => void
 }
 
-export function MiniCalendar({ year, month, wotdDates, viewDate, today, onSelect, onPrevMonth, onNextMonth }: MiniCalendarProps) {
+export function MiniCalendar({ year, month, wotdDates, studiedDates, viewDate, today, onSelect, onPrevMonth, onNextMonth }: MiniCalendarProps) {
   const { i18n } = useTranslation()
   const isVi = i18n.language === 'vi'
 
@@ -93,7 +95,7 @@ export function MiniCalendar({ year, month, wotdDates, viewDate, today, onSelect
             >
               {parseInt(dateStr.slice(-2), 10)}
               {hasWOTD && !isSelected && (
-                <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[var(--color-primary)]" />
+                <span className={cn('absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full', studiedDates?.has(dateStr) ? 'bg-orange-500' : 'bg-[var(--color-primary)]')} />
               )}
             </button>
           )

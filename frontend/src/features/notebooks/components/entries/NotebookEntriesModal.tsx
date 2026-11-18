@@ -11,6 +11,7 @@ import { SaveToNotebookModal } from '@/features/shared/SaveToNotebookModal'
 import { useEntryStatuses } from '../../hooks/useEntryStatuses'
 import { useNotebookEntries } from '../../hooks/useNotebookEntries'
 import { sortOptions } from '../../sortOptions'
+import { AddEntriesForm } from './AddEntriesForm'
 import { EntriesHeader } from './EntriesHeader'
 import { EntryDetailView } from './EntryDetailView'
 import { EntryGrid } from './EntryGrid'
@@ -24,14 +25,17 @@ interface NotebookEntriesModalProps {
   onDeleted: () => void
   onEdit?: () => void
   onCountsChanged?: (learned: number, notLearned: number) => void
+  /** Show a form to add many words at once; called after words were added. */
+  onEntriesAdded?: () => void
 }
 
 /** A notebook's words: filterable, sortable grid, or one word in detail. */
-export function NotebookEntriesModal({ notebook, canEdit, onClose, onDeleted, onEdit, onCountsChanged }: NotebookEntriesModalProps) {
+export function NotebookEntriesModal({ notebook, canEdit, onClose, onDeleted, onEdit, onCountsChanged, onEntriesAdded }: NotebookEntriesModalProps) {
   const { t } = useTranslation()
   const [sort, setSort] = useState<NotebookSortOrder>('updated_at_desc')
   const [filters, setFilters] = useState<Set<EntryFilter>>(new Set(ALL_ENTRY_FILTERS))
-  const { entries, loading, removeLocal } = useNotebookEntries(notebook.id, sort)
+  const [entriesVersion, setEntriesVersion] = useState(0)
+  const { entries, loading, removeLocal } = useNotebookEntries(notebook.id, sort, entriesVersion)
   const { statuses, setStatus } = useEntryStatuses(entries, loading, onCountsChanged)
   const { selectedNotebookChar: selectedChar, setSelectedNotebookChar: setSelectedChar } = useUIStore()
   const [removingChar, setRemovingChar] = useState<string | null>(null)
@@ -104,6 +108,13 @@ export function NotebookEntriesModal({ notebook, canEdit, onClose, onDeleted, on
           onDelete={canEdit ? () => setConfirmDelete(true) : undefined}
           onClose={onClose}
         />
+
+        {!selectedChar && onEntriesAdded && (
+          <AddEntriesForm
+            notebookId={notebook.id}
+            onAdded={() => { setEntriesVersion((v) => v + 1); onEntriesAdded() }}
+          />
+        )}
 
         {!selectedChar && (
           <div className="px-6 py-2 shrink-0 flex items-center gap-2">

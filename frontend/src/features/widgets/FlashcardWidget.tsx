@@ -4,16 +4,20 @@ import { Loader2 } from 'lucide-react'
 import { useCardCarousel } from '@/hooks/useCardCarousel'
 import { useSaveFlashcardStatus } from '@/hooks/useSaveFlashcardStatus'
 import { useFlashcardStore, type FlashcardWidgetConfig } from '@/store/flashcard.store'
-import type { NotebookResponse } from '@/types'
+import type { FlashcardStatus, NotebookResponse } from '@/types'
 import { FlashcardLarge } from '@/features/flashcards/components/FlashcardLarge'
 import { WotdDatePicker } from '@/features/flashcards/components/WotdDatePicker'
 import { CardStack } from './components/CardStack'
+import { ReviewButton } from './components/ReviewButton'
 import { WidgetHeader } from './components/WidgetHeader'
 import { FlashcardWidgetSettings, type WidgetSettingsValues } from './FlashcardWidgetSettings'
 import { useDayChange } from './hooks/useDayChange'
 import { useRefreshCountdown } from './hooks/useRefreshCountdown'
+import { useReview } from './hooks/useReview'
+import { useStudyDays } from './hooks/useStudyDays'
 import { useWidgetCards } from './hooks/useWidgetCards'
 import { useWotdHistory } from './hooks/useWotdHistory'
+import { countStreak, longestStreak } from './streak'
 
 interface Props {
   widget: FlashcardWidgetConfig
@@ -27,6 +31,7 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
   const saveStatus = useSaveFlashcardStatus()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [largeOpen, setLargeOpen] = useState(false)
+  const [reviewOpen, setReviewOpen] = useState(false)
 
   const isWotd = widget.isDefault
   const cardsLoader = useWidgetCards(widget.id)
@@ -34,6 +39,15 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
   const cards = history.viewDate !== null && history.historyCards !== null ? history.historyCards : widget.cards
   const carousel = useCardCarousel(cards.length)
   const loading = cardsLoader.loading || history.loading
+  const studyDays = useStudyDays(isWotd)
+  const review = useReview(isWotd, studyDays.markToday)
+
+  function handleStatusChange(char: string, status: FlashcardStatus | null) {
+    saveStatus(char, status)
+    if (!isWotd) return
+    if (status) studyDays.markToday()
+    review.trackWotdStatus(char, status)
+  }
 
   async function loadTodaysWords() {
     if (await cardsLoader.ensureTodaysWords()) {
@@ -72,7 +86,7 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
   return (
     <>
       <div className="bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-xl px-1 py-4 flex flex-col gap-3">
-        <WidgetHeader name={widget.name} onExpand={() => setLargeOpen(true)} onOpenSettings={() => setSettingsOpen(true)} />
+        <WidgetHeader name={widget.name} streak={isWotd ? { days: countStreak(studyDays.dates), best: longestStreak(studyDays.dates) } : undefined} onExpand={() => setLargeOpen(true)} onOpenSettings={() => setSettingsOpen(true)} />
 
         {loading ? (
           <div className="flex items-center justify-center h-[240px]">
@@ -84,7 +98,7 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
           </div>
         ) : (
           <>
-            <CardStack cards={cards} carousel={carousel} onStatusChange={saveStatus} />
+            <CardStack cards={cards} carousel={carousel} onStatusChange={handleStatusChange} />
             <p className="text-center text-xs text-[var(--color-text-muted)]">
               {carousel.safeIndex + 1}/{cards.length}
             </p>
@@ -101,8 +115,10 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
 
         {!loading && isWotd && (
           <div className="border-t border-[var(--color-border)] pt-2 flex flex-col gap-0">
+            {review.cards.length > 0 && <ReviewButton count={review.cards.length} onClick={() => setReviewOpen(true)} />}
             <WotdDatePicker
               wotdDates={history.dates}
+              studiedDates={studyDays.dates}
               viewDate={history.viewDate}
               onSelectDate={history.selectDate}
               onBackToToday={history.backToToday}
@@ -126,13 +142,22 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
           cards={cards}
           initialIndex={carousel.safeIndex}
           onClose={() => setLargeOpen(false)}
-          onStatusChange={saveStatus}
+          onStatusChange={handleStatusChange}
           wotd={isWotd ? {
             wotdDates: history.dates,
+            studiedDates: studyDays.dates,
             viewDate: history.viewDate,
             onSelectDate: history.selectDate,
             onBackToToday: history.backToToday,
           } : undefined}
+        />
+      )}
+
+      {reviewOpen && (
+        <FlashcardLarge
+          cards={review.cards}
+          onClose={() => { setReviewOpen(false); review.refresh() }}
+          onStatusChange={review.answer}
         />
       )}
     </>

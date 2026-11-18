@@ -4,11 +4,13 @@ from datetime import datetime, timezone
 from sqlalchemy import bindparam, text
 from sqlmodel import Session, select
 
+from app.models.character import Character
+
 from app.core.cedict_utils import clean_meaning
 from app.core.pinyin import numeric_to_diacritic
 from app.models.flashcard import UserFlashcard
 from app.schemas.flashcard import FlashcardCardResponse, FlashcardReading, FlashcardStatusUpdate
-from app.services.character_lookup import get_brief_source_ids
+from app.services.character_lookup import batch_brief_lookup, get_brief_source_ids
 from app.services.sino_vn_service import compose_from_db
 
 _CEDICT_SKIP = re.compile(
@@ -73,6 +75,19 @@ def build_card(
         cvdict_brief=_cvdict_brief(cvdict_raw),
         status=status,
     )
+
+
+def build_cards(session: Session, words: list[str], status_by_word: dict[str, str | None]) -> list[FlashcardCardResponse]:
+    """Cards for the given words in order (words missing from the dictionary are skipped)."""
+    if not words:
+        return []
+    char_by_word = {c.simplified: c for c in session.exec(select(Character).where(Character.simplified.in_(words))).all()}
+    pinyins_by_char, cedict_by_char, cvdict_by_char = batch_brief_lookup(session, [c.id for c in char_by_word.values()])
+    return [
+        build_card(session, w, pinyins_by_char.get(c.id, []), cedict_by_char.get(c.id), cvdict_by_char.get(c.id), status_by_word.get(w))
+        for w in words
+        if (c := char_by_word.get(w))
+    ]
 
 
 # Raw SQL: CTEs + GROUP_CONCAT across app.db and the attached dictionary.db are much simpler

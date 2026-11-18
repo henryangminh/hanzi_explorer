@@ -1,7 +1,7 @@
 """
-Convert numeric-tone pinyin to diacritic pinyin.
-Example: "ke3 yi3" → "kě yǐ"
-         "you2 yong3" → "yóu yǒng"
+Convert between numeric-tone pinyin and diacritic pinyin.
+Example: "ke3 yi3" ↔ "kě yǐ"
+         "you2 yong3" ↔ "yóu yǒng"
 """
 
 TONE_MAP: dict[str, list[str]] = {
@@ -69,3 +69,47 @@ def numeric_to_diacritic(pinyin: str) -> str:
             result.append(syllable)
 
     return ' '.join(result)
+
+
+# tone-marked vowel → (vowel, tone)
+_MARKED: dict[str, tuple[str, int]] = {
+    mark: (vowel, tone + 1)
+    for vowel, marks in TONE_MAP.items() if vowel != 'v'
+    for tone, mark in enumerate(marks[:4])
+}
+
+
+def diacritic_to_numeric(text: str) -> str:
+    """
+    Replace tone marks with a tone number at the end of each marked syllable (lowercase input).
+    "nǐhǎo"    → "ni3hao3"
+    "zhōngguó" → "zhong1guo2"
+    "lǜ"       → "lü4"
+    Unmarked syllables are left as they are.
+    """
+    out: list[str] = []
+    i, n = 0, len(text)
+    while i < n:
+        ch = text[i]
+        i += 1
+        if ch not in _MARKED:
+            out.append(ch)
+            continue
+        vowel, tone = _MARKED[ch]
+        # "r" ends a syllable only in ér / ěr / èr (erhua like huār is a syllable of its own: hua1 r5)
+        prev = text[i - 2] if i >= 2 else ''
+        starts_syllable = not (prev.isalpha() and prev not in VOWELS and prev not in _MARKED)
+        finals = ('ng', 'n', 'r') if vowel == 'e' and starts_syllable else ('ng', 'n')
+        out.append(vowel)
+        # Rest of the syllable: the following vowels, then a final n / ng (/ r) unless it starts the next syllable
+        while i < n and text[i] in VOWELS:
+            out.append(text[i])
+            i += 1
+        for final in finals:
+            end = i + len(final)
+            if text.startswith(final, i) and (end == n or (text[end] not in VOWELS and text[end] not in _MARKED)):
+                out.append(final)
+                i = end
+                break
+        out.append(str(tone))
+    return ''.join(out)

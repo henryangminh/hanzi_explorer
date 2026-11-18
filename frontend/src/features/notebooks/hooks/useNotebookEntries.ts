@@ -8,9 +8,9 @@ interface Loaded {
   done: boolean
 }
 
-/** A notebook's entries, streamed in as the server produces them. */
-export function useNotebookEntries(notebookId: number, sort: NotebookSortOrder) {
-  const key = `${notebookId}:${sort}`
+/** A notebook's entries, streamed in as the server produces them; a new `version` streams them again. */
+export function useNotebookEntries(notebookId: number, sort: NotebookSortOrder, version = 0) {
+  const key = `${notebookId}:${sort}:${version}`
   // Data is tagged with the (notebook, sort) it belongs to, so a change shows an empty list at once
   const [loaded, setLoaded] = useState<Loaded>({ key: '', entries: [], done: false })
 

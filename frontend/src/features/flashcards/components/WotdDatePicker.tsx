@@ -8,6 +8,7 @@ import { MiniCalendar } from '@/components/ui/MiniCalendar'
 
 interface WotdDatePickerProps {
   wotdDates: Set<string>
+  studiedDates?: Set<string>
   /** null = today's words */
   viewDate: string | null
   onSelectDate: (date: string) => void
@@ -17,7 +18,7 @@ interface WotdDatePickerProps {
 }
 
 /** "Words of the day" date toggle: shows the viewed date and expands into a calendar of past days. */
-export function WotdDatePicker({ wotdDates, viewDate, onSelectDate, onBackToToday, rowPaddingClass = 'px-0.5' }: WotdDatePickerProps) {
+export function WotdDatePicker({ wotdDates, studiedDates, viewDate, onSelectDate, onBackToToday, rowPaddingClass = 'px-0.5' }: WotdDatePickerProps) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const calendar = useCalendarMonth()
@@ -53,6 +54,7 @@ export function WotdDatePicker({ wotdDates, viewDate, onSelectDate, onBackToToda
           year={calendar.year}
           month={calendar.month}
           wotdDates={wotdDates}
+          studiedDates={studiedDates}
           viewDate={viewDate}
           today={today}
           onSelect={(date) => { onSelectDate(date); setExpanded(false) }}

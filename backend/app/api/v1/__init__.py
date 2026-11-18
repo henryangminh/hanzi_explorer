@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1 import auth, users, notes, dictionary, radicals, settings, notebooks, flashcards, admin, search_history, wotd
+from app.api.v1 import auth, users, notes, dictionary, radicals, settings, notebooks, flashcards, admin, search_history, wotd, review, word_reports
 
 router = APIRouter(prefix="/api/v1")
 
@@ -14,3 +14,5 @@ router.include_router(notebooks.router)
 router.include_router(admin.router)
 router.include_router(search_history.router)
 router.include_router(wotd.router)
+router.include_router(review.router)
+router.include_router(word_reports.router)

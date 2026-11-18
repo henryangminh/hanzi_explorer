@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     # Database — app.db holds user data (read/write); dictionary.db is reference data (read-only)
     database_url: str = "sqlite:///./data/app.db"
     dictionary_db_path: str = "./data/dictionary.db"
+    # hvdic crawl (written by migration/crawlers/hvdic; optional — only read for the admin data page)
+    hvdic_db_path: str = "../migration/crawled/hvdic.db"
 
     # CORS
     cors_origins: List[str] = ["http://localhost:5173"]

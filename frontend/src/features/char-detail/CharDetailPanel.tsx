@@ -22,6 +22,8 @@ interface Props {
   char: string
   /** Data the caller already has (lite or full); otherwise it is fetched. */
   initialEntry?: InitialEntry
+  /** Show the word as a heading (off when the caller already shows it). */
+  showHeading?: boolean
   /** Show the "My notes" section. */
   showNotes?: boolean
   /** Only show the parts for this (normalized) reading. */
@@ -31,7 +33,7 @@ interface Props {
   onWordClick?: (word: string) => void
 }
 
-export function CharDetailPanel({ char, initialEntry, showNotes = false, pinyinFilter, onDataLoaded, onNoteSaved, onWordClick }: Props) {
+export function CharDetailPanel({ char, initialEntry, showHeading = true, showNotes = false, pinyinFilter, onDataLoaded, onNoteSaved, onWordClick }: Props) {
   const { t } = useTranslation()
   const notes = useCharNotes(char, initialEntry && isFullEntry(initialEntry) ? initialEntry.user_notes ?? [] : [], onNoteSaved)
   const { full, lite, loadingFull } = useCharEntry(char, initialEntry, (data) => {
@@ -48,7 +50,7 @@ export function CharDetailPanel({ char, initialEntry, showNotes = false, pinyinF
 
   return (
     <div className="flex flex-col gap-4">
-      <CharHeading char={entry.char} traditional={heading.traditional} pinyin={heading.pinyin} />
+      {showHeading && <CharHeading char={entry.char} traditional={heading.traditional} pinyin={heading.pinyin} />}
       <TagList tags={entry.hsk_tags ?? []} />
       {firstBilingual && <RadicalInfo radical={firstBilingual.radical} strokeCount={firstBilingual.stroke_count} />}
 

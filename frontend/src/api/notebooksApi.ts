@@ -1,6 +1,6 @@
 import api from '@/lib/axios'
 import { streamNdjson } from '@/lib/ndjson'
-import type { NotebookEntryPreview, NotebookResponse, NotebookSortOrder } from '@/types'
+import type { AddEntriesResult, NotebookEntryPreview, NotebookResponse, NotebookSortOrder } from '@/types'
 
 export interface NotebookInput {
   name: string
@@ -30,6 +30,12 @@ export const notebooksApi = {
 
   addEntry: async (notebookId: number, char: string): Promise<void> => {
     await api.post(`/notebooks/${notebookId}/entries`, { char })
+  },
+
+  /** Add many dictionary words at once; words not in the dictionary are reported, not added. */
+  addEntries: async (notebookId: number, chars: string[]): Promise<AddEntriesResult> => {
+    const { data } = await api.post<AddEntriesResult>(`/notebooks/${notebookId}/entries/bulk`, { chars })
+    return data
   },
 
   removeEntry: async (notebookId: number, char: string): Promise<void> => {

@@ -17,3 +17,10 @@ export function formatCountdown(ms: number): string {
   const s = totalSecs % 60
   return [h, m, s].map((n) => String(n).padStart(2, '0')).join(':')
 }
+
+/** Server timestamp (UTC, possibly without a zone suffix) → local DD/MM/YYYY HH:mm */
+export function formatDateTime(iso: string): string {
+  const date = new Date(/[zZ]|[+-]\d\d:\d\d$/.test(iso) ? iso : `${iso}Z`)
+  const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  return `${formatDateShort(toLocalDateStr(date))} ${time}`
+}

@@ -12,6 +12,16 @@ export const wotdApi = {
     return data
   },
 
+  /** Record that the user studied today (marked a card); the streak is built from these days. */
+  markStudied: async (date: string): Promise<void> => {
+    await api.post('/wotd/studied', { date })
+  },
+
+  studiedDates: async (): Promise<string[]> => {
+    const { data } = await api.get<string[]>('/wotd/studied')
+    return data
+  },
+
   forDate: async (date: string): Promise<FlashcardEntry[]> => {
     const { data } = await api.get<FlashcardEntry[]>(`/wotd/${date}`)
     return data

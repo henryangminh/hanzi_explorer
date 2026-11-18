@@ -6,6 +6,8 @@ from fastapi.responses import StreamingResponse
 from app.api.v1.notebook_access import assert_can_edit, assert_can_view, get_notebook_or_404
 from app.core.deps import CurrentUser, DbSession
 from app.schemas.notebook import (
+    AddEntriesRequest,
+    AddEntriesResponse,
     AddEntryRequest,
     NotebookCreate,
     NotebookEntryResponse,
@@ -96,6 +98,18 @@ def add_entry(
         return notebook_service.add_entry(session, nb, data)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+
+
+@router.post("/{notebook_id}/entries/bulk", response_model=AddEntriesResponse)
+def add_entries(
+    notebook_id: int,
+    data: AddEntriesRequest,
+    session: DbSession,
+    user: CurrentUser,
+):
+    nb = get_notebook_or_404(session, notebook_id)
+    assert_can_edit(nb, user)
+    return notebook_service.add_entries(session, nb, data.chars)
 
 
 @router.delete("/{notebook_id}/entries/{char}", status_code=status.HTTP_204_NO_CONTENT)

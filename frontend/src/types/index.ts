@@ -167,6 +167,12 @@ export interface NotebookResponse {
   updated_at: string
 }
 
+export interface AddEntriesResult {
+  added: string[]
+  existing: string[]
+  unknown: string[]
+}
+
 export interface NotebookEntryResponse {
   id: number
   notebook_id: number
@@ -224,4 +230,92 @@ export interface SearchHistoryItem {
 
 export interface SearchHistoryListResponse {
   items: SearchHistoryItem[]
+}
+
+// ── Admin ─────────────────────────────────────────────────
+
+export interface UserActivity {
+  id: number
+  username: string
+  display_name: string
+  /** Local YYYY-MM-DD dates, newest first */
+  studied_dates: string[]
+  learned_count: number
+  not_learned_count: number
+  review_due: number
+}
+
+export interface RecentSearch {
+  display_name: string
+  char: string
+  searched_at: string
+}
+
+export interface AdminStats {
+  total_users: number
+  active_users: number
+  deleted_users: number
+  global_notebooks: number
+  global_entries: number
+  open_reports: number
+  learners: UserActivity[]
+  recent_searches: RecentSearch[]
+}
+
+// ── Word reports ──────────────────────────────────────────
+
+export type WordReportStatus = 'open' | 'resolved'
+
+export interface WordReport {
+  id: number
+  char: string
+  message: string
+  status: WordReportStatus
+  reporter: string
+  created_at: string
+  resolved_at: string | null
+}
+
+// ── Admin data sources ────────────────────────────────────
+
+export interface DefinitionSource {
+  name: string
+  version: string | null
+  entry_count: number
+  imported_at: string | null
+  origin: string | null
+}
+
+export interface Dataset {
+  key: string
+  rows: number
+  origin: string
+}
+
+export interface OnlineSource {
+  source: string
+  cached_words: number
+  last_cached_at: string | null
+}
+
+export interface CrawlStatus {
+  chars_done: number
+  chars_total: number
+  words_done: number
+  words_total: number
+  requests_24h: number
+  budget_24h: number
+  denials_24h: number
+  denials_7d: number
+  last_request_at: string | null
+  eta_days: number
+}
+
+export interface DataSources {
+  dictionary_built_at: string
+  total_words: number
+  definition_sources: DefinitionSource[]
+  datasets: Dataset[]
+  online_sources: OnlineSource[]
+  crawler: CrawlStatus | null
 }

@@ -9,8 +9,8 @@ from app.core.pinyin import numeric_to_diacritic
 from app.models.character import Character, PinyinReading
 from app.models.flashcard import UserFlashcard
 from app.models.notebook import Notebook, NotebookEntry
-from app.models.sino_vn import SinoVietnamese
 from app.schemas.notebook import (
+    AddEntriesResponse,
     AddEntryRequest,
     NotebookCreate,
     NotebookEntryPreview,
@@ -18,7 +18,8 @@ from app.schemas.notebook import (
     NotebookResponse,
     NotebookUpdate,
 )
-from app.services.character_lookup import batch_brief_lookup, resolve_simplified
+from app.services.character_lookup import batch_brief_lookup, get_character, resolve_simplified
+from app.services.sino_vn_service import compose_from_db
 
 SortOrder = Literal["updated_at_desc", "updated_at_asc", "created_at_desc", "created_at_asc", "name_asc", "name_desc"]
 
@@ -81,7 +82,7 @@ def list_notebooks(
     global_notebooks = session.exec(global_stmt).all()
 
     # Private notebooks: sorted by user-chosen sort param
-    private_stmt = select(Notebook).where(Notebook.owner_id == user_id)
+    private_stmt = select(Notebook).where(Notebook.owner_id == user_id, Notebook.type == "private")
     private_stmt = _sort_notebooks(private_stmt, sort)
     private_notebooks = session.exec(private_stmt).all()
 
@@ -163,6 +164,27 @@ def add_entry(
     )
 
 
+def add_entries(session: Session, nb: Notebook, chars: list[str]) -> AddEntriesResponse:
+    """Add many dictionary words at once (traditional input is stored as simplified); unknown words are skipped."""
+    present = set(session.exec(select(NotebookEntry.char).where(NotebookEntry.notebook_id == nb.id)).all())
+    result = AddEntriesResponse(added=[], existing=[], unknown=[])
+    for char in dict.fromkeys(c.strip() for c in chars if c.strip()):
+        row = get_character(session, char)
+        if row is None:
+            result.unknown.append(char)
+        elif row.simplified in present:
+            result.existing.append(row.simplified)
+        else:
+            session.add(NotebookEntry(notebook_id=nb.id, char=row.simplified))
+            present.add(row.simplified)
+            result.added.append(row.simplified)
+    if result.added:
+        nb.updated_at = datetime.now(timezone.utc)
+        session.add(nb)
+        session.commit()
+    return result
+
+
 def remove_entry(session: Session, nb: Notebook, char: str) -> bool:
     entry = session.exec(
         select(NotebookEntry)
@@ -237,21 +259,6 @@ def stream_entries_preview(
         # 2. Pinyin readings + first CC-CEDICT / CVDICT definitions for chunk
         pinyins_by_char, cedict_by_char, cvdict_by_char = batch_brief_lookup(session, char_ids)
 
-        # 3. Sino-Vietnamese readings for primary pinyin
-        first_pinyin_by_char = {
-            char_id: readings[0]
-            for char_id, readings in pinyins_by_char.items()
-            if readings
-        }
-        sv_rows = session.exec(
-            select(SinoVietnamese).where(SinoVietnamese.character_id.in_(char_ids))
-        ).all()
-        sino_vn_by_char: dict[int, list[str]] = {}
-        for sv in sv_rows:
-            if sv.pinyin == first_pinyin_by_char.get(sv.character_id):
-                values = sino_vn_by_char.setdefault(sv.character_id, [])
-                values.extend(v.strip() for v in sv.hanviet.split("/") if v.strip())
-
         # Yield entries in chunk
         for entry, char in chunk:
             if char is None:
@@ -265,6 +272,7 @@ def stream_entries_preview(
                 cedict_brief=clean_meaning(cedict_by_char[char.id]).split(";")[0].strip() if char.id in cedict_by_char else None,
                 cvdict_brief=cvdict_by_char[char.id].split("/")[0].strip() if char.id in cvdict_by_char else None,
                 pinyins=[numeric_to_diacritic(p) for p in pinyins_by_char.get(char.id, [])],
-                sino_vn=sino_vn_by_char.get(char.id, []),
+                # Hán Việt of the primary reading, composed like the dictionary and flashcards do
+                sino_vn=compose_from_db(session, char.simplified, pinyins_by_char[char.id][0]) if pinyins_by_char.get(char.id) else [],
                 is_separable=char.is_separable,
             )

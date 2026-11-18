@@ -1,11 +1,30 @@
 from typing import List
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 from app.core.deps import AdminUser, DbSession
+from app.schemas.admin_stats import AdminStats
+from app.schemas.data_source import DataSources
+from app.schemas.review import DATE_PATTERN
 from app.schemas.user import UserPublic, AdminUserCreate, AdminUserUpdate
-from app.services import admin_service
+from app.services import admin_service, admin_stats_service, data_source_service
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+@router.get("/stats", response_model=AdminStats)
+def get_stats(current_admin: AdminUser, session: DbSession, date: str = Query(pattern=DATE_PATTERN)):
+    """
+    Overview for the admin dashboard. `date` is the admin's local date. Admin only.
+    """
+    return admin_stats_service.get_stats(session, date)
+
+
+@router.get("/data-sources", response_model=DataSources)
+def get_data_sources(current_admin: AdminUser, session: DbSession):
+    """
+    Dictionary sources, online sources and the hvdic crawl progress (read only). Admin only.
+    """
+    return data_source_service.get_data_sources(session)
 
 
 @router.get("/users", response_model=List[UserPublic])

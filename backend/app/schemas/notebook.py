@@ -57,3 +57,13 @@ class NotebookEntryPreview(BaseModel):
 
 class AddEntryRequest(BaseModel):
     char: str
+
+
+class AddEntriesRequest(BaseModel):
+    chars: list[str]
+
+
+class AddEntriesResponse(BaseModel):
+    added: list[str]      # simplified headwords now in the notebook
+    existing: list[str]   # already in the notebook
+    unknown: list[str]    # not in the dictionary, so not added

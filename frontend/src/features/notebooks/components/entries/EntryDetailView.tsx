@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { BookmarkPlus, ChevronLeft } from 'lucide-react'
+import { Bookmark, ChevronLeft } from 'lucide-react'
 import { useGoToDictionary } from '@/hooks/useGoToDictionary'
 import { CharDetailPanel } from '@/features/char-detail/CharDetailPanel'
 
@@ -23,7 +23,7 @@ export function EntryDetailView({ char, onBack, onSave }: { char: string; onBack
           className="p-1.5 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-bg-subtle)] transition-colors"
           title={t('notebooks.saveToNotebook')}
         >
-          <BookmarkPlus size={15} />
+          <Bookmark size={15} />
         </button>
       </div>
       {/* CharDetailPanel self-manages: shows DB data first, then lazy-loads Wiktionary */}

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { AlertCircle, BookmarkPlus, Check } from 'lucide-react'
+import { AlertCircle, Bookmark, Check } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import type { NotebookResponse } from '@/types'
 
@@ -16,7 +16,7 @@ function StateIcon({ saving, feedback }: { saving: boolean; feedback: SaveFeedba
   if (saving) return <span className="text-xs text-[var(--color-text-muted)]">...</span>
   if (feedback === 'ok') return <Check size={15} className="text-green-500" />
   if (feedback === 'dup') return <AlertCircle size={15} className="text-orange-400" />
-  return <BookmarkPlus size={15} className="text-[var(--color-text-muted)]" />
+  return <Bookmark size={15} className="text-[var(--color-text-muted)]" />
 }
 
 /** A notebook to save the word into, showing saved / already-there feedback. */

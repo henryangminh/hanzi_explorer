@@ -24,6 +24,9 @@ export function TabResults({ tab, statuses, showStatus, onStatusChange, onWordCl
         </p>
       )}
       {tab.error && <p className="text-sm text-red-500">{tab.error}</p>}
+      {!tab.loading && !tab.error && tab.results.length === 0 && (
+        <p className="text-sm text-[var(--color-text-muted)] py-4 text-center">{t('dictionary.noResultsFor', { query: tab.query })}</p>
+      )}
 
       {tab.results.flatMap((result, idx) => splitByReading(result).map((reading, readingIdx) => (
         <EntryCard

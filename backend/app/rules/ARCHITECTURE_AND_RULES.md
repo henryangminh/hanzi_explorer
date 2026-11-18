@@ -209,7 +209,7 @@ Có 2 file SQLite (chi tiết: `migration/README.md`):
 
 | File | Vai trò | Schema do ai quản lý |
 |---|---|---|
-| `data/app.db` | DB chính (read/write): users, user_notes, user_flashcards, notebooks, notebook_entries, search_history, wotd_history, external_cache | Backend (`init_db` → `create_all` chỉ cho bảng app) |
+| `data/app.db` | DB chính (read/write): users, user_notes, user_flashcards, notebooks, notebook_entries, search_history, wotd_history, study_days, review_items, word_reports, external_cache | Backend (`init_db` → `create_all` chỉ cho bảng app) |
 | `data/dictionary.db` | Attach read-only với schema `dictionary` | `migration/schema/dictionary.sql` |
 
 Raw SQL tham chiếu bảng từ điển phải ghi rõ schema: `dictionary.characters`, `dictionary.definitions`, ...

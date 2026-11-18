@@ -1,6 +1,7 @@
+from datetime import date
 from pathlib import Path
 
-from sqlalchemy import event
+from sqlalchemy import event, inspect
 from sqlmodel import SQLModel, create_engine, Session
 
 from app.core.config import get_settings
@@ -35,10 +36,22 @@ def init_db() -> None:
             "Build it with the scripts in migration/ (see migration/README.md)."
         )
     # Import all models here so SQLModel metadata is fully populated
-    from app.models import user, character, radical, note, flashcard, notebook, sino_vn, search_history, synonym_antonym, wotd, cache  # noqa: F401
+    from app.models import user, character, radical, note, flashcard, notebook, sino_vn, search_history, synonym_antonym, wotd, cache, study_day, review, word_report  # noqa: F401
     # Only create app tables — dictionary tables are owned by migration/schema/dictionary.sql
     app_tables = [t for t in SQLModel.metadata.sorted_tables if t.schema != DICTIONARY_SCHEMA]
+    existing = set(inspect(engine).get_table_names())
     SQLModel.metadata.create_all(engine, tables=app_tables)
+    _backfill_new_tables(existing)
+
+
+def _backfill_new_tables(existing: set[str]) -> None:
+    """Seed tables added after users already had data — once, when the table is first created."""
+    from app.services import review_service, study_day_service
+    with Session(engine) as session:
+        if "study_days" not in existing:
+            study_day_service.backfill_from_wotd(session)
+        if "review_items" not in existing:
+            review_service.backfill_from_wotd(session, date.today().isoformat())
 
 
 def get_session():

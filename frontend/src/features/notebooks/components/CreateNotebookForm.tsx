@@ -12,17 +12,18 @@ type NotebookType = 'private' | 'global'
 interface CreateNotebookFormProps {
   /** Admins may also create global notebooks. */
   allowGlobal?: boolean
+  defaultType?: NotebookType
   idPrefix?: string
   className?: string
   onCreated: (nb: NotebookResponse) => void
   onCancel: () => void
 }
 
-export function CreateNotebookForm({ allowGlobal = false, idPrefix = 'nb', className, onCreated, onCancel }: CreateNotebookFormProps) {
+export function CreateNotebookForm({ allowGlobal = false, defaultType = 'private', idPrefix = 'nb', className, onCreated, onCancel }: CreateNotebookFormProps) {
   const { t } = useTranslation()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [type, setType] = useState<NotebookType>('private')
+  const [type, setType] = useState<NotebookType>(defaultType)
   const [creating, setCreating] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {

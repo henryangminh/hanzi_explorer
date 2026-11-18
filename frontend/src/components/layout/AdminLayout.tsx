@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth.store'
-import { Users, Database, Shield, DatabaseBackup, LogOut, LayoutDashboard } from 'lucide-react'
+import { Users, Database, Flag, DatabaseBackup, LogOut, LayoutDashboard } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { Navbar } from './navbar/Navbar'
 import { useTranslation } from 'react-i18next'
@@ -14,7 +14,7 @@ export function AdminLayout() {
     { to: '/admin/dashboard', label: t('admin.layout.systemAdmin'), icon: LayoutDashboard },
     { to: '/admin/users', label: t('admin.layout.users'), icon: Users },
     { to: '/admin/data', label: t('admin.layout.data'), icon: Database },
-    { to: '/admin/moderation', label: t('admin.layout.moderation'), icon: Shield },
+    { to: '/admin/reports', label: t('admin.layout.reports'), icon: Flag },
     { to: '/admin/notebooks', label: t('admin.layout.notebooks'), icon: DatabaseBackup },
   ]
 

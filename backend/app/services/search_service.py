@@ -10,6 +10,7 @@ from typing import List, Tuple
 from sqlmodel import Session, select
 from sqlalchemy import func
 
+from app.core.pinyin import diacritic_to_numeric
 from app.models.character import Character, PinyinReading
 
 _NO_FREQ = 999_999  # sentinel for NULL frequency — sort last
@@ -28,6 +29,11 @@ def _freq_map(session: Session, words: List[str]) -> dict[str, int]:
         simp: (freq if freq is not None else _NO_FREQ)
         for simp, freq in rows
     }
+
+
+def _like_prefix(text: str) -> str:
+    """LIKE pattern matching values that start with `text` (its % and _ taken literally; use escape='\\')."""
+    return text.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_') + '%'
 
 
 def _is_chinese_char(c: str) -> bool:
@@ -62,6 +68,18 @@ def traditional_to_simplified(session: Session, text: str) -> str:
     for trad, simp in trad_rows:
         if trad and simp and trad != simp and trad not in simp_set:
             t2s[trad] = simp
+
+    # Characters only listed inside words (館 in 圖書館): take the simplified char at the same position
+    for c in unique_chars:
+        if c in t2s or c in simp_set:
+            continue
+        word = session.exec(
+            select(Character.traditional, Character.simplified)
+            .where(Character.traditional.contains(c, autoescape=True))
+            .limit(1)
+        ).first()
+        if word and len(word[0]) == len(word[1]):
+            t2s[c] = word[1][word[0].index(c)]
 
     if not t2s:
         return text
@@ -118,7 +136,7 @@ def extract_all_words(session: Session, text: str) -> List[str]:
 
     trailing: List[str] = []
     for c in text:
-        if c not in seen:
+        if c not in seen and _is_chinese_char(c):
             trailing.append(c)
             seen.add(c)
     trailing.sort(key=lambda c: freq.get(c, _NO_FREQ))
@@ -149,7 +167,7 @@ def short_search(session: Session, query: str) -> List[str]:
     # Step 2: prefix extensions (words starting with full query, longer than query)
     prefix_rows = session.exec(
         select(Character.simplified)
-        .where(Character.simplified.like(f'{query}%'))
+        .where(Character.simplified.like(_like_prefix(query), escape='\\'))
         .distinct()
     ).all()
 
@@ -172,41 +190,40 @@ def short_search(session: Session, query: str) -> List[str]:
 # ── Pinyin mode ───────────────────────────────────────────
 
 def _norm_db_pinyin_no_tones(col):
-    """SQLAlchemy expression: lower(col) with spaces and tone digits removed."""
-    expr = func.lower(col)
-    expr = func.replace(expr, ' ', '')
+    """SQLAlchemy expression: lower(col) with spaces and tone digits removed, ü (u:) as v."""
+    expr = _norm_db_pinyin_no_spaces(col)
     for d in '12345':
         expr = func.replace(expr, d, '')
     return expr
 
 
 def _norm_db_pinyin_no_spaces(col):
-    """SQLAlchemy expression: lower(col) with only spaces removed."""
-    return func.replace(func.lower(col), ' ', '')
+    """SQLAlchemy expression: lower(col) with spaces removed, ü (stored as u:) as v."""
+    return func.replace(func.replace(func.lower(col), ' ', ''), 'u:', 'v')
 
 
 def pinyin_search(session: Session, pinyin_input: str) -> List[str]:
     """
     Search by pinyin. Two sub-modes:
     - No digits in input (e.g. bukeqi): strip tones from DB pinyin for comparison
-    - Digits in input (e.g. ming2tian1): keep tone digits, only strip spaces
+    - Digits in input (e.g. ming2tian1, or tone marks: míngtiān): keep tone digits, only strip spaces
+    ü can be typed as ü, v or u: (lü4, lv4, lu:4).
 
     Returns list of simplified words, sorted by pinyin match length desc.
     """
-    raw = pinyin_input.strip().lower()
+    raw = diacritic_to_numeric(pinyin_input.strip().lower()).replace('ü', 'v').replace('u:', 'v')
     has_digits = bool(re.search(r'\d', raw))
+    normalized_input = re.sub(r"[\s']", '', raw)
 
     if has_digits:
-        normalized_input = re.sub(r'\s', '', raw)
         norm_db_expr = _norm_db_pinyin_no_spaces(PinyinReading.pinyin_numeric)
     else:
-        normalized_input = re.sub(r'\s', '', raw)
         norm_db_expr = _norm_db_pinyin_no_tones(PinyinReading.pinyin_numeric)
 
     stmt = (
         select(Character.simplified, PinyinReading.pinyin_numeric)
         .join(PinyinReading, PinyinReading.character_id == Character.id)
-        .where(norm_db_expr.like(f'{normalized_input}%'))
+        .where(norm_db_expr.like(_like_prefix(normalized_input), escape='\\'))
         .distinct()
     )
     rows = session.exec(stmt).all()
@@ -218,10 +235,9 @@ def pinyin_search(session: Session, pinyin_input: str) -> List[str]:
             seen.add(simplified)
             if not pinyin_num:
                 continue
-            if has_digits:
-                db_norm = pinyin_num.replace(' ', '').lower()
-            else:
-                db_norm = re.sub(r'[\s0-9]', '', pinyin_num.lower())
+            db_norm = pinyin_num.replace(' ', '').lower().replace('u:', 'v')
+            if not has_digits:
+                db_norm = re.sub(r'[0-9]', '', db_norm)
 
             if db_norm == normalized_input:
                 score = 100.0
