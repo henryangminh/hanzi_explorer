@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { isAxiosError } from 'axios'
 import { useAuthStore } from '@/store/auth.store'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
@@ -24,8 +25,8 @@ export function LoginPage() {
       } else {
         navigate('/dashboard', { replace: true })
       }
-    } catch {
-      setError(t('auth.loginError'))
+    } catch (err) {
+      setError(t(isAxiosError(err) && err.response?.status === 403 ? 'auth.accountDisabled' : 'auth.loginError'))
     }
   }
 

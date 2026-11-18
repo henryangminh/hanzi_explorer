@@ -24,11 +24,11 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Redirect to login on 401
+// Redirect to login on 401 — except a failed login itself, whose error the login page shows
 api.interceptors.response.use(
   (res) => res,
   (error) => {
-    if (error.response?.status === 401) handleUnauthorized()
+    if (error.response?.status === 401 && error.config?.url !== '/auth/login') handleUnauthorized()
     return Promise.reject(error)
   }
 )

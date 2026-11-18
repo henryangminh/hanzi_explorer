@@ -21,6 +21,7 @@ export default {
       password: 'Password',
       loginButton: 'Sign in',
       loginError: 'Incorrect username or password',
+      accountDisabled: 'This account has been disabled, please contact an administrator',
       loggingIn: 'Signing in...',
     },
     settings: {

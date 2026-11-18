@@ -23,6 +23,7 @@ export default {
       password: 'Mật khẩu',
       loginButton: 'Đăng nhập',
       loginError: 'Sai tên đăng nhập hoặc mật khẩu',
+      accountDisabled: 'Tài khoản đã bị khoá, hãy liên hệ quản trị viên',
       loggingIn: 'Đang đăng nhập...',
     },
     // settings

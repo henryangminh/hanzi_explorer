@@ -16,6 +16,9 @@ def login(body: LoginRequest, session: DbSession):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
         )
+    # Checked after the password, so a locked account is only revealed to its owner
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is disabled")
     token = create_access_token(subject=str(user.id))
     return TokenResponse(access_token=token)
 

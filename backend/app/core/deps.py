@@ -25,7 +25,7 @@ def get_current_user(
         raise credentials_exception
 
     user = session.get(User, int(user_id))
-    if user is None or user.is_deleted:
+    if user is None or user.is_deleted or not user.is_active:
         raise credentials_exception
     return user
 
