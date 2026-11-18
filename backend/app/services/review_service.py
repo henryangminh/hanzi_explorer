@@ -1,11 +1,9 @@
-import json
 from datetime import date as Date, timedelta
 
 from sqlmodel import Session, select
 
 from app.models.flashcard import UserFlashcard
 from app.models.review import ReviewItem
-from app.models.wotd import WOTDHistory
 from app.schemas.flashcard import FlashcardCardResponse
 from app.services.flashcard_service import build_cards
 
@@ -67,14 +65,11 @@ def get_due_cards(session: Session, user_id: int, date: str) -> list[FlashcardCa
     return build_cards(session, list(chars), {})
 
 
-def backfill_from_wotd(session: Session, today: str) -> None:
-    """Words of past days already marked "not learned" are due for review today."""
-    marked = {(fc.user_id, fc.char) for fc in session.exec(
-        select(UserFlashcard).where(UserFlashcard.status == "not_learned")
-    ).all()}
-    pending = set()
-    for record in session.exec(select(WOTDHistory)).all():
-        pending |= {(record.user_id, ch) for ch in json.loads(record.chars_json) if (record.user_id, ch) in marked}
-    for user_id, char in pending:
-        session.add(ReviewItem(user_id=user_id, char=char, interval_days=INTERVALS[0], due_date=today))
+def backfill_not_learned(session: Session, today: str) -> None:
+    """Words marked "not learned" without a review schedule (marked before every ✗ was reviewed) are due today."""
+    scheduled = set(session.exec(select(ReviewItem.user_id, ReviewItem.char)).all())
+    marked = session.exec(select(UserFlashcard).where(UserFlashcard.status == "not_learned")).all()
+    for fc in marked:
+        if (fc.user_id, fc.char) not in scheduled:
+            session.add(ReviewItem(user_id=fc.user_id, char=fc.char, interval_days=INTERVALS[0], due_date=today))
     session.commit()

@@ -18,7 +18,8 @@ export function Navbar() {
     <header className="sticky top-0 z-40 w-full border-b border-[var(--color-border)] bg-[var(--color-bg-surface)]">
       <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
         <Link to={user?.is_admin ? '/admin/dashboard' : '/dashboard'} className="flex items-center gap-2 shrink-0" onClick={closeMobileMenu}>
-          <span className="font-cjk text-xl font-bold text-[var(--color-primary)]">漢</span>
+          {/* The logo as a mask, so it takes the theme's primary color (lighter in dark mode) */}
+          <span aria-hidden className="h-6 w-[27px] bg-[var(--color-primary)] [mask:url(/logo.png)_center/contain_no-repeat]" />
           <span className="hidden sm:block text-sm font-semibold text-[var(--color-text)]">Hanzi Explorer</span>
         </Link>
 

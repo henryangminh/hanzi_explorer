@@ -3,7 +3,7 @@ import { Bookmark, ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { FlashcardStatusButtons } from '@/components/ui/FlashcardStatusButtons'
 import type { FlashcardStatus } from '@/types'
-import { SpeakButtons } from './SpeakButtons'
+import { SpeakButton } from './SpeakButton'
 
 const ICON_BUTTON = 'p-1 rounded text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] transition-colors'
 const ICON_SIZE = 18
@@ -34,7 +34,7 @@ export function EntryActions({ char, status, showStatus, collapsed, onStatus, on
         {collapsed ? <ChevronDown size={ICON_SIZE} /> : <ChevronUp size={ICON_SIZE} />}
       </button>
       {showStatus && <FlashcardStatusButtons status={status} size="sm" onClick={onStatus} />}
-      <SpeakButtons text={char} iconSize={ICON_SIZE} buttonClass={cn(ICON_BUTTON, 'hover:text-[var(--color-primary)]')} />
+      <SpeakButton text={char} iconSize={ICON_SIZE} buttonClass={cn(ICON_BUTTON, 'hover:text-[var(--color-primary)]')} />
     </div>
   )
 }

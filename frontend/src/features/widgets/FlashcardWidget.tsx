@@ -43,10 +43,10 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
   const review = useReview(isWotd, studyDays.markToday)
 
   function handleStatusChange(char: string, status: FlashcardStatus | null) {
-    saveStatus(char, status)
+    const saved = saveStatus(char, status)
     if (!isWotd) return
     if (status) studyDays.markToday()
-    review.trackWotdStatus(char, status)
+    saved.then(review.refresh)  // marking a due word ✓ takes it out of today's review
   }
 
   async function loadTodaysWords() {
@@ -107,7 +107,8 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
 
         {!loading && !isWotd && (
           <div className="border-t border-[var(--color-border)] pt-2">
-            <p className="text-xs text-[var(--color-text-muted)] text-center">
+            {/* Same row height as the words-of-the-day footer (review button), so widgets line up */}
+            <p className="min-h-7 flex items-center justify-center text-xs text-[var(--color-text-muted)]">
               {countdown ? t('dashboard.refreshIn', { time: countdown }) : ''}
             </p>
           </div>
@@ -115,8 +116,8 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
 
         {!loading && isWotd && (
           <div className="border-t border-[var(--color-border)] pt-2 flex flex-col gap-0">
-            {review.cards.length > 0 && <ReviewButton count={review.cards.length} onClick={() => setReviewOpen(true)} />}
             <WotdDatePicker
+              leading={review.cards.length > 0 && <ReviewButton count={review.cards.length} onClick={() => setReviewOpen(true)} />}
               wotdDates={history.dates}
               studiedDates={studyDays.dates}
               viewDate={history.viewDate}

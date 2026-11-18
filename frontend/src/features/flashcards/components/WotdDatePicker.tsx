@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/cn'
@@ -15,10 +15,12 @@ interface WotdDatePickerProps {
   onBackToToday: () => void
   /** Horizontal padding of the toggle rows. */
   rowPaddingClass?: string
+  /** Shown left of the date toggle, on the same row (the toggle takes the remaining width). */
+  leading?: ReactNode
 }
 
 /** "Words of the day" date toggle: shows the viewed date and expands into a calendar of past days. */
-export function WotdDatePicker({ wotdDates, studiedDates, viewDate, onSelectDate, onBackToToday, rowPaddingClass = 'px-0.5' }: WotdDatePickerProps) {
+export function WotdDatePicker({ wotdDates, studiedDates, viewDate, onSelectDate, onBackToToday, rowPaddingClass = 'px-0.5', leading }: WotdDatePickerProps) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const calendar = useCalendarMonth()
@@ -26,18 +28,21 @@ export function WotdDatePicker({ wotdDates, studiedDates, viewDate, onSelectDate
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className={cn('flex items-center justify-between w-full text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors', rowPaddingClass)}
-      >
-        <span>
-          {viewDate !== null
-            ? t('dashboard.viewingDate', { date: formatDateShort(viewDate) })
-            : formatDateShort(today)}
-        </span>
-        <ChevronRight size={13} className={cn('transition-transform duration-200', expanded && 'rotate-90')} />
-      </button>
+      <div className="min-h-7 flex items-center gap-2">
+        {leading}
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className={cn('flex-1 min-w-0 flex items-center justify-between text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors', rowPaddingClass)}
+        >
+          <span>
+            {viewDate !== null
+              ? t('dashboard.viewingDate', { date: formatDateShort(viewDate) })
+              : formatDateShort(today)}
+          </span>
+          <ChevronRight size={13} className={cn('transition-transform duration-200', expanded && 'rotate-90')} />
+        </button>
+      </div>
 
       {viewDate !== null && (
         <button

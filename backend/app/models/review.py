@@ -4,7 +4,7 @@ from sqlmodel import Field, SQLModel
 
 
 class ReviewItem(SQLModel, table=True):
-    """A words-of-the-day word the user didn't know, scheduled for spaced review."""
+    """A word the user marked "not learned", scheduled for spaced review."""
     __tablename__ = "review_items"
     __table_args__ = (UniqueConstraint("user_id", "char", name="uq_review_user_char"),)
 

@@ -58,6 +58,7 @@ export function AdminNotebooksPage() {
           title={t('notebooks.globalSection')}
           notebooks={globalNotebooks}
           emptyText={t('notebooks.empty')}
+          collapsible={false}
           onOpen={setOpenNotebook}
           onEdit={setEditingNotebook}
           canEdit={canEdit}
@@ -68,6 +69,7 @@ export function AdminNotebooksPage() {
         <NotebookEntriesModal
           notebook={openNotebook}
           canEdit
+          showStatus={false}
           onClose={() => setOpenNotebook(null)}
           onDeleted={() => notebooks.remove(openNotebook.id)}
           onEdit={() => setEditingNotebook(openNotebook)}

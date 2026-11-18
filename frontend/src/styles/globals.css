@@ -176,6 +176,11 @@
 
 html { font-size: 18px; }
 
+/* Tailwind 4 leaves buttons with the default arrow; in the base layer so cursor-* utilities still win */
+@layer base {
+  button:not(:disabled), [role="button"]:not([aria-disabled="true"]) { cursor: pointer; }
+}
+
 body {
   margin: 0;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;

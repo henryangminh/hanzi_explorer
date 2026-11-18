@@ -13,6 +13,8 @@ interface NotebookSectionProps {
   emptyText?: string
   /** Always show the expand chevron (otherwise only when there is more than fits collapsed). */
   alwaysShowToggle?: boolean
+  /** Collapse to two rows until expanded (off: always show every notebook). */
+  collapsible?: boolean
   onOpen: (nb: NotebookResponse) => void
   /** Edit button on the cards the user may edit. */
   onEdit?: (nb: NotebookResponse) => void
@@ -20,20 +22,21 @@ interface NotebookSectionProps {
 }
 
 /** A titled grid of notebook cards, collapsed to two rows until expanded. */
-export function NotebookSection({ title, notebooks, emptyText, alwaysShowToggle = false, onOpen, onEdit, canEdit }: NotebookSectionProps) {
+export function NotebookSection({ title, notebooks, emptyText, alwaysShowToggle = false, collapsible = true, onOpen, onEdit, canEdit }: NotebookSectionProps) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
-  const visible = expanded ? notebooks : notebooks.slice(0, COLLAPSED_COUNT)
+  const visible = expanded || !collapsible ? notebooks : notebooks.slice(0, COLLAPSED_COUNT)
 
   return (
     <section className="flex flex-col gap-3">
       <button
-        title={`${t('common.expand')} / ${t('common.collapse')}`}
+        title={collapsible ? `${t('common.expand')} / ${t('common.collapse')}` : undefined}
+        disabled={!collapsible}
         onClick={() => setExpanded((v) => !v)}
-        className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider hover:text-[var(--color-text)] transition-colors w-fit"
+        className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider enabled:hover:text-[var(--color-text)] transition-colors w-fit"
       >
         {title} ({notebooks.length})
-        {(alwaysShowToggle || notebooks.length > COLLAPSED_COUNT) && (
+        {collapsible && (alwaysShowToggle || notebooks.length > COLLAPSED_COUNT) && (
           <ChevronDown size={12} className={cn('transition-transform duration-200', expanded && 'rotate-180')} />
         )}
       </button>

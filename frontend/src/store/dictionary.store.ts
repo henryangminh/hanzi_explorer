@@ -19,6 +19,8 @@ interface DictionaryState {
   closeTab: (id: string) => void
   appendResultToTab: (tabId: string, entry: DictLiteResponse) => void
   finishTab: (tabId: string, error?: string) => void
+  /** Clear the query and close every tab (another account signs in). */
+  reset: () => void
 }
 
 export const useDictionaryStore = create<DictionaryState>()((set) => ({
@@ -27,6 +29,8 @@ export const useDictionaryStore = create<DictionaryState>()((set) => ({
   activeTabId: null,
 
   setQuery: (query) => set({ query }),
+
+  reset: () => set({ query: '', tabs: [], activeTabId: null }),
 
   addTab: (tab) =>
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id })),

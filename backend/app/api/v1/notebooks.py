@@ -14,7 +14,7 @@ from app.schemas.notebook import (
     NotebookResponse,
     NotebookUpdate,
 )
-from app.services import notebook_service
+from app.services import flashcard_service, notebook_service
 
 router = APIRouter(prefix="/notebooks", tags=["notebooks"])
 
@@ -42,6 +42,14 @@ def create_notebook(
             detail="Chỉ admin mới có thể tạo sổ tay chung",
         )
     return notebook_service.create_notebook(session, user.id, data)
+
+
+@router.get("/{notebook_id}/statuses")
+def get_notebook_statuses(notebook_id: int, session: DbSession, user: CurrentUser):
+    """The user's learned / not-learned status of every word in the notebook."""
+    nb = get_notebook_or_404(session, notebook_id)
+    assert_can_view(nb, user)
+    return flashcard_service.get_notebook_statuses(session, user.id, notebook_id)
 
 
 @router.get("/{notebook_id}/entries/preview")

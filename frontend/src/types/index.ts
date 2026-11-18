@@ -220,6 +220,19 @@ export interface FlashcardEntry {
 
 export type FlashcardStatusMap = Record<string, FlashcardStatus | null>
 
+// ── Reader ────────────────────────────────────────────────
+
+/** A piece of a pasted text: a dictionary word, or what lies between words (punctuation, Latin…). */
+export interface ReaderToken {
+  /** As written in the text */
+  text: string
+  /** Simplified dictionary word; null when not a word */
+  word: string | null
+  /** Reading in context, e.g. "yín háng" */
+  pinyin: string | null
+  status: FlashcardStatus | null
+}
+
 // ── Search History ────────────────────────────────────────
 
 export interface SearchHistoryItem {

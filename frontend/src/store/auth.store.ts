@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { User } from '@/types'
 import { authApi } from '@/api/authApi'
+import { resetSessionStores } from './resetSessionStores'
 
 interface AuthState {
   user: User | null
@@ -21,6 +22,7 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (username, password) => {
         set({ isLoading: true })
+        resetSessionStores()
         try {
           const { access_token } = await authApi.login(username, password)
           localStorage.setItem('access_token', access_token)
@@ -36,6 +38,7 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         localStorage.removeItem('access_token')
+        resetSessionStores()
         set({ user: null, token: null })
       },
 

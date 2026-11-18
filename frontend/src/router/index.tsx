@@ -11,6 +11,7 @@ import { ProfilePage } from '@/features/auth/ProfilePage'
 import { NotebooksPage } from '@/features/notebooks/NotebooksPage'
 import { MyNotesPage } from '@/features/my-notes/MyNotesPage'
 import { FlashcardsPage } from '@/features/flashcards/FlashcardsPage'
+import { ReaderPage } from '@/features/reader/ReaderPage'
 import { AdminRoute } from './AdminRoute'
 import { UserRoute } from './UserRoute'
 import { AdminLayout } from '@/components/layout/AdminLayout'
@@ -41,6 +42,7 @@ export const router = createBrowserRouter([
           { path: 'flashcards', element: <FlashcardsPage /> },
           { path: 'radicals', element: <RadicalsPage /> },
           { path: 'dictionary', element: <DictionaryPage /> },
+          { path: 'reader', element: <ReaderPage /> },
           { path: 'notebooks', element: <NotebooksPage /> },
           { path: 'my-notes', element: <MyNotesPage /> },
         ],

@@ -62,7 +62,8 @@ interface EntryCardProps {
   removable: boolean
   removing: boolean
   onSelect: () => void
-  onStatusChange: (status: FlashcardStatus | null) => void
+  /** Omitted: no learned / not learned buttons. */
+  onStatusChange?: (status: FlashcardStatus | null) => void
   onRemove: () => void
 }
 
@@ -75,7 +76,7 @@ export function EntryCard({ entry, status, removable, removing, onSelect, onStat
   function handleStatus(clicked: FlashcardStatus, e: React.MouseEvent) {
     e.stopPropagation()
     trigger(e, cardRef.current, STATUS_RIPPLE_COLOR[clicked])
-    onStatusChange(toggleStatus(status, clicked))
+    onStatusChange?.(toggleStatus(status, clicked))
   }
 
   return (
@@ -91,7 +92,7 @@ export function EntryCard({ entry, status, removable, removing, onSelect, onStat
       <div className="flex items-start justify-between gap-1.5">
         <EntryHeadword entry={entry} />
         <div className="flex items-center gap-1 shrink-0 mt-0.5" onClick={stopClick}>
-          <FlashcardStatusButtons status={status} size="xs" onClick={handleStatus} />
+          {onStatusChange && <FlashcardStatusButtons status={status} size="xs" onClick={handleStatus} />}
           {removable && (
             <button
               onClick={onRemove}

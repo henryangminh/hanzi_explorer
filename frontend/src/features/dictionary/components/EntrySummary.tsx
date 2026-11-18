@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/cn'
 import { ColorizedHanzi, ColorizedPinyin } from '@/lib/pinyinColor'
 import type { DictLiteResponse } from '@/types'
+import { HanVietLine } from '@/features/char-detail/components/HanVietLine'
 import type { EntryPreview } from '../entryPreview'
 import { EntryTags } from './EntryTags'
 
@@ -43,14 +44,7 @@ export function EntrySummary({ entry, preview, showTags }: { entry: DictLiteResp
               )}
             </span>
           )}
-          {preview.pinyin && entry.sino_vn?.length > 0 && (
-            <p className="mt-0.5 text-[var(--color-text-muted)] cursor-text">
-              <span title={t('dictionary.hanVietTitle')} className="inline-block mr-1.5 align-[1px] text-[10px] leading-snug font-semibold px-1 rounded border border-[var(--color-border-md)]">
-                {t('dictionary.hanVietTag')}
-              </span>
-              {entry.sino_vn.join(', ')}
-            </p>
-          )}
+          {preview.pinyin && <HanVietLine readings={entry.sino_vn} className="mt-0.5" />}
           {showTags && <EntryTags entry={entry} />}
           {preview.meaning && (
             <p className="text-[var(--color-text-muted)] truncate mt-0.5 cursor-text">{preview.meaning}</p>

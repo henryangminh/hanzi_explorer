@@ -7,6 +7,7 @@ import type { DictionaryResponse } from '@/types'
 import { CedictSection } from './components/CedictSection'
 import { CharHeading } from './components/CharHeading'
 import { CvdictSection } from './components/CvdictSection'
+import { HanVietLine } from './components/HanVietLine'
 import { LoadingLine } from '@/components/ui/LoadingLine'
 import { RadicalInfo } from './components/RadicalInfo'
 import { TagList } from './components/TagList'
@@ -50,7 +51,12 @@ export function CharDetailPanel({ char, initialEntry, showHeading = true, showNo
 
   return (
     <div className="flex flex-col gap-4">
-      {showHeading && <CharHeading char={entry.char} traditional={heading.traditional} pinyin={heading.pinyin} />}
+      {showHeading && (
+        <div className="flex flex-col gap-1.5 select-text">
+          <CharHeading char={entry.char} traditional={heading.traditional} pinyin={heading.pinyin} />
+          <HanVietLine readings={entry.sino_vn} className="text-sm" />
+        </div>
+      )}
       <TagList tags={entry.hsk_tags ?? []} />
       {firstBilingual && <RadicalInfo radical={firstBilingual.radical} strokeCount={firstBilingual.stroke_count} />}
 

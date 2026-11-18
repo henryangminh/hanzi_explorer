@@ -34,7 +34,8 @@ export function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Header */}
         <div className="text-center mb-8">
-          <span className="font-cjk text-5xl text-[var(--color-primary)]">漢</span>
+          {/* The logo as a mask, so it takes the theme's primary color (lighter in dark mode) */}
+          <span aria-hidden className="mx-auto block h-14 w-16 bg-[var(--color-primary)] [mask:url(/logo.png)_center/contain_no-repeat]" />
           <h1 className="mt-3 text-xl font-semibold text-[var(--color-text)]">
             Hanzi Explorer
           </h1>

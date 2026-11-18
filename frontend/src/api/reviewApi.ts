@@ -1,7 +1,7 @@
 import api from '@/lib/axios'
 import type { FlashcardEntry } from '@/types'
 
-/** Spaced review of the words-of-the-day words marked "not learned". Dates are local YYYY-MM-DD. */
+/** Spaced review of the words marked "not learned". Dates are local YYYY-MM-DD. */
 export const reviewApi = {
   due: async (date: string): Promise<FlashcardEntry[]> => {
     const { data } = await api.get<FlashcardEntry[]>('/review/due', { params: { date } })

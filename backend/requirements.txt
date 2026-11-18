@@ -9,3 +9,4 @@ python-dotenv==1.0.1
 beautifulsoup4
 pydantic-settings==2.3.0
 hanzipy==1.0.4
+pypinyin==0.55.0

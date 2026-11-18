@@ -1,6 +1,8 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
 import type { FlashcardEntry, FlashcardStatus } from '@/types'
+import { useAuthStore } from './auth.store'
+import { setStorageUser, userScopedStorage } from './userScopedStorage'
 
 export type IntervalUnit = 'minutes' | 'hours' | 'days'
 export type RepeatMode = 'random' | 'repeat_unlearned' | 'unlearned_only' | 'no_repeat'
@@ -89,6 +91,7 @@ export const useFlashcardStore = create<FlashcardState>()(
     }),
     {
       name: 'flashcard-storage',
+      storage: createJSONStorage(() => userScopedStorage),
       version: 1,
       // v1: cards carry every reading (`readings`) — drop cached cards so widgets reload them
       migrate: (persisted, version) => {
@@ -101,3 +104,13 @@ export const useFlashcardStore = create<FlashcardState>()(
     }
   )
 )
+
+/** Widgets belong to an account: put the previous account's away and load the new one's. */
+useAuthStore.subscribe((state, prev) => {
+  const id = state.user?.id ?? null
+  if (id === (prev.user?.id ?? null)) return
+  setStorageUser(null)  // so clearing doesn't overwrite anyone's saved widgets
+  useFlashcardStore.setState({ widgets: [] })
+  setStorageUser(id)
+  if (id !== null) useFlashcardStore.persist.rehydrate()
+})

@@ -17,19 +17,28 @@ interface UIState {
   // My Notes
   expandedNote: UserNoteResponse | null
   setExpandedNote: (n: UserNoteResponse | null) => void
+
+  /** Close everything (another account signs in). */
+  reset: () => void
+}
+
+const INITIAL = {
+  openNotebook: null,
+  selectedNotebookChar: null,
+  selectedRadical: null,
+  selectedRadicalChar: null,
+  expandedNote: null,
 }
 
 export const useUIStore = create<UIState>((set) => ({
-  openNotebook: null,
+  ...INITIAL,
+  reset: () => set(INITIAL),
+
   setOpenNotebook: (nb) => set({ openNotebook: nb }),
-  selectedNotebookChar: null,
   setSelectedNotebookChar: (char) => set({ selectedNotebookChar: char }),
 
-  selectedRadical: null,
   setSelectedRadical: (r) => set({ selectedRadical: r }),
-  selectedRadicalChar: null,
   setSelectedRadicalChar: (char) => set({ selectedRadicalChar: char }),
 
-  expandedNote: null,
   setExpandedNote: (n) => set({ expandedNote: n }),
 }))

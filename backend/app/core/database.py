@@ -42,16 +42,22 @@ def init_db() -> None:
     existing = set(inspect(engine).get_table_names())
     SQLModel.metadata.create_all(engine, tables=app_tables)
     _backfill_new_tables(existing)
+    _schedule_unreviewed()
 
 
 def _backfill_new_tables(existing: set[str]) -> None:
     """Seed tables added after users already had data — once, when the table is first created."""
-    from app.services import review_service, study_day_service
+    from app.services import study_day_service
     with Session(engine) as session:
         if "study_days" not in existing:
             study_day_service.backfill_from_wotd(session)
-        if "review_items" not in existing:
-            review_service.backfill_from_wotd(session, date.today().isoformat())
+
+
+def _schedule_unreviewed() -> None:
+    """Every word marked "not learned" is under review; catches words marked before that was the rule."""
+    from app.services import review_service
+    with Session(engine) as session:
+        review_service.backfill_not_learned(session, date.today().isoformat())
 
 
 def get_session():

@@ -23,6 +23,12 @@ export const flashcardsApi = {
     return data
   },
 
+  /** Statuses of every word in a notebook (no size limit, unlike `statuses`). */
+  notebookStatuses: async (notebookId: number): Promise<FlashcardStatusMap> => {
+    const { data } = await api.get<FlashcardStatusMap>(`/notebooks/${notebookId}/statuses`)
+    return data
+  },
+
   setStatus: async (char: string, status: FlashcardStatus | null): Promise<void> => {
     await api.put('/notebooks/flashcards/status', { char, status })
   },

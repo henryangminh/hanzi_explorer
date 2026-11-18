@@ -5,12 +5,11 @@ import { toLocalDateStr } from '@/lib/date'
 import type { FlashcardEntry, FlashcardStatus } from '@/types'
 
 /**
- * Spaced review of words-of-the-day words marked "not learned": the cards due today,
- * answering them, and keeping the schedule in step with the words-of-the-day marks.
+ * Spaced review of the words marked "not learned": the cards due today and answering them.
  * `onStudied` runs when a review card is answered.
  */
 export function useReview(active: boolean, onStudied: () => void) {
-  const saveStatus = useSaveFlashcardStatus()
+  const saveStatus = useSaveFlashcardStatus({ scheduleReview: false })
   const [cards, setCards] = useState<FlashcardEntry[]>([])
 
   function refresh() {
@@ -30,11 +29,5 @@ export function useReview(active: boolean, onStudied: () => void) {
     reviewApi.answer(char, toLocalDateStr(), status === 'learned').catch(() => {})
   }
 
-  /** A words-of-the-day card was marked: "not learned" schedules it for review, anything else takes it out. */
-  function trackWotdStatus(char: string, status: FlashcardStatus | null) {
-    const request = status === 'not_learned' ? reviewApi.schedule(char, toLocalDateStr()) : reviewApi.unschedule(char)
-    request.then(refresh).catch(() => {})
-  }
-
-  return { cards, refresh, answer, trackWotdStatus }
+  return { cards, refresh, answer }
 }

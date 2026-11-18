@@ -5,6 +5,7 @@ import { MAX_WIDGETS, useFlashcardStore, type FlashcardWidgetConfig } from '@/st
 import { FlashcardWidget } from '@/features/widgets/FlashcardWidget'
 import { FlashcardWidgetSettings, type WidgetSettingsValues } from '@/features/widgets/FlashcardWidgetSettings'
 import { AddWidgetButton } from './components/AddWidgetButton'
+import { HomeSearch } from './components/HomeSearch'
 import { MobileWidgetCarousel } from './components/MobileWidgetCarousel'
 import { useDashboardNotebooks } from './hooks/useDashboardNotebooks'
 
@@ -43,6 +44,8 @@ export function HomePage() {
       <h1 className="text-2xl font-bold text-[var(--color-text)]">
         {t('dashboard.greeting', { name: user?.display_name ?? '' })}
       </h1>
+
+      <HomeSearch />
 
       <MobileWidgetCarousel widgets={sortedWidgets} notebooks={notebooks} canAdd={canAdd} onAdd={() => setAddingWidget(true)} />
 

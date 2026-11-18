@@ -13,7 +13,8 @@ interface EntryGridProps {
   removable: boolean
   removingChar: string | null
   onSelect: (char: string) => void
-  onStatusChange: (char: string, status: FlashcardStatus | null) => void
+  /** Omitted: no learned / not learned buttons. */
+  onStatusChange?: (char: string, status: FlashcardStatus | null) => void
   onRemove: (entry: NotebookEntryPreview) => void
 }
 
@@ -25,6 +26,8 @@ export function EntryGrid({ entries, statuses, scrollElement, removable, removin
     return result
   }, [entries])
 
+  // The virtualizer is only used inside this component, so the compiler skipping it is harmless
+  // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: scrollElement,
@@ -50,7 +53,7 @@ export function EntryGrid({ entries, statuses, scrollElement, removable, removin
               removable={removable}
               removing={removingChar === entry.char}
               onSelect={() => onSelect(entry.char)}
-              onStatusChange={(status) => onStatusChange(entry.char, status)}
+              onStatusChange={onStatusChange && ((status) => onStatusChange(entry.char, status))}
               onRemove={() => onRemove(entry)}
             />
           ))}

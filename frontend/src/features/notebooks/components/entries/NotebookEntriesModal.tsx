@@ -27,22 +27,30 @@ interface NotebookEntriesModalProps {
   onCountsChanged?: (learned: number, notLearned: number) => void
   /** Show a form to add many words at once; called after words were added. */
   onEntriesAdded?: () => void
+  /** The learned / not learned marks and filter (off when managing a notebook rather than studying it). */
+  showStatus?: boolean
 }
 
 /** A notebook's words: filterable, sortable grid, or one word in detail. */
-export function NotebookEntriesModal({ notebook, canEdit, onClose, onDeleted, onEdit, onCountsChanged, onEntriesAdded }: NotebookEntriesModalProps) {
+export function NotebookEntriesModal({ notebook, canEdit, onClose, onDeleted, onEdit, onCountsChanged, onEntriesAdded, showStatus = true }: NotebookEntriesModalProps) {
   const { t } = useTranslation()
   const [sort, setSort] = useState<NotebookSortOrder>('updated_at_desc')
   const [filters, setFilters] = useState<Set<EntryFilter>>(new Set(ALL_ENTRY_FILTERS))
   const [entriesVersion, setEntriesVersion] = useState(0)
   const { entries, loading, removeLocal } = useNotebookEntries(notebook.id, sort, entriesVersion)
-  const { statuses, setStatus } = useEntryStatuses(entries, loading, onCountsChanged)
+  const { statuses, setStatus } = useEntryStatuses(notebook.id, entries, loading, onCountsChanged, showStatus)
   const { selectedNotebookChar: selectedChar, setSelectedNotebookChar: setSelectedChar } = useUIStore()
   const [removingChar, setRemovingChar] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [saveModalChar, setSaveModalChar] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  // The selected word belongs to this notebook: the next one opens on its word list
+  function close() {
+    setSelectedChar(null)
+    onClose()
+  }
 
   const visibleEntries = useMemo(() => filterEntries(entries, statuses, filters), [entries, statuses, filters])
 
@@ -62,7 +70,7 @@ export function NotebookEntriesModal({ notebook, canEdit, onClose, onDeleted, on
     try {
       await notebooksApi.remove(notebook.id)
       onDeleted()
-      onClose()
+      close()
     } finally {
       setDeleting(false)
     }
@@ -88,7 +96,7 @@ export function NotebookEntriesModal({ notebook, canEdit, onClose, onDeleted, on
           removable={canEdit}
           removingChar={removingChar}
           onSelect={(char) => setSelectedChar(selectedChar === char ? null : char)}
-          onStatusChange={setStatus}
+          onStatusChange={showStatus ? setStatus : undefined}
           onRemove={removeEntry}
         />
         {loading && <StreamingIndicator label={t('common.streamingLoading')} className="py-3" />}
@@ -97,16 +105,17 @@ export function NotebookEntriesModal({ notebook, canEdit, onClose, onDeleted, on
   }
 
   return (
-    <ModalOverlay onClose={onClose} className="bg-black/60 p-4">
+    <ModalOverlay onClose={close} className="bg-black/60 p-4">
       <div className="w-full max-w-3xl h-full max-h-[90vh] bg-[var(--color-bg-surface)] rounded-2xl shadow-2xl flex flex-col">
         <EntriesHeader
           notebook={notebook}
-          shownCount={visibleEntries.length}
-          totalCount={entries.length}
+          // While streaming, the notebook's own total — not a count ticking up as batches arrive
+          shownCount={loading ? notebook.entry_count : visibleEntries.length}
+          totalCount={loading ? notebook.entry_count : entries.length}
           statuses={statuses}
           onEdit={canEdit ? onEdit : undefined}
           onDelete={canEdit ? () => setConfirmDelete(true) : undefined}
-          onClose={onClose}
+          onClose={close}
         />
 
         {!selectedChar && onEntriesAdded && (
@@ -119,7 +128,7 @@ export function NotebookEntriesModal({ notebook, canEdit, onClose, onDeleted, on
         {!selectedChar && (
           <div className="px-6 py-2 shrink-0 flex items-center gap-2">
             <Select value={sort} options={sortOptions(t)} onChange={setSort} />
-            <EntryStatusFilter selected={filters} onChange={setFilters} />
+            {showStatus && <EntryStatusFilter selected={filters} onChange={setFilters} />}
           </div>
         )}
 

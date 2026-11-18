@@ -9,6 +9,7 @@ from app.models.character import Character
 from app.core.cedict_utils import clean_meaning
 from app.core.pinyin import numeric_to_diacritic
 from app.models.flashcard import UserFlashcard
+from app.models.notebook import NotebookEntry
 from app.schemas.flashcard import FlashcardCardResponse, FlashcardReading, FlashcardStatusUpdate
 from app.services.character_lookup import batch_brief_lookup, get_brief_source_ids
 from app.services.sino_vn_service import compose_from_db
@@ -192,6 +193,17 @@ def get_flashcard_statuses(
         .where(UserFlashcard.char.in_(chars))
     ).all()
     return {r.char: r.status for r in rows}
+
+
+def get_notebook_statuses(session: Session, user_id: int, notebook_id: int) -> dict[str, str | None]:
+    """The user's statuses of every word in a notebook (words never marked are left out)."""
+    rows = session.exec(
+        select(UserFlashcard.char, UserFlashcard.status)
+        .join(NotebookEntry, NotebookEntry.char == UserFlashcard.char)
+        .where(NotebookEntry.notebook_id == notebook_id)
+        .where(UserFlashcard.user_id == user_id)
+    ).all()
+    return {char: status for char, status in rows}
 
 
 def update_flashcard_status(

@@ -8,7 +8,7 @@ export function ReviewButton({ count, onClick }: { count: number; onClick: () =>
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center justify-center gap-1.5 w-full py-1.5 mb-2 rounded-lg text-xs font-medium text-[var(--color-primary)] bg-[var(--color-bg-subtle)] hover:bg-[var(--color-border)] transition-colors"
+      className="flex items-center justify-center gap-1.5 flex-1 min-w-0 whitespace-nowrap py-1.5 rounded-lg text-xs font-medium text-[var(--color-primary)] bg-[var(--color-bg-subtle)] hover:bg-[var(--color-border)] transition-colors"
     >
       <RotateCcw size={12} />
       {t('dashboard.review', { count })}
