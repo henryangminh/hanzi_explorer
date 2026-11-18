@@ -15,6 +15,7 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlmodel import Session, SQLModel  # noqa: E402
 
+from app.core import login_throttle  # noqa: E402
 from app.core.database import engine  # noqa: E402
 from app.core.security import create_access_token, hash_password  # noqa: E402
 from app.models import DICTIONARY_SCHEMA  # noqa: E402
@@ -23,6 +24,11 @@ from app.models.user import User  # noqa: E402
 from main import app  # noqa: E402
 
 _APP_TABLES = [t for t in SQLModel.metadata.sorted_tables if t.schema != DICTIONARY_SCHEMA]
+
+
+@pytest.fixture(autouse=True)
+def _forget_failed_logins():
+    login_throttle.reset()
 
 
 @pytest.fixture

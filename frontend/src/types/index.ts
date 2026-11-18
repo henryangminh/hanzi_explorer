@@ -231,7 +231,12 @@ export interface ReaderToken {
   /** Reading in context, e.g. "yín háng" */
   pinyin: string | null
   status: FlashcardStatus | null
+  /** HSK level per standard; 7 stands for 7-9. Missing when the word isn't in that list. */
+  hsk: Partial<Record<HskStandard, number>>
 }
+
+/** HSK 2.0, HSK 3.0 (2021) and its newest revision */
+export type HskStandard = 'old' | 'new' | 'newest'
 
 // ── Search History ────────────────────────────────────────
 

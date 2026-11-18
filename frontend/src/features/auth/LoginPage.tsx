@@ -26,7 +26,13 @@ export function LoginPage() {
         navigate('/dashboard', { replace: true })
       }
     } catch (err) {
-      setError(t(isAxiosError(err) && err.response?.status === 403 ? 'auth.accountDisabled' : 'auth.loginError'))
+      const response = isAxiosError(err) ? err.response : undefined
+      if (response?.status === 429) {
+        const seconds = Number(response.headers['retry-after']) || 60
+        setError(t('auth.tooManyAttempts', { minutes: Math.ceil(seconds / 60) }))
+      } else {
+        setError(t(response?.status === 403 ? 'auth.accountDisabled' : 'auth.loginError'))
+      }
     }
   }
 

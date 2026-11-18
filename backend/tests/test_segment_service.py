@@ -1,4 +1,4 @@
-from app.services.segment_service import segment_run
+from app.services.segment_service import parse_hsk_levels, segment_run
 
 RANKS = {"我们": 50, "明天": 469, "银行": 769, "天去": 900_000, "我": 5, "们": 60, "明": 300,
          "天": 100, "去": 40, "银": 2000, "行": 80, "研究": 600, "研究生": 3000, "生命": 900, "命": 1500,
@@ -21,3 +21,9 @@ def test_unknown_characters_stand_alone():
 def test_never_builds_a_word_longer_than_the_limit():
     ranks = {"一二三四五六七八九": 1}  # 9 chars: longer than MAX_WORD_LENGTH
     assert segment_run("一二三四五六七八九", ranks) == list("一二三四五六七八九")
+
+
+def test_hsk_levels_per_standard():
+    assert parse_hsk_levels(["newest-3", "new-4", "old-3"]) == {"newest": 3, "new": 4, "old": 3}
+    assert parse_hsk_levels(["new-7"]) == {"new": 7}
+    assert parse_hsk_levels([]) == {}

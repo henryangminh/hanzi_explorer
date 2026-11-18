@@ -1,4 +1,6 @@
+import { useReaderPrefsStore } from '@/store/readerPrefs.store'
 import type { ReaderToken } from '@/types'
+import { isAboveHskLevel } from '../isAboveHskLevel'
 import { ReaderWord } from './ReaderWord'
 
 interface Props {
@@ -10,11 +12,13 @@ interface Props {
 
 /** The analysed text: words are clickable, everything else (punctuation, Latin text) is plain. */
 export function ReadingText({ tokens, showPinyin, selected, onSelect }: Props) {
+  const { hskStandard, hskLevel } = useReaderPrefsStore()
   return (
     <div className="font-cjk text-2xl leading-[2.4] whitespace-pre-wrap break-words text-[var(--color-text)] bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-xl px-4 py-3">
       {tokens.map((token, i) =>
         token.word ? (
-          <ReaderWord key={i} token={token} showPinyin={showPinyin} selected={selected === i} onClick={() => onSelect(i)} />
+          <ReaderWord key={i} token={token} showPinyin={showPinyin} selected={selected === i}
+            highlighted={isAboveHskLevel(token, hskStandard, hskLevel)} onClick={() => onSelect(i)} />
         ) : (
           <span key={i}>{token.text}</span>
         ),

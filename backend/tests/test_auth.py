@@ -1,5 +1,8 @@
+import time
+
 import pytest
 
+from app.core import login_throttle
 from tests.conftest import auth
 
 
@@ -61,3 +64,34 @@ def test_unlocked_user_can_log_in_again(client, session, make_user):
     session.add(u)
     session.commit()
     assert client.post("/api/v1/auth/login", json={"username": "henry", "password": "secret-pass"}).status_code == 200
+
+
+def _login(client, password):
+    return client.post("/api/v1/auth/login", json={"username": "henry", "password": password})
+
+
+def test_too_many_wrong_passwords_lock_out_even_the_right_one(client, make_user):
+    make_user("henry", "secret-pass")
+    for _ in range(5):
+        assert _login(client, "wrong").status_code == 401
+    r = _login(client, "secret-pass")
+    assert r.status_code == 429 and int(r.headers["Retry-After"]) > 0
+
+
+def test_a_successful_login_forgets_earlier_failures(client, make_user):
+    make_user("henry", "secret-pass")
+    for _ in range(4):
+        _login(client, "wrong")
+    assert _login(client, "secret-pass").status_code == 200
+    for _ in range(4):
+        assert _login(client, "wrong").status_code == 401
+    assert _login(client, "secret-pass").status_code == 200
+
+
+def test_the_lockout_ends_after_the_window(client, make_user, monkeypatch):
+    make_user("henry", "secret-pass")
+    for _ in range(5):
+        _login(client, "wrong")
+    later = time.monotonic() + login_throttle.WINDOW_SECONDS + 1
+    monkeypatch.setattr(login_throttle.time, "monotonic", lambda: later)
+    assert _login(client, "secret-pass").status_code == 200

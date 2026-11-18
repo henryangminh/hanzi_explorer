@@ -6,11 +6,13 @@ interface Props {
   token: ReaderToken
   showPinyin: boolean
   selected: boolean
+  /** Above the chosen HSK level */
+  highlighted: boolean
   onClick: () => void
 }
 
-/** One word of the text with its pinyin above; learned words fade, "not learned" ones are underlined. */
-export function ReaderWord({ token, showPinyin, selected, onClick }: Props) {
+/** One word of the text with its pinyin above; learned words fade, "not learned" ones are underlined, hard ones highlighted. */
+export function ReaderWord({ token, showPinyin, selected, highlighted, onClick }: Props) {
   const ref = useRef<HTMLButtonElement>(null)
 
   // Below lg the word panel is a bottom sheet: bring the chosen word up above it
@@ -27,6 +29,7 @@ export function ReaderWord({ token, showPinyin, selected, onClick }: Props) {
       onClick={onClick}
       className={cn(
         'scroll-mt-20 rounded px-0.5 mx-px transition-colors hover:bg-[var(--color-bg-subtle)]',
+        highlighted && 'bg-[var(--color-highlight)] hover:brightness-95',
         selected && 'bg-[var(--color-bg-subtle)] ring-1 ring-[var(--color-primary)]',
         token.status === 'learned' && 'text-[var(--color-text-muted)]',
         token.status === 'not_learned' && 'underline decoration-red-400 decoration-2 underline-offset-4',

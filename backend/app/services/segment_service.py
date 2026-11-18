@@ -1,9 +1,12 @@
 """Splitting a Chinese text into dictionary words, for the reading assistant."""
+import json
 import re
 
 from pypinyin import Style, pinyin
+from sqlalchemy import column, table
 from sqlmodel import Session, select
 
+from app.models import DICTIONARY_SCHEMA
 from app.models.character import Character
 from app.models.flashcard import UserFlashcard
 from app.schemas.reader import ReaderToken
@@ -13,6 +16,7 @@ MAX_WORD_LENGTH = 8
 _NO_FREQ = 999_999   # words without a frequency rank count as rare
 _CHUNK = 500         # stay well below SQLite's bound-parameter limit
 _CHINESE_RUN = re.compile(r'[一-鿿㐀-䶿]+')
+_HSK_WORDS = table("hsk_words", column("simplified"), column("levels"), schema=DICTIONARY_SCHEMA)
 
 
 def segment_run(run: str, ranks: dict[str, int]) -> list[str]:
@@ -76,8 +80,29 @@ def _statuses(session: Session, user_id: int, words: list[str]) -> dict[str, str
     return statuses
 
 
+def parse_hsk_levels(levels: list[str]) -> dict[str, int]:
+    """["newest-3", "new-4", "old-3"] → {"newest": 3, "new": 4, "old": 3}, the lowest level per standard."""
+    parsed: dict[str, int] = {}
+    for item in levels:
+        standard, _, level = item.rpartition('-')
+        if standard and level.isdigit():
+            parsed[standard] = min(int(level), parsed.get(standard, int(level)))
+    return parsed
+
+
+def _hsk_levels(session: Session, words: list[str]) -> dict[str, dict[str, int]]:
+    found: dict[str, dict[str, int]] = {}
+    for k in range(0, len(words), _CHUNK):
+        for simp, levels in session.exec(
+            select(_HSK_WORDS.c.simplified, _HSK_WORDS.c.levels)
+            .where(_HSK_WORDS.c.simplified.in_(words[k:k + _CHUNK]))
+        ).all():
+            found[simp] = parse_hsk_levels(json.loads(levels))
+    return found
+
+
 def segment_text(session: Session, user_id: int, text: str) -> list[ReaderToken]:
-    """The text as tokens: dictionary words (with pinyin and the user's status) and everything in between."""
+    """The text as tokens: dictionary words (with pinyin, the user's status and HSK levels) and everything in between."""
     simplified = traditional_to_simplified(session, text)  # same length: converted char by char
     runs = [m for m in _CHINESE_RUN.finditer(simplified)]
     ranks = _dictionary_words(session, [m.group() for m in runs])
@@ -102,8 +127,11 @@ def segment_text(session: Session, user_id: int, text: str) -> list[ReaderToken]
     if pos < len(text):
         tokens.append(ReaderToken(text=text[pos:]))
 
-    statuses = _statuses(session, user_id, list({t.word for t in tokens if t.word}))
+    words = list({t.word for t in tokens if t.word})
+    statuses = _statuses(session, user_id, words)
+    hsk = _hsk_levels(session, words)
     for t in tokens:
         if t.word:
             t.status = statuses.get(t.word)
+            t.hsk = hsk.get(t.word, {})
     return tokens

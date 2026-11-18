@@ -22,6 +22,7 @@ export default {
       loginButton: 'Sign in',
       loginError: 'Incorrect username or password',
       accountDisabled: 'This account has been disabled, please contact an administrator',
+      tooManyAttempts: 'Too many failed attempts, please try again in {{minutes}} min',
       loggingIn: 'Signing in...',
     },
     settings: {
@@ -100,6 +101,12 @@ export default {
       hidePinyin: 'Hide pinyin',
       legendLearned: 'Faded: learned',
       legendNotLearned: 'Red underline: not learned',
+      hskHighlight: 'Highlight words above',
+      hskOff: 'Off',
+      hskOld: 'HSK 2.0',
+      hskNew: 'HSK 3.0',
+      hskNewest: 'HSK 3.0 newest',
+      legendAboveLevel: 'Yellow: above the chosen level',
     },
     handwriting: {
       title: 'Handwriting Recognition',

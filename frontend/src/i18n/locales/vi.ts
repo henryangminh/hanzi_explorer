@@ -24,6 +24,7 @@ export default {
       loginButton: 'Đăng nhập',
       loginError: 'Sai tên đăng nhập hoặc mật khẩu',
       accountDisabled: 'Tài khoản đã bị khoá, hãy liên hệ quản trị viên',
+      tooManyAttempts: 'Nhập sai quá nhiều lần, hãy thử lại sau {{minutes}} phút',
       loggingIn: 'Đang đăng nhập...',
     },
     // settings
@@ -106,6 +107,12 @@ export default {
       hidePinyin: 'Ẩn pinyin',
       legendLearned: 'Mờ: đã thuộc',
       legendNotLearned: 'Gạch đỏ: chưa thuộc',
+      hskHighlight: 'Tô sáng từ trên cấp',
+      hskOff: 'Tắt',
+      hskOld: 'HSK 2.0',
+      hskNew: 'HSK 3.0',
+      hskNewest: 'HSK 3.0 mới nhất',
+      legendAboveLevel: 'Nền vàng: trên cấp đã chọn',
     },
     handwriting: {
       title: 'Nhận diện chữ viết tay',
