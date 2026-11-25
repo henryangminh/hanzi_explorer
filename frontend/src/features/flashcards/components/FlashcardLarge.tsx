@@ -87,7 +87,7 @@ export function FlashcardLarge({ cards, initialIndex = 0, onClose, onStatusChang
       {/* Card row: [prev] [card] [next] grouped so the arrows sit beside the card edges. */}
       <div className="flex-1 flex items-center justify-center min-h-0" {...swipe}>
         <div className="flex items-center gap-3 h-full">
-          <button type="button" onClick={() => navigate('prev')} className={cn('flex-none', NAV_BUTTON)}>
+          <button type="button" onClick={() => navigate('prev')} aria-label={t('common.previous')} className={cn('flex-none', NAV_BUTTON)}>
             <ChevronLeft size={28} />
           </button>
 
@@ -125,7 +125,7 @@ export function FlashcardLarge({ cards, initialIndex = 0, onClose, onStatusChang
               </button>
             </div>
             <div className="flex-1 flex items-center">
-              <button type="button" onClick={() => navigate('next')} className={NAV_BUTTON}>
+              <button type="button" onClick={() => navigate('next')} aria-label={t('common.next')} className={NAV_BUTTON}>
                 <ChevronRight size={28} />
               </button>
             </div>

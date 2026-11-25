@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { User } from '@/types'
 import { authApi } from '@/api/authApi'
 import { resetSessionStores } from './resetSessionStores'
+import { useSettingsStore } from './settings.store'
 
 interface AuthState {
   user: User | null
@@ -28,6 +29,10 @@ export const useAuthStore = create<AuthState>()(
           localStorage.setItem('access_token', access_token)
           set({ token: access_token })
           const user = await authApi.me()
+          // The account's saved theme and language follow it to every browser
+          const settings = useSettingsStore.getState()
+          settings.setTheme(user.theme)
+          settings.setLanguage(user.language)
           set({ user, isLoading: false })
           return user
         } catch (err) {

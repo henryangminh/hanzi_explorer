@@ -11,6 +11,7 @@ import { NotebookSourceField } from './components/settings/NotebookSourceField'
 import { RepeatModeField } from './components/settings/RepeatModeField'
 import { SettingsModalShell } from './components/settings/SettingsModalShell'
 import { settingsErrorKey } from './validateSettings'
+import { widgetName } from './widgetName'
 
 export interface WidgetSettingsValues {
   name: string
@@ -31,7 +32,7 @@ interface Props {
 
 export function FlashcardWidgetSettings({ widget, allNotebooks, onSave, onDelete, onClose }: Props) {
   const { t } = useTranslation()
-  const [name, setName] = useState(widget.name)
+  const [name, setName] = useState(widgetName(widget))
   const [intervalValue, setIntervalValue] = useState(widget.intervalValue)
   const [intervalUnit, setIntervalUnit] = useState<IntervalUnit>(widget.intervalUnit)
   const [count, setCount] = useState(widget.count)

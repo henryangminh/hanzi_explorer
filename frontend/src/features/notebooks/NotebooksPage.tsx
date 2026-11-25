@@ -38,7 +38,7 @@ export function NotebooksPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-[var(--color-text)]">{t('notebooks.title')}</h1>
         <div className="flex items-center gap-2">
           <Select align="right" value={notebooks.sort} options={sortOptions(t)} onChange={notebooks.setSort} />

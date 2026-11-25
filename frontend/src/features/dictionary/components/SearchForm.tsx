@@ -69,11 +69,12 @@ export function SearchForm({ query, onQueryChange, onSearch, searching }: Search
             </button>
           )}
         </div>
-        <div className="flex gap-2 max-sm:justify-between">
-          <Button type="button" variant="outline" className="w-1/4 sm:w-auto justify-center sm:flex-none" onClick={handwriting.toggle} title={t('handwriting.title')}>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" className="justify-center flex-none" onClick={handwriting.toggle} title={t('handwriting.title')} aria-label={t('handwriting.title')}>
             <PenLine size={16} />
           </Button>
-          <Button type="submit" className="w-1/4 sm:w-auto justify-center sm:flex-none" isLoading={searching}>
+          {/* Fills the row on mobile, so the label never wraps or gets cut */}
+          <Button type="submit" className="flex-1 sm:flex-none justify-center whitespace-nowrap" isLoading={searching}>
             {t('dictionary.title')}
           </Button>
         </div>

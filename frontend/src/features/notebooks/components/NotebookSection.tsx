@@ -28,7 +28,7 @@ export function NotebookSection({ title, notebooks, emptyText, alwaysShowToggle 
   const visible = expanded || !collapsible ? notebooks : notebooks.slice(0, COLLAPSED_COUNT)
 
   return (
-    <section className="flex flex-col gap-3">
+    <section className="@container flex flex-col gap-3">
       <button
         title={collapsible ? `${t('common.expand')} / ${t('common.collapse')}` : undefined}
         disabled={!collapsible}
@@ -43,7 +43,8 @@ export function NotebookSection({ title, notebooks, emptyText, alwaysShowToggle 
       {notebooks.length === 0 && emptyText ? (
         <p className="text-sm text-[var(--color-text-muted)]">{emptyText}</p>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        // Columns follow the section's own width: narrower beside the admin sidebar
+        <div className="grid grid-cols-2 @lg:grid-cols-4 gap-2">
           {visible.map((nb) => (
             <NotebookCard key={nb.id} notebook={nb} onClick={() => onOpen(nb)} onEdit={onEdit && canEdit?.(nb) ? () => onEdit(nb) : undefined} />
           ))}

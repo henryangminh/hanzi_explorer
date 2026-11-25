@@ -31,7 +31,7 @@ function OptionButton({
 }
 
 export function SettingsPage() {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const { theme, language, setTheme, setLanguage, syncToServer } = useSettingsStore()
   const navigate = useNavigate()
 
@@ -42,7 +42,6 @@ export function SettingsPage() {
 
   const handleLanguage = (l: 'vi' | 'en') => {
     setLanguage(l)
-    i18n.changeLanguage(l)
     syncToServer()
   }
 

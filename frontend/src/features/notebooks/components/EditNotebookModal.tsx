@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { isAxiosError } from 'axios'
 import { notebooksApi } from '@/api/notebooksApi'
 import { Button } from '@/components/ui/Button'
 import { ModalOverlay } from '@/components/ui/ModalOverlay'
@@ -17,6 +18,7 @@ export function EditNotebookModal({ notebook, onClose, onSaved }: EditNotebookMo
   const [name, setName] = useState(notebook.name)
   const [description, setDescription] = useState(notebook.description ?? '')
   const [saving, setSaving] = useState(false)
+  const [nameTaken, setNameTaken] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -25,6 +27,9 @@ export function EditNotebookModal({ notebook, onClose, onSaved }: EditNotebookMo
     try {
       onSaved(await notebooksApi.update(notebook.id, { name: name.trim(), description: description.trim() || null }))
       onClose()
+    } catch (err) {
+      if (!isAxiosError(err) || err.response?.status !== 409) throw err
+      setNameTaken(true)
     } finally {
       setSaving(false)
     }
@@ -38,7 +43,8 @@ export function EditNotebookModal({ notebook, onClose, onSaved }: EditNotebookMo
           idPrefix="edit-nb"
           name={name}
           description={description}
-          onNameChange={setName}
+          nameError={nameTaken ? t('notebooks.nameTaken') : undefined}
+          onNameChange={(v) => { setName(v); setNameTaken(false) }}
           onDescriptionChange={setDescription}
         />
         <div className="flex gap-2 justify-end">

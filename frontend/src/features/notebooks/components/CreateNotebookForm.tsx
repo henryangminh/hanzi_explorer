@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { isAxiosError } from 'axios'
 import { notebooksApi } from '@/api/notebooksApi'
 import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui/Button'
@@ -25,6 +26,7 @@ export function CreateNotebookForm({ allowGlobal = false, defaultType = 'private
   const [description, setDescription] = useState('')
   const [type, setType] = useState<NotebookType>(defaultType)
   const [creating, setCreating] = useState(false)
+  const [nameTaken, setNameTaken] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,6 +34,9 @@ export function CreateNotebookForm({ allowGlobal = false, defaultType = 'private
     setCreating(true)
     try {
       onCreated(await notebooksApi.create({ name: name.trim(), description: description.trim() || null, type }))
+    } catch (err) {
+      if (!isAxiosError(err) || err.response?.status !== 409) throw err
+      setNameTaken(true)
     } finally {
       setCreating(false)
     }
@@ -43,7 +48,8 @@ export function CreateNotebookForm({ allowGlobal = false, defaultType = 'private
         idPrefix={idPrefix}
         name={name}
         description={description}
-        onNameChange={setName}
+        nameError={nameTaken ? t('notebooks.nameTaken') : undefined}
+        onNameChange={(v) => { setName(v); setNameTaken(false) }}
         onDescriptionChange={setDescription}
       />
       {allowGlobal && (

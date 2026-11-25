@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useSwipe } from '@/hooks/useSwipe'
@@ -26,11 +27,12 @@ interface CardStackProps {
 
 /** The widget's carousel: one card on top of a stack, with arrows and swipe. */
 export function CardStack({ cards, carousel, onStatusChange }: CardStackProps) {
+  const { t } = useTranslation()
   const swipe = useSwipe(carousel.go)
   const card = cards[carousel.safeIndex]
   return (
     <div className="flex items-center gap-0.5">
-      <button type="button" onClick={() => carousel.go('prev')} className={ARROW}>
+      <button type="button" onClick={() => carousel.go('prev')} aria-label={t('common.previous')} className={ARROW}>
         <ChevronLeft size={20} />
       </button>
 
@@ -48,7 +50,7 @@ export function CardStack({ cards, carousel, onStatusChange }: CardStackProps) {
         </div>
       </div>
 
-      <button type="button" onClick={() => carousel.go('next')} className={ARROW}>
+      <button type="button" onClick={() => carousel.go('next')} aria-label={t('common.next')} className={ARROW}>
         <ChevronRight size={20} />
       </button>
     </div>

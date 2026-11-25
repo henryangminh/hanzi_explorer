@@ -16,7 +16,7 @@ export interface MiniCalendarProps {
 }
 
 export function MiniCalendar({ year, month, wotdDates, studiedDates, viewDate, today, onSelect, onPrevMonth, onNextMonth }: MiniCalendarProps) {
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
   const isVi = i18n.language === 'vi'
 
   const monthLabel = new Date(year, month).toLocaleDateString(
@@ -47,6 +47,7 @@ export function MiniCalendar({ year, month, wotdDates, studiedDates, viewDate, t
         <button
           type="button"
           onClick={onPrevMonth}
+          aria-label={t('common.previous')}
           className="p-0.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors"
         >
           <ChevronLeft size={13} />
@@ -55,6 +56,7 @@ export function MiniCalendar({ year, month, wotdDates, studiedDates, viewDate, t
         <button
           type="button"
           onClick={onNextMonth}
+          aria-label={t('common.next')}
           className="p-0.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-subtle)] transition-colors"
         >
           <ChevronRight size={13} />

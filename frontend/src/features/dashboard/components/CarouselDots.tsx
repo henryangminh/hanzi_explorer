@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
@@ -5,9 +6,10 @@ const ARROW = 'p-1 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--c
 
 /** Prev / dots / next controls under a carousel. */
 export function CarouselDots({ count, active, onNav }: { count: number; active: number; onNav: (dir: 'prev' | 'next') => void }) {
+  const { t } = useTranslation()
   return (
     <div className="flex items-center justify-center gap-3">
-      <button type="button" onClick={() => onNav('prev')} className={ARROW}>
+      <button type="button" onClick={() => onNav('prev')} aria-label={t('common.previous')} className={ARROW}>
         <ChevronLeft size={18} />
       </button>
       <div className="flex gap-2">
@@ -18,7 +20,7 @@ export function CarouselDots({ count, active, onNav }: { count: number; active: 
           />
         ))}
       </div>
-      <button type="button" onClick={() => onNav('next')} className={ARROW}>
+      <button type="button" onClick={() => onNav('next')} aria-label={t('common.next')} className={ARROW}>
         <ChevronRight size={18} />
       </button>
     </div>

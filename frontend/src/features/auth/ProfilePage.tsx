@@ -21,7 +21,7 @@ export function ProfilePage() {
     setSaving(true)
     setError('')
     try {
-      await usersApi.updateProfile(displayName)
+      await usersApi.updateProfile(displayName.trim())
       await fetchMe()
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
@@ -56,9 +56,10 @@ export function ProfilePage() {
             label={t('profile.displayName')}
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
+            maxLength={100}
           />
           {error && <p className="text-sm text-red-500">{error}</p>}
-          <Button type="submit" isLoading={saving}>
+          <Button type="submit" isLoading={saving} disabled={!displayName.trim()}>
             {saved ? t('profile.saved') : t('profile.save')}
           </Button>
         </form>

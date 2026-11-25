@@ -10,7 +10,7 @@ export function UserActions({ pathname }: { pathname: string }) {
   const { user, logout } = useAuthStore()
   const { theme, setTheme } = useSettingsStore()
   return (
-    <div className="hidden sm:flex items-center gap-1">
+    <div className="hidden lg:flex items-center gap-1">
       <NavIconButton label={theme === 'light' ? t('nav.darkMode') : t('nav.lightMode')} onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
         {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
       </NavIconButton>

@@ -15,16 +15,17 @@ interface ReportCardProps {
 export function ReportCard({ report, onResolve, onReopen, onDelete }: ReportCardProps) {
   const { t } = useTranslation()
   return (
-    <li className="flex gap-4 p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-surface)]">
+    <li className="flex flex-wrap gap-x-4 gap-y-2 p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-surface)]">
       <span className="font-cjk text-2xl text-[var(--color-text)] shrink-0 select-text">{report.char}</span>
-      <div className="flex-1 min-w-0 flex flex-col gap-1">
+      {/* Wide enough to read; on a phone the actions wrap below instead of squeezing it */}
+      <div className="flex-1 min-w-48 flex flex-col gap-1">
         <p className="text-sm text-[var(--color-text)] whitespace-pre-wrap break-words select-text">{report.message}</p>
         <p className="text-xs text-[var(--color-text-muted)]">
           {report.reporter} · {formatDateTime(report.created_at)}
           {report.resolved_at && ` · ${t('admin.reports.resolvedAt', { date: formatDateTime(report.resolved_at) })}`}
         </p>
       </div>
-      <div className="flex items-start gap-1 shrink-0">
+      <div className="flex items-start gap-1 shrink-0 ml-auto">
         {report.status === 'open' ? (
           <Button size="sm" variant="outline" onClick={onResolve}><Check size={14} />{t('admin.reports.resolve')}</Button>
         ) : (

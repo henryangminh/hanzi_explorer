@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { usersApi } from '@/api/usersApi'
+import i18n from '@/i18n'
 
 interface SettingsState {
   theme: 'light' | 'dark'
@@ -21,7 +22,10 @@ export const useSettingsStore = create<SettingsState>()(
         document.documentElement.classList.toggle('dark', theme === 'dark')
       },
 
-      setLanguage: (language) => set({ language }),
+      setLanguage: (language) => {
+        set({ language })
+        i18n.changeLanguage(language)
+      },
 
       syncToServer: async () => {
         const { theme, language } = get()
@@ -33,6 +37,7 @@ export const useSettingsStore = create<SettingsState>()(
       onRehydrateStorage: () => (state) => {
         if (state) {
           document.documentElement.classList.toggle('dark', state.theme === 'dark')
+          i18n.changeLanguage(state.language)
         }
       },
     }

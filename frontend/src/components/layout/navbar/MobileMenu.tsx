@@ -29,7 +29,7 @@ export function MobileMenu({ pathname, onClose }: { pathname: string; onClose: (
   const { theme, setTheme } = useSettingsStore()
 
   return (
-    <div className="sm:hidden border-t border-[var(--color-border)] bg-[var(--color-bg-surface)] px-4 py-3 flex flex-col gap-1">
+    <div className="lg:hidden border-t border-[var(--color-border)] bg-[var(--color-bg-surface)] px-4 py-3 flex flex-col gap-1">
       {!user?.is_admin && NAV_ITEMS.map(({ to, labelKey, icon: Icon }) => (
         <MenuLink key={to} to={to} active={pathname.startsWith(to)} onClick={onClose}>
           <Icon size={16} />

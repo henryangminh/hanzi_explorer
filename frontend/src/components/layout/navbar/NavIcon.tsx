@@ -30,7 +30,7 @@ interface NavIconProps {
 export function NavIconButton({ label, active, onClick, children }: NavIconProps & { onClick: () => void }) {
   return (
     <div className="relative group">
-      <button onClick={onClick} className={iconClass(active)}>{children}</button>
+      <button onClick={onClick} aria-label={label} className={iconClass(active)}>{children}</button>
       <HoverLabel text={label} />
     </div>
   )
@@ -40,7 +40,7 @@ export function NavIconButton({ label, active, onClick, children }: NavIconProps
 export function NavIconLink({ to, label, active, children }: NavIconProps & { to: string }) {
   return (
     <div className="relative group">
-      <Link to={to} className={cn(iconClass(active), 'block')}>{children}</Link>
+      <Link to={to} aria-label={label} className={cn(iconClass(active), 'block')}>{children}</Link>
       <HoverLabel text={label} />
     </div>
   )

@@ -1,18 +1,20 @@
 import { useTranslation } from 'react-i18next'
 import { Input } from '@/components/ui/Input'
 
+export const MAX_NOTEBOOK_NAME = 100
 export const MAX_NOTEBOOK_DESCRIPTION = 150
 
 interface NotebookFieldsProps {
   idPrefix: string
   name: string
   description: string
+  nameError?: string
   onNameChange: (v: string) => void
   onDescriptionChange: (v: string) => void
 }
 
 /** Name + optional description inputs of a notebook form. */
-export function NotebookFields({ idPrefix, name, description, onNameChange, onDescriptionChange }: NotebookFieldsProps) {
+export function NotebookFields({ idPrefix, name, description, nameError, onNameChange, onDescriptionChange }: NotebookFieldsProps) {
   const { t } = useTranslation()
   return (
     <>
@@ -21,6 +23,8 @@ export function NotebookFields({ idPrefix, name, description, onNameChange, onDe
         label={t('notebooks.nameLabel')}
         value={name}
         onChange={(e) => onNameChange(e.target.value)}
+        error={nameError}
+        maxLength={MAX_NOTEBOOK_NAME}
         placeholder={t('notebooks.namePlaceholder')}
         autoFocus
       />

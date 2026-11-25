@@ -90,11 +90,25 @@ def list_notebooks(
     return [_to_response(session, nb, user_id) for nb in all_notebooks]
 
 
+def _assert_name_free(session: Session, name: str, type: str, owner_id: int, exclude_id: int | None = None) -> None:
+    """A user's private notebooks have distinct names, and so do the global ones (ignoring case).
+    Raises ValueError if the name is taken."""
+    stmt = select(Notebook.name).where(Notebook.type == type)
+    if type == "private":
+        stmt = stmt.where(Notebook.owner_id == owner_id)
+    if exclude_id is not None:
+        stmt = stmt.where(Notebook.id != exclude_id)
+    if any(n.casefold() == name.casefold() for n in session.exec(stmt)):
+        raise ValueError(f"Đã có sổ tay tên {name}")
+
+
 def create_notebook(
     session: Session,
     user_id: int,
     data: NotebookCreate,
 ) -> NotebookResponse:
+    """Raises ValueError if the name is taken."""
+    _assert_name_free(session, data.name, data.type, user_id)
     nb = Notebook(
         name=data.name,
         description=data.description,
@@ -113,7 +127,9 @@ def update_notebook(
     data: NotebookUpdate,
     user_id: int,
 ) -> NotebookResponse:
+    """Raises ValueError if the new name is taken."""
     if data.name is not None:
+        _assert_name_free(session, data.name, nb.type, nb.owner_id, exclude_id=nb.id)
         nb.name = data.name
     if data.description is not None:
         nb.description = data.description

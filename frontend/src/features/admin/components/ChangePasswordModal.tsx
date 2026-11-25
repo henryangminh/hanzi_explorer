@@ -36,7 +36,7 @@ export function ChangePasswordModal({ user, onUpdate, onClose }: {
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div>
             <label className="block text-sm font-medium mb-1">{t('admin.users.newPassword')}</label>
-            <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} className={INPUT} />
+            <input required minLength={6} type="password" value={password} onChange={(e) => setPassword(e.target.value)} className={INPUT} />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">{t('admin.users.confirmNewPassword')}</label>

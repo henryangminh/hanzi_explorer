@@ -37,7 +37,9 @@ export default api
 
 /** The `detail` message of a FastAPI error response, if there is one. */
 export function getErrorDetail(err: unknown): string | undefined {
-  return axios.isAxiosError(err) ? err.response?.data?.detail : undefined
+  // A validation error (422) carries a list of field errors, not a message to show
+  const detail = axios.isAxiosError(err) ? err.response?.data?.detail : undefined
+  return typeof detail === 'string' ? detail : undefined
 }
 
 /** HTTP status of a failed request, if there is one. */

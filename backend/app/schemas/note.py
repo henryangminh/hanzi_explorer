@@ -1,5 +1,9 @@
-from typing import List, Optional
-from pydantic import BaseModel
+from typing import Annotated, List, Optional
+from pydantic import BaseModel, StringConstraints
+
+# Same limits as the note form
+NoteTitle = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)]
+NoteDetail = Annotated[str, StringConstraints(strip_whitespace=True, max_length=250)]
 
 
 class UserNoteResponse(BaseModel):
@@ -13,10 +17,10 @@ class UserNoteResponse(BaseModel):
 
 
 class NoteCreate(BaseModel):
-    title: str
-    detail: Optional[str] = None
+    title: NoteTitle
+    detail: Optional[NoteDetail] = None
 
 
 class NoteUpdate(BaseModel):
-    title: str
-    detail: Optional[str] = None
+    title: NoteTitle
+    detail: Optional[NoteDetail] = None

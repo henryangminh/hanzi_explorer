@@ -26,7 +26,7 @@ export function UserRow({ user, onUpdate, onDelete, onRestore, onChangePassword 
 
   const action = (tooltip: string, onClick: () => void, icon: React.ReactNode, className = 'hover:text-[var(--color-text)]') => (
     <Tooltip position="top" text={tooltip}>
-      <button onClick={onClick} className={`${className} outline-none`}>{icon}</button>
+      <button onClick={onClick} aria-label={tooltip} className={`${className} outline-none`}>{icon}</button>
     </Tooltip>
   )
 

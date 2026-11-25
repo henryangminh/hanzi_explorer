@@ -22,15 +22,15 @@ export function CreateUserForm({ onCreate }: { onCreate: (input: AdminUserCreate
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium mb-1">{t('admin.users.username')}</label>
-          <input required value={form.username} onChange={(e) => set('username', e.target.value)} className={INPUT} />
+          <input required maxLength={50} value={form.username} onChange={(e) => set('username', e.target.value)} className={INPUT} />
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">{t('admin.users.displayName')}</label>
-          <input required value={form.display_name} onChange={(e) => set('display_name', e.target.value)} className={INPUT} />
+          <input required maxLength={100} value={form.display_name} onChange={(e) => set('display_name', e.target.value)} className={INPUT} />
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">{t('admin.users.password')}</label>
-          <input required type="password" value={form.password} onChange={(e) => set('password', e.target.value)} className={INPUT} />
+          <input required minLength={6} type="password" value={form.password} onChange={(e) => set('password', e.target.value)} className={INPUT} />
         </div>
         <div className="flex items-center gap-4 mt-6">
           <label className="flex items-center gap-2 cursor-pointer">

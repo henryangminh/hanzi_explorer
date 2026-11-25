@@ -1,17 +1,21 @@
 from datetime import datetime
-from typing import Literal, Optional
-from pydantic import BaseModel
+from typing import Annotated, Literal, Optional
+from pydantic import BaseModel, StringConstraints
+
+# Same limits as the notebook form
+NotebookName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+NotebookDescription = Annotated[str, StringConstraints(strip_whitespace=True, max_length=150)]
 
 
 class NotebookCreate(BaseModel):
-    name: str
-    description: Optional[str] = None
+    name: NotebookName
+    description: Optional[NotebookDescription] = None
     type: Literal["global", "private"] = "private"
 
 
 class NotebookUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
+    name: Optional[NotebookName] = None
+    description: Optional[NotebookDescription] = None
     sort_order: Optional[int] = None
 
 

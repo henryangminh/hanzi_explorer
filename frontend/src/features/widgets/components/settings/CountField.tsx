@@ -11,7 +11,7 @@ export function CountField({ value, onChange }: { value: number; onChange: (v: n
         min={1}
         max={100}
         value={value}
-        onChange={(e) => onChange(Math.max(1, parseInt(e.target.value) || 1))}
+        onChange={(e) => onChange(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))}
         className={`w-full px-2 py-2 ${FIELD_INPUT} ${NO_SPINNER} text-center`}
       />
     </>

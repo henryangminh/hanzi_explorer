@@ -20,14 +20,15 @@ export function Navbar() {
         <Link to={user?.is_admin ? '/admin/dashboard' : '/dashboard'} className="flex items-center gap-2 shrink-0" onClick={closeMobileMenu}>
           {/* The logo as a mask, so it takes the theme's primary color (lighter in dark mode) */}
           <span aria-hidden className="h-6 w-[27px] bg-[var(--color-primary)] [mask:url(/logo.png)_center/contain_no-repeat]" />
-          <span className="hidden sm:block text-sm font-semibold text-[var(--color-text)]">Hanzi Explorer</span>
+          {/* Hidden where the full menu is shown but still tight (lg), so the English labels fit */}
+          <span className="hidden sm:block lg:hidden xl:block text-sm font-semibold text-[var(--color-text)]">Hanzi Explorer</span>
         </Link>
 
         {!user?.is_admin && <DesktopNav pathname={pathname} />}
         <UserActions pathname={pathname} />
 
         <button
-          className="sm:hidden p-2 rounded-lg text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text)] transition-colors"
+          className="lg:hidden p-2 rounded-lg text-[var(--color-text-muted)] hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text)] transition-colors"
           onClick={() => setMobileMenuOpen((open) => !open)}
           aria-label={t('nav.toggleMenu')}
         >

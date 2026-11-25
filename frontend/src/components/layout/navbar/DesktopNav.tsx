@@ -3,11 +3,11 @@ import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/cn'
 import { NAV_ITEMS } from './navItems'
 
-/** Section links in the bar (desktop). */
+/** Section links in the bar (desktop; below lg they don't fit, in English especially). */
 export function DesktopNav({ pathname }: { pathname: string }) {
   const { t } = useTranslation()
   return (
-    <nav className="hidden sm:flex items-center gap-1">
+    <nav className="hidden lg:flex items-center gap-1">
       {NAV_ITEMS.map(({ to, labelKey, icon: Icon }) => (
         <Link
           key={to}

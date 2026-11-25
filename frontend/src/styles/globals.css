@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* `dark:` utilities follow the app's theme (the .dark class), not the OS setting */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ── Brown color tokens ─────────────────────────────────── */
 :root {
   --brown-50:  #fdf8f6;

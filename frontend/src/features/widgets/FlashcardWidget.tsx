@@ -17,6 +17,7 @@ import { useReview } from './hooks/useReview'
 import { useStudyDays } from './hooks/useStudyDays'
 import { useWidgetCards } from './hooks/useWidgetCards'
 import { useWotdHistory } from './hooks/useWotdHistory'
+import { widgetName } from './widgetName'
 import { countStreak, longestStreak } from './streak'
 
 interface Props {
@@ -86,7 +87,7 @@ export function FlashcardWidget({ widget, allNotebooks }: Props) {
   return (
     <>
       <div className="bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-xl px-1 py-4 flex flex-col gap-3">
-        <WidgetHeader name={widget.name} streak={isWotd ? { days: countStreak(studyDays.dates), best: longestStreak(studyDays.dates) } : undefined} onExpand={() => setLargeOpen(true)} onOpenSettings={() => setSettingsOpen(true)} />
+        <WidgetHeader name={widgetName(widget)} streak={isWotd ? { days: countStreak(studyDays.dates), best: longestStreak(studyDays.dates) } : undefined} onExpand={() => setLargeOpen(true)} onOpenSettings={() => setSettingsOpen(true)} />
 
         {loading ? (
           <div className="flex items-center justify-center h-[240px]">

@@ -41,7 +41,10 @@ def create_notebook(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Chỉ admin mới có thể tạo sổ tay chung",
         )
-    return notebook_service.create_notebook(session, user.id, data)
+    try:
+        return notebook_service.create_notebook(session, user.id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
 
 @router.get("/{notebook_id}/statuses")
@@ -79,7 +82,10 @@ def update_notebook(
 ):
     nb = get_notebook_or_404(session, notebook_id)
     assert_can_edit(nb, user)
-    return notebook_service.update_notebook(session, nb, data, user.id)
+    try:
+        return notebook_service.update_notebook(session, nb, data, user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
 
 @router.delete("/{notebook_id}", status_code=status.HTTP_204_NO_CONTENT)
